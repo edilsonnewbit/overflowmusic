@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
+import { CACHE_EVENTS, cacheSetlistKey, getCache, setCache } from "./src/lib/cache";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-native";
 import { BottomTabs, type MobileTab } from "./src/components/BottomTabs";
@@ -58,6 +59,7 @@ export default function App() {
   const [loadingSetlist, setLoadingSetlist] = useState(false);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [eventsStatus, setEventsStatus] = useState("Carregue os eventos.");
+  const [isOffline, setIsOffline] = useState(false);
 
   const isLoggedIn = Boolean(user && accessToken);
 
@@ -140,6 +142,7 @@ export default function App() {
     setActiveEventId(null);
     setEventSetlist(null);
     setActiveTab("events");
+    setIsOffline(false);
     setStatusText("Sessão encerrada.");
   }
 
@@ -155,14 +158,26 @@ export default function App() {
   async function loadEventsList() {
     setLoadingEvents(true);
     setEventsStatus("Carregando eventos...");
+
+    const cached = await getCache<MusicEvent[]>(CACHE_EVENTS);
+    if (cached) {
+      setEvents(cached);
+    }
+
     try {
       const result = await fetchEvents();
-      setEvents(result.events);
-      setEventsStatus(
-        result.ok ? `${result.events.length} evento(s) encontrado(s).` : result.message ?? "Falha.",
-      );
+      if (result.ok) {
+        setEvents(result.events);
+        void setCache(CACHE_EVENTS, result.events);
+        setIsOffline(false);
+        setEventsStatus(`${result.events.length} evento(s) encontrado(s).`);
+      } else {
+        if (!cached) setEvents([]);
+        setEventsStatus(result.message ?? "Falha.");
+      }
     } catch {
-      setEventsStatus("Erro de rede ao carregar eventos.");
+      setIsOffline(true);
+      setEventsStatus(cached ? "Dados em cache (offline)." : "Sem conexão com o servidor.");
     } finally {
       setLoadingEvents(false);
     }
@@ -170,13 +185,20 @@ export default function App() {
 
   async function selectEvent(id: string) {
     setActiveEventId(id);
-    setEventSetlist(null);
     setLoadingSetlist(true);
+
+    const cached = await getCache<EventSetlist>(cacheSetlistKey(id));
+    setEventSetlist(cached ?? null);
+
     try {
       const result = await fetchEventSetlist(id);
-      setEventSetlist(result.setlist);
+      if (result.ok) {
+        setEventSetlist(result.setlist);
+        void setCache(cacheSetlistKey(id), result.setlist);
+        setIsOffline(false);
+      }
     } catch {
-      setEventSetlist(null);
+      setIsOffline(true);
     } finally {
       setLoadingSetlist(false);
     }
@@ -420,6 +442,13 @@ export default function App() {
           <Text style={styles.statusText}>{statusText}</Text>
         </View>
 
+        {isLoggedIn && isOffline && (
+          <View style={{ backgroundColor: "#7a3f00", padding: 8, borderRadius: 8, marginBottom: 8 }}>
+            <Text style={{ color: "#ffd4a0", fontSize: 12, textAlign: "center" }}>
+              ⚠ Modo offline — exibindo dados em cache
+            </Text>
+          </View>
+        )}
         {!isLoggedIn ? <LoginScreen onSubmit={login} /> : renderLoggedArea()}
       </ScrollView>
 

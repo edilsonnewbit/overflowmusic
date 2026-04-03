@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { fetchSongById, fetchSongs } from "../lib/api";
+import { CACHE_SONGS, getCache, setCache } from "../lib/cache";
 import { styles } from "../styles";
 import type { Song, SongImportResult, SongPreview, SongSection } from "../types";
 
@@ -78,6 +79,7 @@ function BrowseTab() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isStale, setIsStale] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Song | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -89,12 +91,24 @@ function BrowseTab() {
   async function loadSongs() {
     setLoading(true);
     setError(null);
+
+    const cached = await getCache<Song[]>(CACHE_SONGS);
+    if (cached) {
+      setSongs(cached);
+    }
+
     try {
       const result = await fetchSongs();
       if (!result.ok) throw new Error(result.message);
       setSongs(result.songs);
+      void setCache(CACHE_SONGS, result.songs);
+      setIsStale(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao carregar músicas.");
+      if (cached) {
+        setIsStale(true);
+      } else {
+        setError(e instanceof Error ? e.message : "Erro ao carregar músicas.");
+      }
     } finally {
       setLoading(false);
     }
@@ -147,6 +161,11 @@ function BrowseTab() {
           <ActivityIndicator color="#1ecad3" />
           <Text style={{ color: "#b3c6e0", marginTop: 8 }}>Carregando músicas...</Text>
         </View>
+      )}
+      {isStale && !loading && (
+        <Text style={{ color: "#f59e0b", marginHorizontal: 12, marginBottom: 4, fontSize: 12 }}>
+          ⚠ Dados em cache — sem conexão com o servidor
+        </Text>
       )}
       {error && <Text style={{ color: "#f87171", margin: 12 }}>{error}</Text>}
       {loadingDetail && (
