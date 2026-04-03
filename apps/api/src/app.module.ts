@@ -8,6 +8,8 @@ import { ChecklistTemplatesController } from "./checklist/checklist-templates.co
 import { ChecklistTemplatesService } from "./checklist/checklist-templates.service";
 import { EventsController } from "./events/events.controller";
 import { EventsService } from "./events/events.service";
+import { NotificationsController } from "./notifications/notifications.controller";
+import { NotificationsService } from "./notifications/notifications.service";
 import { PrismaModule } from "./prisma/prisma.module";
 import { SetlistController } from "./setlist/setlist.controller";
 import { SetlistService } from "./setlist/setlist.service";
@@ -20,11 +22,12 @@ import { SongsService } from "./songs/songs.service";
     AppController,
     AuthController,
     EventsController,
+    NotificationsController,
     SetlistController,
     SongsController,
     ChecklistTemplatesController,
     ChecklistRunsController,
   ],
-  providers: [AuthService, EventsService, SetlistService, SongsService, ChecklistTemplatesService, ChecklistRunsService],
+  providers: [AuthService, EventsService, NotificationsService, SetlistService, SongsService, ChecklistTemplatesService, ChecklistRunsService],
 })
 export class AppModule {}

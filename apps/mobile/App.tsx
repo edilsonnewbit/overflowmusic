@@ -1,8 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { CACHE_EVENTS, cacheSetlistKey, getCache, setCache } from "./src/lib/cache";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-native";
+import * as Notifications from "expo-notifications";
 import { BottomTabs, type MobileTab } from "./src/components/BottomTabs";
 import {
   authGoogle,
@@ -18,6 +19,7 @@ import {
   updateChecklistItem,
 } from "./src/lib/api";
 import { TOKEN_KEY } from "./src/lib/config";
+import { registerForPushNotificationsAsync } from "./src/lib/notifications";
 import { AccountScreen } from "./src/screens/AccountScreen";
 import { ChecklistScreen } from "./src/screens/ChecklistScreen";
 import { EventsScreen } from "./src/screens/EventsScreen";
@@ -63,10 +65,27 @@ export default function App() {
   const [isOffline, setIsOffline] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
 
+  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
+  const responseListener = useRef<Notifications.EventSubscription | null>(null);
+
   const isLoggedIn = Boolean(user && accessToken);
 
   useEffect(() => {
     void bootstrapSession();
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(() => {
+      // Notificação recebida em foreground — já exibida pelo handler global
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {
+      // Usuário tocou na notificação → navegar para eventos
+      setActiveTab("events");
+    });
+
+    return () => {
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
   }, []);
 
   async function bootstrapSession() {
@@ -82,6 +101,7 @@ export default function App() {
       setAccessToken(savedToken);
       setUser(me);
       setStatusText(`Sessão ativa: ${me.name}`);
+      void registerForPushNotificationsAsync(savedToken);
       await loadTemplates();
       await loadEventsList();
     } catch {
@@ -120,6 +140,7 @@ export default function App() {
         setAccessToken(body.accessToken);
         setUser(me);
         setStatusText(`Login aprovado: ${me.name}`);
+        void registerForPushNotificationsAsync(body.accessToken);
         await loadTemplates();
         await loadEventsList();
         return;
