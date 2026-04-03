@@ -1,0 +1,429 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { BottomTabs, type MobileTab } from "./src/components/BottomTabs";
+import {
+  authGoogle,
+  fetchChecklistTemplates,
+  fetchEventChecklist,
+  fetchEventSetlist,
+  fetchEvents,
+  fetchMe,
+  importSongTxt,
+  previewSongTxt,
+  reorderSetlist,
+  updateChecklistItem,
+} from "./src/lib/api";
+import { TOKEN_KEY } from "./src/lib/config";
+import { AccountScreen } from "./src/screens/AccountScreen";
+import { ChecklistScreen } from "./src/screens/ChecklistScreen";
+import { EventsScreen } from "./src/screens/EventsScreen";
+import { LoginScreen } from "./src/screens/LoginScreen";
+import { SongsScreen } from "./src/screens/SongsScreen";
+import { styles } from "./src/styles";
+import type {
+  AuthUser,
+  ChecklistRun,
+  ChecklistTemplate,
+  EventSetlist,
+  LoginPayload,
+  MusicEvent,
+  SetlistItem,
+  SongImportResult,
+  SongPreview,
+} from "./src/types";
+
+export default function App() {
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loadingSession, setLoadingSession] = useState(true);
+  const [statusText, setStatusText] = useState("Inicializando...");
+
+  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
+  const [eventId, setEventId] = useState("");
+  const [eventChecklist, setEventChecklist] = useState<ChecklistRun>(null);
+  const [loadingChecklist, setLoadingChecklist] = useState(false);
+  const [updatingChecklistItemId, setUpdatingChecklistItemId] = useState<string | null>(null);
+  const [songPreview, setSongPreview] = useState<SongPreview | null>(null);
+  const [songImportResult, setSongImportResult] = useState<SongImportResult | null>(null);
+  const [loadingSongPreview, setLoadingSongPreview] = useState(false);
+  const [loadingSongImport, setLoadingSongImport] = useState(false);
+  const [activeTab, setActiveTab] = useState<MobileTab>("events");
+
+  const [events, setEvents] = useState<MusicEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const [eventSetlist, setEventSetlist] = useState<EventSetlist>(null);
+  const [loadingSetlist, setLoadingSetlist] = useState(false);
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [eventsStatus, setEventsStatus] = useState("Carregue os eventos.");
+
+  const isLoggedIn = Boolean(user && accessToken);
+
+  useEffect(() => {
+    void bootstrapSession();
+  }, []);
+
+  async function bootstrapSession() {
+    setLoadingSession(true);
+    try {
+      const savedToken = await AsyncStorage.getItem(TOKEN_KEY);
+      if (!savedToken) {
+        setStatusText("Faça login para continuar.");
+        return;
+      }
+
+      const me = await fetchMe(savedToken);
+      setAccessToken(savedToken);
+      setUser(me);
+      setStatusText(`Sessão ativa: ${me.name}`);
+      await loadTemplates();
+      await loadEventsList();
+    } catch {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      setAccessToken(null);
+      setUser(null);
+      setStatusText("Sessão inválida. Faça login novamente.");
+    } finally {
+      setLoadingSession(false);
+    }
+  }
+
+  async function login(payload: LoginPayload) {
+    setStatusText("Autenticando...");
+
+    try {
+      const { ok, body } = await authGoogle(payload);
+      if (!ok) {
+        setStatusText(body.message || "Falha no login.");
+        return;
+      }
+
+      if (body.status === "PENDING_APPROVAL") {
+        setStatusText("Conta pendente de aprovação do administrador.");
+        return;
+      }
+
+      if (body.status === "REJECTED") {
+        setStatusText("Conta rejeitada. Contate um administrador.");
+        return;
+      }
+
+      if (body.status === "APPROVED" && typeof body.accessToken === "string") {
+        await AsyncStorage.setItem(TOKEN_KEY, body.accessToken);
+        const me = await fetchMe(body.accessToken);
+        setAccessToken(body.accessToken);
+        setUser(me);
+        setStatusText(`Login aprovado: ${me.name}`);
+        await loadTemplates();
+        await loadEventsList();
+        return;
+      }
+
+      setStatusText("Resposta de login inesperada.");
+    } catch {
+      setStatusText("Erro de rede no login.");
+    }
+  }
+
+  async function logout() {
+    await AsyncStorage.removeItem(TOKEN_KEY);
+    setAccessToken(null);
+    setUser(null);
+    setTemplates([]);
+    setEventId("");
+    setEventChecklist(null);
+    setSongPreview(null);
+    setSongImportResult(null);
+    setEvents([]);
+    setActiveEventId(null);
+    setEventSetlist(null);
+    setActiveTab("events");
+    setStatusText("Sessão encerrada.");
+  }
+
+  async function loadTemplates() {
+    try {
+      const nextTemplates = await fetchChecklistTemplates();
+      setTemplates(nextTemplates);
+    } catch {
+      setTemplates([]);
+    }
+  }
+
+  async function loadEventsList() {
+    setLoadingEvents(true);
+    setEventsStatus("Carregando eventos...");
+    try {
+      const result = await fetchEvents();
+      setEvents(result.events);
+      setEventsStatus(
+        result.ok ? `${result.events.length} evento(s) encontrado(s).` : result.message ?? "Falha.",
+      );
+    } catch {
+      setEventsStatus("Erro de rede ao carregar eventos.");
+    } finally {
+      setLoadingEvents(false);
+    }
+  }
+
+  async function selectEvent(id: string) {
+    setActiveEventId(id);
+    setEventSetlist(null);
+    setLoadingSetlist(true);
+    try {
+      const result = await fetchEventSetlist(id);
+      setEventSetlist(result.setlist);
+    } catch {
+      setEventSetlist(null);
+    } finally {
+      setLoadingSetlist(false);
+    }
+  }
+
+  async function moveSetlistItem(
+    item: SetlistItem,
+    direction: "up" | "down",
+    sorted: SetlistItem[],
+  ) {
+    if (reorderingId || !activeEventId) return;
+    const idx = sorted.findIndex((s) => s.id === item.id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+    setReorderingId(item.id);
+    const newOrder = sorted.map((s, i) => ({ id: s.id, order: i + 1 }));
+    const tmp = newOrder[idx].order;
+    newOrder[idx].order = newOrder[swapIdx].order;
+    newOrder[swapIdx].order = tmp;
+
+    try {
+      const result = await reorderSetlist(activeEventId, newOrder, accessToken);
+      if (!result.ok) {
+        setStatusText(result.message ?? "Falha ao reordenar.");
+        return;
+      }
+      // Refresh setlist
+      const fresh = await fetchEventSetlist(activeEventId);
+      setEventSetlist(fresh.setlist);
+    } catch {
+      setStatusText("Erro de rede ao reordenar.");
+    } finally {
+      setReorderingId(null);
+    }
+  }
+
+  async function loadChecklist(eventId: string) {
+    if (loadingChecklist) {
+      return;
+    }
+
+    const cleanEventId = eventId.trim();
+    if (!cleanEventId) {
+      setStatusText("Informe um Event ID para carregar checklist.");
+      return;
+    }
+
+    setStatusText("Carregando checklist...");
+    setLoadingChecklist(true);
+    try {
+      const result = await fetchEventChecklist(cleanEventId);
+      if (!result.ok) {
+        setStatusText(result.message || "Falha ao carregar checklist.");
+        return;
+      }
+
+      setEventChecklist(result.checklist);
+      setStatusText("Checklist carregado.");
+    } catch {
+      setStatusText("Erro de rede ao carregar checklist.");
+    } finally {
+      setLoadingChecklist(false);
+    }
+  }
+
+  async function toggleChecklistItem(itemId: string, nextChecked: boolean) {
+    if (updatingChecklistItemId || loadingChecklist) {
+      return;
+    }
+
+    const cleanEventId = eventId.trim();
+    if (!cleanEventId) {
+      setStatusText("Informe um Event ID antes de atualizar itens.");
+      return;
+    }
+
+    setStatusText("Atualizando item do checklist...");
+    setUpdatingChecklistItemId(itemId);
+    try {
+      const result = await updateChecklistItem(
+        cleanEventId,
+        itemId,
+        { checked: nextChecked, checkedByName: user?.name },
+        accessToken,
+      );
+      if (!result.ok) {
+        setStatusText(result.message || "Falha ao atualizar item.");
+        return;
+      }
+
+      await loadChecklist(cleanEventId);
+      setStatusText("Checklist atualizado.");
+    } catch {
+      setStatusText("Erro de rede ao atualizar item.");
+    } finally {
+      setUpdatingChecklistItemId(null);
+    }
+  }
+
+  async function loadSongPreview(content: string) {
+    if (loadingSongPreview || loadingSongImport) {
+      return;
+    }
+
+    const cleanContent = content.trim();
+    if (!cleanContent) {
+      setStatusText("Cole o conteúdo .txt antes do preview.");
+      return;
+    }
+
+    setStatusText("Gerando preview da cifra...");
+    setLoadingSongPreview(true);
+    try {
+      const result = await previewSongTxt(cleanContent, accessToken);
+      if (!result.ok || !result.parsed) {
+        setStatusText(result.message || "Falha no preview da cifra.");
+        return;
+      }
+
+      setSongPreview(result.parsed);
+      setSongImportResult(null);
+      setStatusText("Preview gerado com sucesso.");
+    } catch {
+      setStatusText("Erro de rede ao gerar preview da cifra.");
+    } finally {
+      setLoadingSongPreview(false);
+    }
+  }
+
+  async function saveSongTxt(content: string) {
+    if (loadingSongImport || loadingSongPreview) {
+      return;
+    }
+
+    const cleanContent = content.trim();
+    if (!cleanContent) {
+      setStatusText("Cole o conteúdo .txt antes de salvar.");
+      return;
+    }
+
+    setStatusText("Salvando cifra...");
+    setLoadingSongImport(true);
+    try {
+      const result = await importSongTxt(cleanContent, accessToken);
+      if (!result.ok || !result.imported) {
+        setStatusText(result.message || "Falha ao salvar cifra.");
+        return;
+      }
+
+      setSongImportResult(result.imported);
+      setStatusText(`Cifra salva: ${result.imported.songTitle} (v${result.imported.chartVersion})`);
+    } catch {
+      setStatusText("Erro de rede ao salvar cifra.");
+    } finally {
+      setLoadingSongImport(false);
+    }
+  }
+
+  function renderLoggedArea() {
+    if (!user) {
+      return null;
+    }
+
+    if (activeTab === "events") {
+      return (
+        <EventsScreen
+          events={events}
+          loading={loadingEvents}
+          activeEventId={activeEventId}
+          setlist={eventSetlist}
+          loadingSetlist={loadingSetlist}
+          reorderingId={reorderingId}
+          onSelectEvent={selectEvent}
+          onMoveItem={moveSetlistItem}
+          statusText={eventsStatus}
+        />
+      );
+    }
+
+    if (activeTab === "songs") {
+      return (
+        <SongsScreen
+          preview={songPreview}
+          importResult={songImportResult}
+          onPreview={loadSongPreview}
+          onImport={saveSongTxt}
+          loadingPreview={loadingSongPreview}
+          loadingImport={loadingSongImport}
+        />
+      );
+    }
+
+    if (activeTab === "account") {
+      return (
+        <AccountScreen
+          user={user}
+          accessToken={accessToken ?? ""}
+          onLogout={logout}
+          onUserUpdate={(updated) => {
+            setUser(updated);
+            setStatusText(`Perfil atualizado: ${updated.name}`);
+          }}
+        />
+      );
+    }
+
+    return (
+      <ChecklistScreen
+        eventId={eventId}
+        onChangeEventId={setEventId}
+        templates={templates}
+        checklist={eventChecklist}
+        onLoadChecklist={loadChecklist}
+        onToggleItem={toggleChecklistItem}
+        loadingChecklist={loadingChecklist}
+        updatingItemId={updatingChecklistItemId}
+      />
+    );
+  }
+
+  if (loadingSession) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <StatusBar style="light" />
+        <View style={styles.centered}>
+          <ActivityIndicator color="#1ecad3" />
+          <Text style={styles.statusText}>Inicializando sessão...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.root}>
+      <StatusBar style="light" />
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.headerCard}>
+          <Text style={styles.kicker}>Overflow Music Mobile</Text>
+          <Text style={styles.title}>MVP Mobile Base</Text>
+          <Text style={styles.statusText}>{statusText}</Text>
+        </View>
+
+        {!isLoggedIn ? <LoginScreen onSubmit={login} /> : renderLoggedArea()}
+      </ScrollView>
+
+      {isLoggedIn ? <BottomTabs activeTab={activeTab} onChange={setActiveTab} /> : null}
+    </SafeAreaView>
+  );
+}

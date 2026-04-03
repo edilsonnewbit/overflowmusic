@@ -1,0 +1,16 @@
+{
+  "name": "overflow-music-app",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start:api": "npm --workspace apps/api run start",
+    "start:web": "npm --workspace apps/web run start",
+    "start:worker": "npm --workspace apps/worker run start",
+    "start:mobile": "npm --workspace apps/mobile run start",
+    "check:deploy-env": "bash ./scripts/check-hostinger-env.sh"
+  }
+}

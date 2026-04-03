@@ -1,0 +1,112 @@
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/www:/var/www/html:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - api
+      - web
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'"
+
+  api:
+    image: ghcr.io/edilsonnewbit/music-overflow-api:${IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: always
+    environment:
+      IMAGE_TAG: ${IMAGE_TAG:-latest}
+      TZ: America/Recife
+      PORT: 3001
+      DATABASE_URL: postgresql://overflow:${POSTGRES_PASSWORD}@postgres:5432/overflow_music
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      FRONTEND_URL: ${FRONTEND_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_ALLOWED_DOMAIN: ${GOOGLE_ALLOWED_DOMAIN}
+      AUTH_BOOTSTRAP_MODE: ${AUTH_BOOTSTRAP_MODE}
+      JWT_SECRET: ${JWT_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: ghcr.io/edilsonnewbit/music-overflow-worker:${IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: always
+    environment:
+      TZ: America/Recife
+      DATABASE_URL: postgresql://overflow:${POSTGRES_PASSWORD}@postgres:5432/overflow_music
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    image: ghcr.io/edilsonnewbit/music-overflow-web:${IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: always
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: https://music.overflowmvmt.com/api
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      AUTH_BOOTSTRAP_MODE: ${AUTH_BOOTSTRAP_MODE}
+      WEB_LOGIN_FALLBACK_ENABLED: ${WEB_LOGIN_FALLBACK_ENABLED:-false}
+      API_INTERNAL_URL: http://api:3001
+    depends_on:
+      - api
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: overflow_music
+      POSTGRES_USER: overflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U overflow -d overflow_music"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

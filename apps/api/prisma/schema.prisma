@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  LEADER
+  MEMBER
+}
+
+enum UserStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ChordChartSourceType {
+  TXT_IMPORT
+  MANUAL
+}
+
+model User {
+  id         String     @id @default(uuid())
+  name       String
+  email      String     @unique
+  googleSub  String     @unique
+  role       UserRole   @default(MEMBER)
+  status     UserStatus @default(PENDING_APPROVAL)
+  createdAt  DateTime   @default(now())
+  reviewedAt DateTime?
+
+  @@index([status])
+}
+
+model Event {
+  id          String      @id @default(uuid())
+  title       String
+  dateTime    DateTime
+  location    String?
+  description String?
+  status      EventStatus @default(DRAFT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  setlist     Setlist?
+  checklistRuns ChecklistRun[]
+}
+
+model Setlist {
+  id        String        @id @default(uuid())
+  eventId   String        @unique
+  title     String?
+  notes     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items     SetlistItem[]
+}
+
+model SetlistItem {
+  id              String   @id @default(uuid())
+  setlistId       String
+  order           Int
+  songTitle       String
+  key             String?
+  leaderName      String?
+  zone            String?
+  transitionNotes String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  setlist         Setlist  @relation(fields: [setlistId], references: [id], onDelete: Cascade)
+
+  @@index([setlistId, order])
+}
+
+model Song {
+  id          String       @id @default(uuid())
+  title       String
+  artist      String?
+  defaultKey  String?
+  tags        Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  chordCharts ChordChart[]
+
+  @@index([title])
+  @@index([artist])
+}
+
+model ChordChart {
+  id         String              @id @default(uuid())
+  songId     String
+  sourceType ChordChartSourceType @default(TXT_IMPORT)
+  rawText    String
+  parsedJson Json
+  version    Int
+  createdAt  DateTime            @default(now())
+  song       Song                @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@index([songId, version])
+}
+
+model ChecklistTemplate {
+  id        String         @id @default(uuid())
+  name      String
+  items     Json
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  runs      ChecklistRun[]
+
+  @@index([name])
+}
+
+model ChecklistRun {
+  id         String             @id @default(uuid())
+  eventId    String
+  templateId String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  event      Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  template   ChecklistTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  items      ChecklistItemRun[]
+
+  @@unique([eventId, templateId])
+  @@index([eventId])
+}
+
+model ChecklistItemRun {
+  id             String       @id @default(uuid())
+  checklistRunId String
+  label          String
+  checked        Boolean      @default(false)
+  checkedByName  String?
+  checkedAt      DateTime?
+  order          Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  checklistRun   ChecklistRun @relation(fields: [checklistRunId], references: [id], onDelete: Cascade)
+
+  @@index([checklistRunId, order])
+}

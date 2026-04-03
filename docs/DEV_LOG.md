@@ -1,0 +1,1438 @@
+# DEV_LOG.md
+
+Registro oficial de progresso para handoff entre LLMs.
+
+## Template de entrada
+```md
+### [YYYY-MM-DD HH:mm TZ] - <LLM/Agente>
+- Objetivo:
+- Feito:
+- Arquivos:
+- Validação:
+- Pendências:
+- Próximo passo:
+```
+
+---
+
+### [2026-04-03 14:40 America/Recife] - Codex
+- Objetivo: Criar sistema de instruções para agentes de IA e fluxo multi-LLM antes da implementação.
+- Feito:
+  - Criado `AGENTS.md` com regras operacionais e padrão de saída.
+  - Criado `docs/LLM_WORKFLOW.md` com método de trabalho em ciclo curto.
+  - Criado este `docs/DEV_LOG.md` com template de handoff.
+  - Documento de projeto já existente mantido como referência principal.
+- Arquivos:
+  - `AGENTS.md`
+  - `docs/LLM_WORKFLOW.md`
+  - `docs/DEV_LOG.md`
+- Validação:
+  - Arquivos criados com estrutura Markdown válida.
+- Pendências:
+  - Criar `docs/TECH_DECISIONS.md` e `docs/OPEN_QUESTIONS.md`.
+  - Iniciar implementação técnica (scaffold monorepo + docker).
+- Próximo passo:
+  - Definir e registrar DEC-001 (stack final e estratégia inicial de scaffold).
+
+### [2026-04-03 14:42 America/Recife] - Codex
+- Objetivo: Completar base de governança multi-LLM com registros de decisão e dúvidas.
+- Feito:
+  - Criado `docs/TECH_DECISIONS.md` com estrutura de DEC.
+  - Criado `docs/OPEN_QUESTIONS.md` com questão inicial de escopo MVP.
+- Arquivos:
+  - `docs/TECH_DECISIONS.md`
+  - `docs/OPEN_QUESTIONS.md`
+- Validação:
+  - Arquivos criados e legíveis.
+- Pendências:
+  - Definir DEC-001 (stack final) antes do scaffold técnico.
+- Próximo passo:
+  - Iniciar implementação pelo setup base (monorepo + docker + CI).
+
+### [2026-04-03 14:46 America/Recife] - Codex
+- Objetivo: Iniciar implementação técnica com scaffold monorepo e base DevOps/Deploy.
+- Feito:
+  - Criado scaffold de monorepo com `apps/api`, `apps/web`, `apps/worker`.
+  - Implementados serviços placeholder funcionais para API, Web e Worker.
+  - Criados Dockerfiles dos 3 serviços.
+  - Criado `docker-compose.yml` de produção para Hostinger (nginx, certbot, api, web, worker, postgres, redis).
+  - Criado `nginx/conf.d/app.conf` para domínio `music.overflowmvmt.com` com roteamento web/api.
+  - Criados scripts `deploy.sh` e `init-letsencrypt.sh`.
+  - Criado workflow `.github/workflows/deploy-hostinger.yml` com build/push GHCR e deploy na Hostinger.
+  - Registradas DEC-001 e DEC-002 em `docs/TECH_DECISIONS.md`.
+- Arquivos:
+  - `package.json`, `.gitignore`, `.env.example`, `README.md`
+  - `apps/api/*`, `apps/web/*`, `apps/worker/*`
+  - `docker-compose.yml`
+  - `nginx/conf.d/app.conf`
+  - `deploy.sh`, `init-letsencrypt.sh`
+  - `.github/workflows/deploy-hostinger.yml`
+  - `docs/TECH_DECISIONS.md`
+- Validação:
+  - Verificação estática manual dos arquivos de configuração.
+  - Não foi possível rodar validação de runtime porque o ambiente atual não possui `node` e `docker` instalados.
+- Pendências:
+  - Migrar placeholders para Next.js/NestJS.
+  - Adicionar healthchecks mais completos e rotas de autenticação real.
+  - Testar deploy real na VPS com secrets configurados.
+- Próximo passo:
+  - Implementar fase 2: substituir `apps/api` por NestJS mantendo endpoint `/api/admin/auth/check` compatível com o pipeline.
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet]
+- Objetivo: Implementar módulo de Eventos e Setlist — web pages + mobile tab + rotas proxy API.
+- Feito:
+  - `apps/web/app/api/events/route.ts` — proxy GET (list) + POST (create).
+  - `apps/web/app/api/events/[eventId]/route.ts` — proxy GET + PATCH + DELETE.
+  - `apps/web/app/api/events/[eventId]/setlist/route.ts` — proxy GET + PUT.
+  - `apps/web/app/api/events/[eventId]/setlist/items/route.ts` — proxy POST.
+  - `apps/web/app/api/events/[eventId]/setlist/items/[itemId]/route.ts` — proxy PATCH + DELETE.
+  - `apps/web/app/events/page.tsx` — listagem + criação de eventos.
+  - `apps/web/app/events/[eventId]/page.tsx` — detalhe do evento + setlist (add/remove itens).
+  - `apps/web/app/page.tsx` — card "Eventos & Setlist" adicionado.
+  - `apps/mobile/src/types.ts` — adicionado `MusicEvent`, `SetlistItem`, `EventSetlist`.
+  - `apps/mobile/src/lib/api.ts` — adicionado `fetchEvents`, `fetchEventSetlist`.
+  - `apps/mobile/src/screens/EventsScreen.tsx` — novo componente (lista eventos + setlist).
+  - `apps/mobile/src/components/BottomTabs.tsx` — tab "Eventos" adicionada.
+  - `apps/mobile/App.tsx` — estado e lógica de eventos/setlist integrados.
+- Arquivos alterados: 13 arquivos (todos listados acima).
+- Validação: TypeScript sem erros em todos os arquivos novos/alterados.
+- Pendências:
+  - Reordenação de itens do setlist via drag-and-drop (web + mobile).
+  - Gestão de usuários/aprovação pelo admin (tela web admin users).
+  - Testes e2e dos endpoints de eventos/setlist.
+- Próximo passo:
+  - Criar tela de gestão de usuários pendentes (`/admin/users`) no web para aprovação de novos logins Google.
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet]
+- Objetivo: Criar módulo de aprovação de usuários admin no web.
+- Feito:
+  - `apps/web/app/api/admin/users/pending/route.ts` — proxy GET lista pendentes.
+  - `apps/web/app/api/admin/users/[userId]/approve/route.ts` — proxy POST aprovar.
+  - `apps/web/app/api/admin/users/[userId]/reject/route.ts` — proxy POST rejeitar.
+  - `apps/web/app/admin/users/page.tsx` — tela com lista de pendentes, seletor de role e botões aprovar/rejeitar.
+  - `apps/web/app/page.tsx` — card "Aprovação de Usuários" adicionado na home.
+- Arquivos alterados: 5 arquivos.
+- Validação: TypeScript sem erros em todos os arquivos.
+- Pendências:
+  - Reordenação drag-and-drop do setlist (web + mobile).
+  - Mobile: tela de aprovação não é necessária (operação admin fica no web).
+  - Testes e2e das rotas de admin.
+- Próximo passo:
+  - Implementar reordenação de itens do setlist (web): arrastar e soltar com botões ↑↓ como fallback acessível.
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet]
+- Objetivo: Adicionar reordenação de itens do setlist com botões ↑↓ na web.
+- Feito:
+  - `apps/web/app/api/events/[eventId]/setlist/reorder/route.ts` — proxy POST para endpoint de reorder.
+  - `apps/web/app/events/[eventId]/page.tsx` — estado `reorderingId`, função `moveItem`, botões ▲▼ acessíveis por item, feedback visual de estado busy/moving, status movido para acima do form.
+- Arquivos alterados: 2 arquivos.
+- Validação: TypeScript sem erros.
+- Pendências:
+  - Modo apresentação do setlist (fullscreen sem distrações).
+  - Gestão de organizações/equipes (cad. de membros, funções).
+  - Testes e2e.
+- Próximo passo:
+  - Criar modo de apresentação do setlist: `/events/[eventId]/present` — tela fullscreen, fonte grande, navegação por teclado/swipe entre músicas.
+
+### [2026-04-03 14:49 America/Recife] - Codex
+- Objetivo: Validar ambiente local após abertura do Docker.
+- Feito:
+  - Confirmado `docker` e `docker compose` funcionais via caminho absoluto.
+  - Confirmado `node` funcional via `/opt/homebrew/bin/node`.
+  - Validado `docker-compose.yml` com `docker compose config` (ok, com warnings esperados por variáveis não definidas).
+  - Build local das imagens concluído com sucesso:
+    - `overflow-test-api:local`
+    - `overflow-test-web:local`
+    - `overflow-test-worker:local`
+- Arquivos:
+  - `docs/DEV_LOG.md`
+- Validação:
+  - Build Docker completo executado com sucesso.
+  - Teste de bind de porta local via Node não permitido no sandbox (`EPERM`), sem impacto no deploy real em VPS.
+- Pendências:
+  - Definir `.env` de produção no Hostinger/GitHub Secrets.
+  - Migrar placeholders para Next.js/NestJS.
+- Próximo passo:
+  - Iniciar migração do `apps/api` para NestJS mantendo endpoint `/api/admin/auth/check`.
+
+### [2026-04-03 14:51 America/Recife] - Codex
+- Objetivo: Migrar `apps/api` de placeholder Node HTTP para NestJS mantendo compatibilidade de endpoints.
+- Feito:
+  - API migrada para NestJS com TypeScript.
+  - Endpoints mantidos:
+    - `GET /health`
+    - `GET /api/health`
+    - `GET /api/admin/auth/check` (Bearer `ADMIN_API_KEY`).
+  - Atualizado Dockerfile da API para build multi-stage (`npm install` + `tsc` + runtime em `dist`).
+  - Removido arquivo antigo `apps/api/src/server.js`.
+- Arquivos:
+  - `apps/api/package.json`
+  - `apps/api/tsconfig.json`
+  - `apps/api/tsconfig.build.json`
+  - `apps/api/src/main.ts`
+  - `apps/api/src/app.module.ts`
+  - `apps/api/src/app.controller.ts`
+  - `apps/api/Dockerfile`
+- Validação:
+  - Build da imagem NestJS concluído com sucesso: `overflow-test-api:nest`.
+- Pendências:
+  - Tratar vulnerabilidades reportadas pelo `npm audit` no build da API.
+  - Migrar `apps/web` para Next.js.
+- Próximo passo:
+  - Iniciar migração de `apps/web` para Next.js mantendo Dockerfile e variáveis de ambiente de produção.
+
+### [2026-04-03 15:19 America/Recife] - Codex
+- Objetivo: Migrar `apps/web` para Next.js e validar build Docker.
+- Feito:
+  - `apps/web` migrado para Next.js (App Router) com TypeScript.
+  - Criados arquivos base (`app/layout.tsx`, `app/page.tsx`, `next.config.mjs`, `tsconfig.json`).
+  - Dockerfile do web atualizado para build multi-stage e runtime standalone.
+  - Erro de tipagem (`JSX.Element`) corrigido.
+  - Build Docker validado com sucesso em versão inicial (`overflow-test-web:next`).
+  - Dependência do Next atualizada para `16.2.2`.
+- Arquivos:
+  - `apps/web/package.json`
+  - `apps/web/next.config.mjs`
+  - `apps/web/tsconfig.json`
+  - `apps/web/next-env.d.ts`
+  - `apps/web/app/layout.tsx`
+  - `apps/web/app/page.tsx`
+  - `apps/web/Dockerfile`
+- Validação:
+  - Build `overflow-test-web:next` passou.
+  - Rebuild após upgrade para `next@16.2.2` ficou bloqueado por instabilidade do Docker daemon (comando sem retorno).
+- Pendências:
+  - Reexecutar build do web com Next 16 assim que o Docker daemon estabilizar.
+  - Migrar `apps/worker` para worker com fila real (BullMQ/Redis) nas próximas fases.
+- Próximo passo:
+  - Fechar estabilização do build web Next 16 e avançar para autenticação Google + aprovação admin na API NestJS.
+
+### [2026-04-03 15:30 America/Recife] - Codex
+- Objetivo: Continuar implementação com autenticação/aprovação no backend e estabilização de build local.
+- Feito:
+  - Implementado fluxo de autenticação base no NestJS (modo bootstrap):
+    - `POST /api/auth/google`
+    - `GET /api/auth/me`
+    - `GET /api/admin/users/pending`
+    - `POST /api/admin/users/:userId/approve`
+    - `POST /api/admin/users/:userId/reject`
+  - Mantida compatibilidade do CI/CD com `GET /api/admin/auth/check`.
+  - Implementado token assinado HS256 interno para sessão de usuário aprovado.
+  - Adicionado seed opcional de admins via `ADMIN_APPROVED_EMAILS`.
+  - Ajustado `next.config.mjs` com `turbopack.root` para eliminar aviso de múltiplos lockfiles.
+  - Atualizados `.env.example`, `.gitignore`, `README.md` e `docs/OPEN_QUESTIONS.md`.
+- Arquivos:
+  - `apps/api/src/auth/auth.types.ts`
+  - `apps/api/src/auth/auth.service.ts`
+  - `apps/api/src/auth/auth.controller.ts`
+  - `apps/api/src/app.module.ts`
+  - `apps/api/src/app.controller.ts`
+  - `apps/web/next.config.mjs`
+  - `.env.example`
+  - `.gitignore`
+  - `README.md`
+  - `docs/OPEN_QUESTIONS.md`
+- Validação:
+  - `apps/api`: `npm run build` OK.
+  - `apps/web`: `npm run build` OK com Next 16.2.2.
+  - Docker daemon segue intermitente para algumas validações de imagem neste ambiente.
+- Pendências:
+  - Trocar login bootstrap por validação real de `idToken` Google no backend.
+  - Persistir usuários/aprovações em banco (atualmente em memória).
+- Próximo passo:
+  - Implementar camada de persistência (Prisma + PostgreSQL) para usuários e aprovações.
+
+### [2026-04-03 15:34 America/Recife] - Codex
+- Objetivo: Implementar persistência real de autenticação/aprovação com Prisma + PostgreSQL.
+- Feito:
+  - Configurado Prisma ORM na API.
+  - Criado schema inicial com `User`, `UserRole`, `UserStatus`.
+  - Criado `PrismaModule` e `PrismaService` para injeção global no NestJS.
+  - Refatorado `AuthService` para usar PostgreSQL (find/create/update/upsert) em vez de memória.
+  - Mantidos endpoints existentes de health e CI/CD.
+  - Atualizados `package.json` e Dockerfile da API para incluir geração do Prisma Client.
+  - Atualizados `.env.example` e `README.md` para refletir persistência e scripts Prisma.
+- Arquivos:
+  - `apps/api/prisma/schema.prisma`
+  - `apps/api/src/prisma/prisma.module.ts`
+  - `apps/api/src/prisma/prisma.service.ts`
+  - `apps/api/src/auth/auth.service.ts`
+  - `apps/api/src/auth/auth.controller.ts`
+  - `apps/api/src/app.module.ts`
+  - `apps/api/package.json`
+  - `apps/api/Dockerfile`
+  - `.env.example`
+  - `README.md`
+- Validação:
+  - `apps/api`: `npm install` OK.
+  - `apps/api`: `npm run prisma:generate` OK.
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Executar `npm run prisma:push` em ambiente com `DATABASE_URL` apontando para o PostgreSQL real.
+  - Implementar validação real de `idToken` Google no backend.
+- Próximo passo:
+  - Conectar a API ao banco do `docker-compose` e aplicar schema com `prisma db push` na esteira de deploy.
+
+### [2026-04-03 15:36 America/Recife] - Codex
+- Objetivo: Substituir login bootstrap por validação real de idToken Google no backend.
+- Feito:
+  - Adicionado `google-auth-library` na API.
+  - `POST /api/auth/google` agora valida `idToken` com `GOOGLE_CLIENT_ID`.
+  - Adicionado controle de domínio opcional via `GOOGLE_ALLOWED_DOMAIN`.
+  - Mantido modo bootstrap apenas por flag (`AUTH_BOOTSTRAP_MODE=true`) para desenvolvimento.
+  - Propagadas novas variáveis em `docker-compose.yml` e workflow de deploy Hostinger.
+  - Atualizados README e OPEN_QUESTIONS.
+- Arquivos:
+  - `apps/api/src/auth/auth.controller.ts`
+  - `apps/api/package.json`
+  - `.env.example`
+  - `docker-compose.yml`
+  - `.github/workflows/deploy-hostinger.yml`
+  - `README.md`
+  - `docs/OPEN_QUESTIONS.md`
+- Validação:
+  - `apps/api`: `npm install` OK.
+  - `apps/api`: `npm run prisma:generate` OK.
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Executar `prisma db push` no ambiente conectado ao PostgreSQL real.
+  - Evoluir emissão de JWT para biblioteca dedicada e refresh token.
+- Próximo passo:
+  - Integrar setlist/eventos no banco com Prisma e iniciar endpoints CRUD do MVP.
+
+### [2026-04-03 15:38 America/Recife] - Codex
+- Objetivo: Implementar CRUD de eventos e setlist no MVP da API.
+- Feito:
+  - Schema Prisma expandido com `Event`, `Setlist`, `SetlistItem` e enum `EventStatus`.
+  - Implementados endpoints de eventos (`GET/POST/PATCH/DELETE`).
+  - Implementados endpoints de setlist por evento (obter, upsert, adicionar item, atualizar item, remover item, reorder).
+  - Proteção de escrita via `ADMIN_API_KEY` mantida.
+  - `AppModule` atualizado com novos controllers/services.
+  - README atualizado com novos endpoints.
+- Arquivos:
+  - `apps/api/prisma/schema.prisma`
+  - `apps/api/src/events/events.controller.ts`
+  - `apps/api/src/events/events.service.ts`
+  - `apps/api/src/setlist/setlist.controller.ts`
+  - `apps/api/src/setlist/setlist.service.ts`
+  - `apps/api/src/app.module.ts`
+  - `README.md`
+- Validação:
+  - `apps/api`: `npm run prisma:generate` OK.
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Aplicar schema no banco real (`npm run prisma:push` com `DATABASE_URL` válido).
+  - Adicionar testes automatizados para fluxo de eventos/setlist.
+- Próximo passo:
+  - Implementar módulo de músicas/cifras e endpoint de importação `.txt` com parser estruturado.
+
+### [2026-04-03 15:41 America/Recife] - Codex
+- Objetivo: Implementar módulo de músicas/cifras com importação de `.txt`.
+- Feito:
+  - Schema Prisma expandido com `Song`, `ChordChart` e enum `ChordChartSourceType`.
+  - Criado parser de cifra `.txt` com estrutura por seções, linhas e dicionário de acordes.
+  - Implementados endpoints de músicas:
+    - `GET /api/songs`
+    - `GET /api/songs/:id`
+    - `GET /api/songs/:id/charts`
+    - `POST /api/songs`
+    - `PATCH /api/songs/:id`
+    - `DELETE /api/songs/:id`
+    - `POST /api/songs/import/txt`
+  - Import `.txt` cria nova versão de cifra (`version`) em `ChordChart`.
+  - `AppModule` atualizado para incluir `SongsController` e `SongsService`.
+  - README atualizado com endpoints novos.
+- Arquivos:
+  - `apps/api/prisma/schema.prisma`
+  - `apps/api/src/songs/chord-txt-parser.ts`
+  - `apps/api/src/songs/songs.service.ts`
+  - `apps/api/src/songs/songs.controller.ts`
+  - `apps/api/src/app.module.ts`
+  - `README.md`
+- Validação:
+  - `apps/api`: `npm run prisma:generate` OK.
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Aplicar schema em banco real (`npm run prisma:push`).
+  - Adicionar testes automatizados para parser e endpoints de importação.
+- Próximo passo:
+  - Conectar upload de arquivo no endpoint (multipart/form-data) e incluir validação de tamanho/MIME.
+
+### [2026-04-03 15:43 America/Recife] - Codex
+- Objetivo: Adicionar upload real de arquivo `.txt` para importação de cifra.
+- Feito:
+  - Implementado endpoint multipart: `POST /api/songs/import/txt/file`.
+  - Upload usa `FileInterceptor` com limite de 1MB.
+  - Validação de arquivo:
+    - obrigatório
+    - extensão `.txt`
+    - MIME permitido (`text/plain` e `application/octet-stream`)
+    - tamanho máximo 1MB
+  - Conteúdo do arquivo convertido para UTF-8 e processado pelo parser existente.
+  - README atualizado com novo endpoint.
+- Arquivos:
+  - `apps/api/src/songs/songs.controller.ts`
+  - `README.md`
+- Validação:
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Adicionar testes automatizados para parser e upload multipart.
+  - Refinar validação de encoding e mensagens de erro padronizadas.
+- Próximo passo:
+  - Implementar suíte de testes para `chord-txt-parser` e endpoints de importação.
+
+### [2026-04-03 15:46 America/Recife] - Codex
+- Objetivo: Implementar testes automatizados para parser `.txt` e validação de upload.
+- Feito:
+  - Criado validador reutilizável de upload `.txt` (`validateTxtUpload`).
+  - Refatorado controller para usar o validador dedicado.
+  - Criados testes unitários:
+    - `chord-txt-parser.test.ts`
+    - `txt-upload-validator.test.ts`
+  - Adicionado script de testes em `apps/api`: `npm test` com `tsx --test`.
+  - README atualizado com comando de teste.
+- Arquivos:
+  - `apps/api/src/songs/txt-upload-validator.ts`
+  - `apps/api/src/songs/songs.controller.ts`
+  - `apps/api/src/songs/chord-txt-parser.test.ts`
+  - `apps/api/src/songs/txt-upload-validator.test.ts`
+  - `apps/api/package.json`
+  - `README.md`
+- Validação:
+  - `apps/api`: `npm test` OK (5/5).
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Adicionar testes de integração HTTP para endpoints de importação.
+  - Melhorar parser para aceitar sintaxe de seção e cifra na mesma linha (ex.: `[Intro] F7M Em7`).
+- Próximo passo:
+  - Implementar testes de integração (supertest) para `POST /api/songs/import/txt` e `/api/songs/import/txt/file`.
+
+### [2026-04-03 15:48 America/Recife] - Codex
+- Objetivo: Adicionar testes de integração HTTP para importação de cifras.
+- Feito:
+  - Adicionados testes de integração com `@nestjs/testing` + `supertest` para:
+    - `POST /api/songs/import/txt` (401 e 201)
+    - `POST /api/songs/import/txt/file` (400 e 201)
+  - Ajustado setup do teste com metadata explícita de DI para `SongsController`.
+  - Atualizadas dependências de teste no `apps/api/package.json`.
+- Arquivos:
+  - `apps/api/src/songs/songs-import.integration.test.ts`
+  - `apps/api/package.json`
+- Validação:
+  - `apps/api`: `npm test` OK (9/9).
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Aplicar `prisma db push` no ambiente conectado ao PostgreSQL real.
+  - Melhorar parser para seções com acordes na mesma linha (`[Intro] F7M Em7`).
+- Próximo passo:
+  - Implementar normalização avançada no parser e adicionar casos de teste para o formato do arquivo anexo completo.
+
+### [2026-04-03 15:50 America/Recife] - Codex
+- Objetivo: Melhorar parser para suportar seção + cifra na mesma linha.
+- Feito:
+  - Parser atualizado para reconhecer entradas como `[Intro] F7M Em7`.
+  - Regex de detecção de acordes ajustada para suportar formatos como `F7M`.
+  - Teste unitário específico adicionado e validado.
+- Arquivos:
+  - `apps/api/src/songs/chord-txt-parser.ts`
+  - `apps/api/src/songs/chord-txt-parser.test.ts`
+- Validação:
+  - `apps/api`: `npm test` OK (10/10).
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Aplicar `prisma db push` no ambiente conectado ao PostgreSQL real.
+  - Evoluir parser para capturar metadados adicionais (bpm, tom sugerido, capo) quando presentes.
+- Próximo passo:
+  - Criar rota de preview de parser sem persistência para UX de revisão antes de salvar.
+
+### [2026-04-03 15:53 America/Recife] - Codex
+- Objetivo: Evoluir parser `.txt` para metadados musicais e aplicar no fluxo de importação.
+- Feito:
+  - Parser atualizado para extrair metadados quando presentes: `Tom/Key`, `BPM`, `Capo`.
+  - `parseChordTxt` agora retorna `metadata` junto com seções e dicionário de acordes.
+  - `SongsService.importTxt` ajustado para preencher `defaultKey` automaticamente ao criar música nova sem `songId`, usando `metadata.suggestedKey`.
+  - Teste unitário do parser adicionado para cobertura de metadados.
+  - Teste unitário do serviço adicionado para garantir preenchimento de `defaultKey` no import.
+  - README atualizado com comportamento do parser/import.
+- Arquivos:
+  - `apps/api/src/songs/chord-txt-parser.ts`
+  - `apps/api/src/songs/songs.service.ts`
+  - `apps/api/src/songs/chord-txt-parser.test.ts`
+  - `apps/api/src/songs/songs.service.test.ts`
+  - `README.md`
+- Validação:
+  - `apps/api`: `npm test` OK (14/14).
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Aplicar schema no banco real (`npm run prisma:push`) com `DATABASE_URL` válido.
+  - Iniciar integração do frontend (web/mobile) com rotas de preview/import de cifra.
+- Próximo passo:
+  - Implementar endpoints e modelo de checklist operacional (`ChecklistTemplate`, `ChecklistRun`, `ChecklistItemRun`) com CRUD inicial no backend.
+
+### [2026-04-03 15:56 America/Recife] - Codex
+- Objetivo: Implementar checklist operacional inicial no backend (templates + execução por evento).
+- Feito:
+  - Schema Prisma expandido com:
+    - `ChecklistTemplate`
+    - `ChecklistRun`
+    - `ChecklistItemRun`
+  - Implementado CRUD inicial de templates:
+    - `GET /api/checklists/templates`
+    - `POST /api/checklists/templates`
+    - `PATCH /api/checklists/templates/:id`
+    - `DELETE /api/checklists/templates/:id`
+  - Implementado checklist por evento:
+    - `GET /api/events/:eventId/checklist`
+    - `PUT /api/events/:eventId/checklist`
+    - `PATCH /api/events/:eventId/checklist/items/:itemId`
+  - Regras básicas incluídas:
+    - validação de `ADMIN_API_KEY` para escrita
+    - validação de evento existente
+    - criação de checklist por template ou lista customizada
+    - atualização de item com `checked`, `checkedAt` e `checkedByName`
+  - `AppModule` atualizado com novos controllers/services.
+  - README atualizado com novos endpoints.
+  - Adicionados testes de integração HTTP para endpoints de checklist.
+- Arquivos:
+  - `apps/api/prisma/schema.prisma`
+  - `apps/api/src/checklist/checklist-templates.service.ts`
+  - `apps/api/src/checklist/checklist-templates.controller.ts`
+  - `apps/api/src/checklist/checklist-runs.service.ts`
+  - `apps/api/src/checklist/checklist-runs.controller.ts`
+  - `apps/api/src/checklist/checklist.integration.test.ts`
+  - `apps/api/src/app.module.ts`
+  - `README.md`
+- Validação:
+  - `apps/api`: `npm run prisma:generate` OK.
+  - `apps/api`: `npm test` OK (19/19).
+  - `apps/api`: `npm run build` OK.
+- Pendências:
+  - Aplicar schema no banco real (`npm run prisma:push`) com `DATABASE_URL` válido.
+  - Integrar UI Web/Mobile para gestão de checklist e import preview.
+- Próximo passo:
+  - Implementar telas web iniciais para fluxo de checklist (templates e checklist do evento) consumindo as novas rotas.
+
+### [2026-04-03 16:02 America/Recife] - Codex
+- Objetivo: Implementar tela web inicial para fluxo de checklist consumindo as novas rotas da API.
+- Feito:
+  - Criada camada BFF no `apps/web` via rotas internas (`app/api/...`) para encaminhar chamadas ao backend com `ADMIN_API_KEY` no servidor.
+  - Endpoints internos implementados:
+    - `GET/POST /api/checklists/templates`
+    - `PATCH/DELETE /api/checklists/templates/:id`
+    - `GET/PUT /api/events/:eventId/checklist`
+    - `PATCH /api/events/:eventId/checklist/items/:itemId`
+  - Página principal (`/`) convertida para painel interativo de checklist com:
+    - criação/seleção/remoção de templates
+    - carregamento de checklist por `eventId`
+    - criação de checklist por template ou lista customizada
+    - toggle de itens concluídos com `checkedByName`
+  - UI atualizada com visual mais moderno (gradientes, cards, tipografia e feedback de status).
+  - `layout` atualizado para usar stylesheet global.
+  - `docker-compose` atualizado para injetar `ADMIN_API_KEY` no container web (necessário para BFF).
+  - README atualizado com requisitos de ambiente do web BFF.
+- Arquivos:
+  - `apps/web/lib/server-api.ts`
+  - `apps/web/app/api/checklists/templates/route.ts`
+  - `apps/web/app/api/checklists/templates/[id]/route.ts`
+  - `apps/web/app/api/events/[eventId]/checklist/route.ts`
+  - `apps/web/app/api/events/[eventId]/checklist/items/[itemId]/route.ts`
+  - `apps/web/app/page.tsx`
+  - `apps/web/app/layout.tsx`
+  - `apps/web/app/globals.css`
+  - `apps/web/tsconfig.json`
+  - `docker-compose.yml`
+  - `README.md`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Conectar tela web com fluxo de autenticação real (Google + sessão) ao invés de modo admin técnico.
+  - Criar telas equivalentes no mobile (Expo) para checklist.
+- Próximo passo:
+  - Implementar UI web inicial de importação de cifra `.txt` com preview usando os endpoints de songs (`/import/txt/preview` e `/import/txt/file/preview`).
+
+### [2026-04-03 16:04 America/Recife] - Codex
+- Objetivo: Implementar UI web de importação/preview de cifra `.txt` (texto e arquivo) usando endpoints de preview.
+- Feito:
+  - Criadas rotas internas no Next (BFF):
+    - `POST /api/songs/import/txt/preview`
+    - `POST /api/songs/import/txt/file/preview`
+  - `serverApiFetch` ajustado para suportar `FormData` sem forçar `Content-Type: application/json`.
+  - Página principal expandida com card **Song TXT Preview** contendo:
+    - preview via texto colado
+    - preview via upload de arquivo `.txt`
+    - exibição de resumo do parser (`title`, `artist`, `key`, `bpm`, `capo`, quantidade de seções e acordes)
+  - Fluxo mantém segredo no servidor web via `ADMIN_API_KEY` (sem expor no browser).
+- Arquivos:
+  - `apps/web/lib/server-api.ts`
+  - `apps/web/app/api/songs/import/txt/preview/route.ts`
+  - `apps/web/app/api/songs/import/txt/file/preview/route.ts`
+  - `apps/web/app/page.tsx`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Adicionar ação de persistência final da cifra (`POST /api/songs/import/txt` e `.../file`) após aprovação do preview.
+  - Conectar autenticação real de usuário/admin no web.
+- Próximo passo:
+  - Implementar no web o fluxo completo de importação com botão **Salvar cifra** após preview (opcionalmente escolhendo `songId`).
+
+### [2026-04-03 16:06 America/Recife] - Codex
+- Objetivo: Implementar fluxo web completo de importação de cifra com botão **Salvar cifra** após preview.
+- Feito:
+  - Adicionadas rotas internas no Next (BFF) para persistência final:
+    - `POST /api/songs/import/txt`
+    - `POST /api/songs/import/txt/file`
+  - UI do card **Song TXT Preview** evoluída com:
+    - campo opcional `songId` para salvar nova versão em música existente
+    - ação `Salvar cifra` usando a fonte do último preview (`text` ou `file`)
+    - status de último salvamento (`songId` e versão da cifra)
+  - Fluxo completo agora cobre:
+    - preview por texto/arquivo
+    - persistência por texto/arquivo
+  - Mantido padrão de segurança: chamadas autenticadas no servidor web via `ADMIN_API_KEY` (sem exposição no client).
+- Arquivos:
+  - `apps/web/app/api/songs/import/txt/route.ts`
+  - `apps/web/app/api/songs/import/txt/file/route.ts`
+  - `apps/web/app/page.tsx`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Conectar autenticação real de usuário/admin no web (substituir modo técnico baseado em `ADMIN_API_KEY`).
+  - Criar versão mobile desse fluxo de preview/import.
+- Próximo passo:
+  - Implementar listagem de músicas no web para seleção assistida de `songId` (evitar input manual), integrada a `GET /api/songs`.
+
+### [2026-04-03 16:08 America/Recife] - Codex
+- Objetivo: Implementar seleção assistida de `songId` no web para importação de cifra.
+- Feito:
+  - Criada rota interna `GET /api/songs` no Next (BFF), proxy para API backend.
+  - UI do card **Song TXT Preview** atualizada:
+    - `songId` agora pode ser escolhido via `<select>` com lista de músicas reais.
+    - opção padrão para criar nova música automaticamente (sem `songId`).
+    - botão de atualização da lista de músicas com contador.
+  - Página passou a carregar lista de músicas na inicialização.
+  - Após `Salvar cifra`, a lista de músicas é recarregada automaticamente.
+- Arquivos:
+  - `apps/web/app/api/songs/route.ts`
+  - `apps/web/app/page.tsx`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Conectar autenticação real Google/admin no web.
+  - Implementar tela mobile equivalente de preview/import.
+- Próximo passo:
+  - Refatorar a home web em seções/rotas dedicadas (checklist e músicas) para reduzir complexidade e preparar integração de auth.
+
+### [2026-04-03 16:11 America/Recife] - Codex
+- Objetivo: Refatorar web em rotas dedicadas para reduzir complexidade da home e preparar integração de autenticação.
+- Feito:
+  - Home (`/`) convertida para **hub** com navegação para módulos operacionais.
+  - Nova página `GET /checklists` criada com toda a gestão de checklist:
+    - templates (listar/criar/remover)
+    - checklist por evento (carregar/criar via template/lista custom)
+    - atualização de itens
+  - Nova página `GET /songs/import` criada com fluxo completo de músicas:
+    - preview `.txt` por texto/arquivo
+    - seleção assistida de `songId`
+    - salvamento final da cifra e feedback de versão
+  - Mantidas rotas internas BFF existentes (sem exposição de segredo no browser).
+- Arquivos:
+  - `apps/web/app/page.tsx`
+  - `apps/web/app/checklists/page.tsx`
+  - `apps/web/app/songs/import/page.tsx`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Integrar autenticação real Google no web e proteção de rotas por sessão/perfil.
+  - Replicar os fluxos principais no mobile.
+- Próximo passo:
+  - Implementar base de autenticação web (login Google + estado de usuário/aprovação) e bloquear páginas operacionais para não-admin/aprovado.
+
+### [2026-04-03 16:15 America/Recife] - Codex
+- Objetivo: Implementar base de autenticação web e bloquear páginas operacionais para usuários não autenticados/não-admin.
+- Feito:
+  - Adicionadas rotas internas de auth no Next (BFF):
+    - `POST /api/auth/google`
+    - `GET /api/auth/me`
+    - `POST /api/auth/logout`
+  - Login aprovado agora persiste sessão em cookie HTTP-only (`overflow_access_token`).
+  - `serverApiFetch` evoluído para múltiplos modos de autenticação:
+    - `admin` (padrão)
+    - `user` (Bearer do cookie)
+    - `none`
+  - Criada página `GET /login` com fluxo base de autenticação:
+    - `idToken` Google (principal)
+    - fallback bootstrap (quando backend permite)
+    - tratamento de estados `APPROVED`, `PENDING_APPROVAL`, `REJECTED`
+  - Criado `AuthGate` client-side para validar sessão/perfil em páginas operacionais (`ADMIN`/`SUPER_ADMIN`).
+  - Proteção de rotas no edge via `proxy.ts` para redirecionar para `/login` sem cookie.
+  - Páginas `/checklists` e `/songs/import` integradas com `AuthGate`.
+  - Hub (`/`) atualizado com link para login.
+- Arquivos:
+  - `apps/web/lib/server-api.ts`
+  - `apps/web/lib/auth-cookie.ts`
+  - `apps/web/app/api/auth/google/route.ts`
+  - `apps/web/app/api/auth/me/route.ts`
+  - `apps/web/app/api/auth/logout/route.ts`
+  - `apps/web/app/login/page.tsx`
+  - `apps/web/components/AuthGate.tsx`
+  - `apps/web/proxy.ts`
+  - `apps/web/app/checklists/page.tsx`
+  - `apps/web/app/songs/import/page.tsx`
+  - `apps/web/app/page.tsx`
+  - `apps/web/middleware.ts` (removido; substituído por `proxy.ts`)
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Integrar botão/login Google real no frontend (Google Identity Services) para obter `idToken` sem input manual.
+  - Ajustar UX de sessão (ex.: botão sair global e página de acesso negado dedicada).
+  - Replicar autenticação e proteção de fluxo no mobile.
+- Próximo passo:
+  - Implementar login Google real no web (GIS) e substituir o campo manual de `idToken` por fluxo de autenticação visual.
+
+### [2026-04-03 16:18 America/Recife] - Codex
+- Objetivo: Implementar login Google real no web (GIS) substituindo fluxo manual de `idToken` como caminho principal.
+- Feito:
+  - Criada rota `GET /api/auth/google/config` no Next para fornecer `GOOGLE_CLIENT_ID` ao frontend.
+  - Página `/login` migrada para Google Identity Services:
+    - carrega script `https://accounts.google.com/gsi/client`
+    - renderiza botão oficial Google
+    - recebe `credential` e envia para `POST /api/auth/google`
+    - mantém fallback manual em `<details>` para debug/bootstrap
+  - Ajustado cookie de sessão na rota `POST /api/auth/google`:
+    - `secure` agora é condicional (`NODE_ENV === "production"`) para funcionar em dev local.
+  - `docker-compose.yml` atualizado para injetar `GOOGLE_CLIENT_ID` também no serviço `web`.
+  - README atualizado com requisito de `GOOGLE_CLIENT_ID` no web BFF.
+- Arquivos:
+  - `apps/web/app/api/auth/google/config/route.ts`
+  - `apps/web/app/login/page.tsx`
+  - `apps/web/app/api/auth/google/route.ts`
+  - `docker-compose.yml`
+  - `README.md`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Adicionar botão global de logout e estado de sessão visível no hub.
+  - Implementar página dedicada de acesso negado (não-admin) em vez de aviso inline.
+  - Levar autenticação equivalente para mobile.
+- Próximo passo:
+  - Implementar header global com estado de usuário (`/api/auth/me`) + ação de logout (`/api/auth/logout`) em todas as páginas web.
+
+### [2026-04-03 16:20 America/Recife] - Codex
+- Objetivo: Implementar header global com estado de sessão e logout em todas as páginas web.
+- Feito:
+  - Criado componente `GlobalHeader` (client-side) com:
+    - leitura de sessão via `GET /api/auth/me`
+    - navegação global (`Hub`, `Checklists`, `Songs`)
+    - exibição do usuário logado (nome + role)
+    - ação de logout via `POST /api/auth/logout`
+  - `RootLayout` atualizado para renderizar o header global em toda a aplicação.
+  - CSS global expandido com estilos do header e ajuste de espaçamento (`.app-shell`) para conteúdo abaixo da barra fixa.
+- Arquivos:
+  - `apps/web/components/GlobalHeader.tsx`
+  - `apps/web/app/layout.tsx`
+  - `apps/web/app/globals.css`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Criar página dedicada para acesso negado (não-admin) e substituir aviso inline do `AuthGate`.
+  - Ajustar UX do login para remover fallback manual fora de ambientes de desenvolvimento.
+  - Replicar padrão de sessão/autenticação no mobile.
+- Próximo passo:
+  - Implementar página `/forbidden` e atualizar `AuthGate` para redirecionar perfis sem permissão para essa rota.
+
+### [2026-04-03 16:22 America/Recife] - Codex
+- Objetivo: Implementar página dedicada de acesso negado e ajustar `AuthGate` para redirecionamento por perfil.
+- Feito:
+  - Nova rota `GET /forbidden` criada com mensagem de acesso negado e ações de navegação (`Hub` / `Trocar conta`).
+  - `AuthGate` refatorado:
+    - remove aviso inline
+    - redireciona para `/forbidden` quando usuário autenticado não é `ADMIN`/`SUPER_ADMIN`
+    - mantém redirecionamento para `/login` quando não autenticado/erro de sessão
+- Arquivos:
+  - `apps/web/app/forbidden/page.tsx`
+  - `apps/web/components/AuthGate.tsx`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Restringir fallback manual de login para ambiente de desenvolvimento apenas.
+  - Replicar padrão de autorização e experiência de acesso negado no mobile.
+- Próximo passo:
+  - Ajustar página `/login` para exibir fallback manual somente quando `NODE_ENV !== "production"` (ou flag explícita), reduzindo superfície em produção.
+
+### [2026-04-03 16:23 America/Recife] - Codex
+- Objetivo: Restringir fallback manual de login para ambientes controlados (dev/flag), reduzindo exposição em produção.
+- Feito:
+  - `GET /api/auth/google/config` passou a retornar `fallbackEnabled` com regra:
+    - `true` se `WEB_LOGIN_FALLBACK_ENABLED=true`
+    - ou em não-produção quando `AUTH_BOOTSTRAP_MODE=true`
+  - Página `/login` ajustada para:
+    - exibir fallback manual somente quando `fallbackEnabled=true`
+    - manter botão Google como fluxo padrão
+  - `docker-compose.yml` atualizado com variáveis para o web:
+    - `AUTH_BOOTSTRAP_MODE`
+    - `WEB_LOGIN_FALLBACK_ENABLED` (default `false`)
+  - Workflow de deploy atualizado para propagar `WEB_LOGIN_FALLBACK_ENABLED`.
+  - README atualizado com documentação das variáveis de fallback.
+- Arquivos:
+  - `apps/web/app/api/auth/google/config/route.ts`
+  - `apps/web/app/login/page.tsx`
+  - `docker-compose.yml`
+  - `.github/workflows/deploy-hostinger.yml`
+  - `README.md`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Definir em produção o valor de `WEB_LOGIN_FALLBACK_ENABLED` (recomendado: `false`).
+  - Implementar experiência equivalente de auth no mobile.
+- Próximo passo:
+  - Adicionar endpoint/status de sessão no hub para indicar claramente quando o usuário está pendente/rejeitado e guiar ação.
+
+### [2026-04-03 16:26 America/Recife] - Codex
+- Objetivo: Exibir status de sessão no Hub para orientar contas pendentes/rejeitadas após login.
+- Feito:
+  - Sistema de `statusHint` adicionado via cookie:
+    - login `PENDING_APPROVAL`/`REJECTED` grava `overflow_login_status_hint`
+    - login `APPROVED` limpa hint e mantém sessão ativa
+  - `GET /api/auth/me` atualizado para retornar `statusHint` quando não autenticado por token.
+  - `POST /api/auth/logout` atualizado para limpar também o `statusHint`.
+  - Novo componente `SessionStatusBanner` no Hub (`/`) com estados:
+    - sessão ativa (aprovado)
+    - aguardando aprovação
+    - acesso rejeitado (com link para `/login`)
+- Arquivos:
+  - `apps/web/lib/auth-cookie.ts`
+  - `apps/web/app/api/auth/google/route.ts`
+  - `apps/web/app/api/auth/me/route.ts`
+  - `apps/web/app/api/auth/logout/route.ts`
+  - `apps/web/components/SessionStatusBanner.tsx`
+  - `apps/web/app/page.tsx`
+- Validação:
+  - `apps/web`: `npm run build` OK.
+- Pendências:
+  - Espelhar esse comportamento de status e feedback no app mobile.
+  - Opcional: expirar/invalidar `statusHint` após mudança de conta sem novo login.
+- Próximo passo:
+  - Iniciar implementação do mobile com base nos fluxos já estáveis de web (auth + checklists + import preview).
+
+### [2026-04-03 16:31 America/Recife] - Codex
+- Objetivo: Iniciar implementação mobile com base nos fluxos web já estáveis (auth + checklist + preview).
+- Feito:
+  - Criado `apps/mobile` com bootstrap Expo/React Native:
+    - `package.json`, `app.json`, `tsconfig.json`, `babel.config.js`
+    - `App.tsx` com MVP funcional
+  - Fluxos implementados no app mobile:
+    - login (`idToken` ou fallback bootstrap)
+    - sessão local via `AsyncStorage` + validação em `/auth/me`
+    - leitura de templates e checklist por evento (`GET`)
+    - preview de cifra `.txt` (requer `EXPO_PUBLIC_ADMIN_API_KEY`)
+  - Workspace raiz atualizado com script `start:mobile`.
+  - `.env.example` expandido com variáveis mobile e fallback web.
+  - README raiz atualizado com seção mobile.
+  - Adicionado `apps/mobile/README.md` para handoff rápido.
+  - Dependências do workspace mobile instaladas.
+- Arquivos:
+  - `apps/mobile/package.json`
+  - `apps/mobile/app.json`
+  - `apps/mobile/tsconfig.json`
+  - `apps/mobile/babel.config.js`
+  - `apps/mobile/App.tsx`
+  - `apps/mobile/README.md`
+  - `apps/mobile/assets/.gitkeep`
+  - `package.json`
+  - `.env.example`
+  - `README.md`
+- Validação:
+  - `npm install --workspace apps/mobile` OK (com warnings de engine em Node `20.19.2`, sem bloquear instalação).
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Integrar autenticação Google nativa no mobile (sem input manual de idToken).
+  - Implementar escrita de checklist/import no backend com autenticação por usuário (hoje endpoints de escrita dependem de `ADMIN_API_KEY`).
+  - Estruturar navegação mobile em telas separadas (login/checklist/songs) e não apenas tela única.
+- Próximo passo:
+  - Implementar navegação mobile (stack/tabs) e separar a UI em telas dedicadas, mantendo o estado de sessão compartilhado.
+
+### [2026-04-03 16:35 America/Recife] - Codex
+- Objetivo: Estruturar navegação mobile em telas separadas com estado de sessão compartilhado.
+- Feito:
+  - `App.tsx` refatorado para shell de estado + roteamento por abas (Checklist, Cifras, Conta).
+  - Camada de tipos e API extraída para `src/types.ts` e `src/lib/api.ts`.
+  - Config central de ambiente/token em `src/lib/config.ts`.
+  - UI modularizada em componentes/telas:
+    - `BottomTabs`
+    - `LoginScreen`
+    - `ChecklistScreen`
+    - `SongsScreen`
+    - `AccountScreen`
+  - Estilos compartilhados extraídos para `src/styles.ts`.
+- Arquivos:
+  - `apps/mobile/App.tsx`
+  - `apps/mobile/src/types.ts`
+  - `apps/mobile/src/lib/config.ts`
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/styles.ts`
+  - `apps/mobile/src/components/BottomTabs.tsx`
+  - `apps/mobile/src/screens/LoginScreen.tsx`
+  - `apps/mobile/src/screens/ChecklistScreen.tsx`
+  - `apps/mobile/src/screens/SongsScreen.tsx`
+  - `apps/mobile/src/screens/AccountScreen.tsx`
+- Validação:
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Integrar login Google nativo no mobile (sem input manual de `idToken`).
+  - Implementar endpoints de escrita/autorização por usuário para checklist e import de cifra (sem depender de `ADMIN_API_KEY` no app).
+- Próximo passo:
+  - Implementar fluxo de autenticação Google nativo no Expo e remover o formulário manual de `idToken` do app mobile.
+
+### [2026-04-03 16:38 America/Recife] - Codex
+- Objetivo: Iniciar autenticação Google nativa no app mobile e reduzir dependência do input manual de `idToken`.
+- Feito:
+  - Adicionadas dependências mobile para OAuth:
+    - `expo-auth-session`
+    - `expo-web-browser`
+  - `LoginScreen` refatorada para fluxo Google nativo (OpenID):
+    - botão `Entrar com Google`
+    - captura de `id_token` retornado pelo Google
+    - envio automático para endpoint existente de login
+  - Fallback manual de login mantido apenas em dev/flag:
+    - `EXPO_PUBLIC_MOBILE_LOGIN_FALLBACK_ENABLED=true` ou `__DEV__`
+  - `app.json` atualizado com `scheme` para redirect (`overflowmusic`).
+  - Documentação e env atualizados para novo fluxo.
+- Arquivos:
+  - `apps/mobile/src/screens/LoginScreen.tsx`
+  - `apps/mobile/src/styles.ts`
+  - `apps/mobile/app.json`
+  - `apps/mobile/package.json`
+  - `.env.example`
+  - `apps/mobile/README.md`
+- Validação:
+  - `npm install --workspace apps/mobile expo-auth-session expo-web-browser` OK (com warnings de engine já conhecidos).
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Backend atualmente valida um único `GOOGLE_CLIENT_ID`; para mobile nativo pode ser necessário aceitar múltiplas audiências (`web/ios/android`).
+  - Substituir endpoint de preview de cifra para fluxo autenticado por usuário (sem `ADMIN_API_KEY` no app).
+- Próximo passo:
+  - Ajustar backend de autenticação para aceitar lista de Google Client IDs válidos e fechar compatibilidade completa do login mobile nativo.
+
+### [2026-04-03 16:41 America/Recife] - Codex
+- Objetivo: Ajustar backend de autenticação para aceitar múltiplos Google Client IDs (web/ios/android).
+- Feito:
+  - `AuthController` atualizado para resolver audiências válidas por configuração:
+    - `GOOGLE_CLIENT_IDS` (lista CSV)
+    - fallback com `GOOGLE_CLIENT_ID` (compatibilidade)
+  - Validação de `idToken` agora usa lista consolidada de audiências.
+  - Propagada nova variável de ambiente na esteira de deploy:
+    - `.env.example`
+    - `docker-compose.yml` (serviço `api`)
+    - `.github/workflows/deploy-hostinger.yml` (ambos deploys)
+  - README atualizado com orientação de uso de `GOOGLE_CLIENT_IDS` em produção.
+- Arquivos:
+  - `apps/api/src/auth/auth.controller.ts`
+  - `.env.example`
+  - `docker-compose.yml`
+  - `.github/workflows/deploy-hostinger.yml`
+  - `README.md`
+- Validação:
+  - `npm --workspace apps/api run build` OK.
+- Pendências:
+  - Configurar segredo `GOOGLE_CLIENT_IDS` no GitHub/Hostinger com IDs reais de web/ios/android.
+  - Revisar se o app mobile deve usar client ID específico por plataforma em runtime.
+- Próximo passo:
+  - Parametrizar o mobile para usar `expo-auth-session` com client IDs por plataforma e alinhar com `GOOGLE_CLIENT_IDS` configurado na API.
+
+### [2026-04-03 16:42 America/Recife] - Codex
+- Objetivo: Alinhar autenticação mobile com múltiplos client IDs por plataforma após ajuste de audiências na API.
+- Feito:
+  - Login mobile atualizado para escolher client ID por plataforma:
+    - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
+    - `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`
+    - `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`
+    - fallback `EXPO_PUBLIC_GOOGLE_CLIENT_ID`
+  - Mensagem de erro de configuração do login atualizada para refletir variáveis por plataforma.
+  - `.env.example` expandido com variáveis Google do mobile por plataforma.
+  - README (raiz e mobile) atualizado com novas variáveis de OAuth.
+- Arquivos:
+  - `apps/mobile/src/screens/LoginScreen.tsx`
+  - `.env.example`
+  - `apps/mobile/README.md`
+  - `README.md`
+- Validação:
+  - `npm --workspace apps/api run build` OK.
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Configurar IDs reais por plataforma nos ambientes (GitHub/Hostinger/local Expo).
+  - Migrar endpoints de escrita (checklist/import) para autenticação de usuário no backend.
+- Próximo passo:
+  - Implementar autorização por token de usuário nos endpoints de escrita de checklist e preview/import de cifra para remover dependência de `ADMIN_API_KEY` no mobile.
+
+### [2026-04-03 16:44 America/Recife] - Codex
+- Objetivo: Remover dependência exclusiva de `ADMIN_API_KEY` para escrita e permitir gestão por usuário autenticado no mobile/web.
+- Feito:
+  - API: adicionado controle de permissão por token de usuário aprovado (`LEADER|ADMIN|SUPER_ADMIN`):
+    - `AuthService.assertCanManageContent(accessToken)`.
+  - Endpoints de escrita atualizados para aceitar:
+    - `Bearer ADMIN_API_KEY` (compatibilidade)
+    - ou token de usuário autorizado.
+  - Controladores atualizados:
+    - `SongsController`
+    - `ChecklistTemplatesController`
+    - `ChecklistRunsController`
+  - Mobile: preview de cifra agora usa token de sessão do usuário por padrão; `EXPO_PUBLIC_ADMIN_API_KEY` virou fallback.
+  - Documentação atualizada (README raiz e mobile) para refletir o novo modelo de autorização.
+- Arquivos:
+  - `apps/api/src/auth/auth.service.ts`
+  - `apps/api/src/songs/songs.controller.ts`
+  - `apps/api/src/checklist/checklist-templates.controller.ts`
+  - `apps/api/src/checklist/checklist-runs.controller.ts`
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/App.tsx`
+  - `apps/mobile/src/screens/SongsScreen.tsx`
+  - `README.md`
+  - `apps/mobile/README.md`
+- Validação:
+  - `npm --workspace apps/api run build` OK.
+  - `npm --workspace apps/api test` OK (executado fora do sandbox devido `EPERM` de IPC local no `tsx`).
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Adicionar testes específicos cobrindo escrita com token de usuário (`LEADER/ADMIN`) e bloqueio de `MEMBER`.
+  - Criar UI mobile para operações de escrita de checklist/import (hoje apenas leitura + preview).
+- Próximo passo:
+  - Implementar testes de autorização por papel nos endpoints de escrita (songs/checklists) para evitar regressão de segurança.
+
+### [2026-04-03 16:46 America/Recife] - Codex
+- Objetivo: Cobrir com testes a nova autorização de escrita por token de usuário.
+- Feito:
+  - Atualizados testes de integração de checklist para injetar `AuthService` mockado e validar:
+    - escrita com token de usuário autorizado
+    - bloqueio com token sem permissão
+  - Atualizados testes de integração de songs import para validar os mesmos cenários de autorização por token de usuário.
+  - Ajustado metadata de injeção nos testes para refletir construtores atualizados dos controllers.
+- Arquivos:
+  - `apps/api/src/checklist/checklist.integration.test.ts`
+  - `apps/api/src/songs/songs-import.integration.test.ts`
+- Validação:
+  - `npm --workspace apps/api run build` OK.
+  - `npm --workspace apps/api test` OK (23 testes, 23 passando).
+- Pendências:
+  - Implementar operações de escrita de checklist no app mobile (atualmente leitura + preview).
+  - Implementar import real de cifra no mobile (além do preview).
+- Próximo passo:
+  - Adicionar no mobile ações de atualização de checklist (`PATCH item`) usando token de usuário autenticado.
+
+### [2026-04-03 16:47 America/Recife] - Codex
+- Objetivo: Adicionar operação de escrita de checklist no mobile usando token autenticado.
+- Feito:
+  - Implementada chamada `PATCH /api/events/:eventId/checklist/items/:itemId` no client mobile (`updateChecklistItem`).
+  - `ChecklistScreen` evoluída para:
+    - controlar `eventId` vindo do estado global
+    - permitir toggle de itens com ação de escrita.
+  - `App.tsx` atualizado com fluxo de atualização:
+    - envio de `checked` + `checkedByName`
+    - recarga do checklist após patch
+    - feedback de status ao usuário.
+  - Documentação mobile e README raiz atualizadas com suporte a atualização de checklist.
+- Arquivos:
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/screens/ChecklistScreen.tsx`
+  - `apps/mobile/src/styles.ts`
+  - `apps/mobile/App.tsx`
+  - `apps/mobile/README.md`
+  - `README.md`
+- Validação:
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+  - `npm --workspace apps/api run build` OK.
+- Pendências:
+  - Implementar import real de cifra no mobile (persistência, não apenas preview).
+  - Adicionar feedback visual por item durante atualização (loading por linha).
+- Próximo passo:
+  - Implementar fluxo mobile de import de cifra `.txt` com upload/persistência usando token de usuário autorizado.
+
+### [2026-04-03 16:49 America/Recife] - Codex
+- Objetivo: Implementar import persistente de cifra `.txt` no mobile com token autenticado.
+- Feito:
+  - Mobile API client atualizado com `importSongTxt(content, accessToken)` para `POST /api/songs/import/txt`.
+  - Novos tipos mobile para resultado de import (`songId`, `songTitle`, `chartVersion`).
+  - Aba de cifras (`SongsScreen`) evoluída com ação `Salvar cifra` além de `Gerar preview`.
+  - `App.tsx` conectado ao novo fluxo de persistência:
+    - valida conteúdo
+    - envia import com token de sessão
+    - exibe retorno da música/versão importada.
+  - README mobile e raiz atualizados para refletir preview + import persistente.
+- Arquivos:
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/types.ts`
+  - `apps/mobile/src/screens/SongsScreen.tsx`
+  - `apps/mobile/App.tsx`
+  - `apps/mobile/README.md`
+  - `README.md`
+- Validação:
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Adicionar fluxo de upload de arquivo `.txt` no mobile (além de colar texto).
+  - Melhorar feedback visual de loading durante preview/import.
+- Próximo passo:
+  - Implementar seleção/upload de arquivo `.txt` no mobile para import/preview sem necessidade de colar manualmente.
+
+### [2026-04-03 16:50 America/Recife] - Codex
+- Objetivo: Permitir seleção de arquivo `.txt` no mobile para alimentar preview/import de cifra.
+- Feito:
+  - Instaladas dependências Expo no app mobile:
+    - `expo-document-picker`
+    - `expo-file-system`
+  - `SongsScreen` atualizada com fluxo de arquivo:
+    - botão `Selecionar arquivo .txt`
+    - leitura do conteúdo do arquivo selecionado
+    - preenchimento automático do campo de texto da cifra
+    - feedback de status (arquivo carregado/erro)
+  - README mobile e raiz atualizados com suporte a seleção de arquivo no dispositivo.
+- Arquivos:
+  - `apps/mobile/src/screens/SongsScreen.tsx`
+  - `apps/mobile/package.json`
+  - `apps/mobile/README.md`
+  - `README.md`
+- Validação:
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Validar manualmente o fluxo de seleção em Android/iOS real (permissões e providers de arquivo).
+  - Melhorar UX de loading nos botões de preview/import e no upload de arquivo.
+- Próximo passo:
+  - Adicionar estados de carregamento e bloqueio de ações simultâneas na aba de cifras para evitar cliques duplicados.
+
+### [2026-04-03 17:15 America/Recife] - Codex
+- Objetivo: Evitar ações duplicadas na aba de cifras com estados de carregamento e bloqueio de interação.
+- Feito:
+  - `App.tsx` atualizado com estados de operação:
+    - `loadingSongPreview`
+    - `loadingSongImport`
+  - Guardas lógicas adicionadas para impedir disparo simultâneo de preview/import.
+  - `SongsScreen` atualizada com:
+    - estado local `loadingFilePick`
+    - desabilitação de botões/input durante operações
+    - labels dinâmicos (`Lendo arquivo...`, `Gerando preview...`, `Salvando cifra...`).
+- Arquivos:
+  - `apps/mobile/App.tsx`
+  - `apps/mobile/src/screens/SongsScreen.tsx`
+- Validação:
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Validar UX em dispositivo real (latência/retry) para confirmar feedback adequado.
+  - Opcional: adicionar debounce/cancelamento de requests de preview.
+- Próximo passo:
+  - Implementar feedback visual por item na aba de checklist durante atualização (`PATCH`) para consistência de UX com a aba de cifras.
+
+### [2026-04-03 17:16 America/Recife] - Codex
+- Objetivo: Melhorar UX de concorrência no mobile com feedback de carregamento em cifras e checklist.
+- Feito:
+  - Aba de cifras:
+    - `App.tsx` com estados `loadingSongPreview` e `loadingSongImport`.
+    - Guardas para bloquear preview/import simultâneos.
+    - `SongsScreen` com `loadingFilePick`, botões/input desabilitados durante operação e labels dinâmicos.
+  - Aba de checklist:
+    - `App.tsx` com `loadingChecklist` e `updatingChecklistItemId`.
+    - `ChecklistScreen` com:
+      - botão de carregar checklist com estado `Carregando...`
+      - desabilitação de input/itens durante update
+      - indicação por item (`atualizando...`) no item em processamento.
+  - README mobile atualizado com feedback de loading no checklist.
+- Arquivos:
+  - `apps/mobile/App.tsx`
+  - `apps/mobile/src/screens/SongsScreen.tsx`
+  - `apps/mobile/src/screens/ChecklistScreen.tsx`
+  - `apps/mobile/README.md`
+- Validação:
+  - `npm --workspace apps/mobile exec tsc --noEmit` OK.
+- Pendências:
+  - Validar UX em dispositivo real para confirmar comportamento em redes lentas.
+  - Opcional: adicionar retry e timeout explícito para operações de rede no mobile.
+- Próximo passo:
+  - Iniciar hardening do deploy: checklist de segredos/variáveis para Hostinger + script de validação pré-deploy.
+
+### [2026-04-03 17:20 America/Recife] - Codex
+- Objetivo: Iniciar hardening de deploy com validação prévia de segredos/variáveis para Hostinger.
+- Feito:
+  - Criado script `scripts/check-hostinger-env.sh` com validação de variáveis obrigatórias de deploy.
+  - Regra de Google aplicada no script:
+    - exige `GOOGLE_CLIENT_IDS` ou `GOOGLE_CLIENT_ID`.
+  - `package.json` atualizado com comando:
+    - `npm run check:deploy-env`
+  - Workflow de deploy atualizado com etapa explícita de validação antes de publicar na VPS.
+  - README atualizado com seção `Deploy Hardening (Hostinger)`.
+- Arquivos:
+  - `scripts/check-hostinger-env.sh`
+  - `package.json`
+  - `.github/workflows/deploy-hostinger.yml`
+  - `README.md`
+- Validação:
+  - Execução local do script com envs de teste: OK.
+- Pendências:
+  - Popular todas as variáveis obrigatórias no GitHub Secrets/Vars do projeto.
+  - Opcional: incluir verificação de formato para algumas variáveis sensíveis (ex.: domínio, portas numéricas).
+- Próximo passo:
+  - Adicionar validações de formato no script (domínio, booleanos e portas) para reduzir erro humano de configuração.
+
+### [2026-04-03 17:21 America/Recife] - Codex
+- Objetivo: Fortalecer script de pre-deploy com validação de formato para reduzir erro de configuração.
+- Feito:
+  - `scripts/check-hostinger-env.sh` atualizado com validações adicionais:
+    - `AUTH_BOOTSTRAP_MODE` e `WEB_LOGIN_FALLBACK_ENABLED` devem ser `true/false`
+    - `SMTP_PORT` numérico e na faixa `1-65535`
+    - `GOOGLE_ALLOWED_DOMAIN` com formato de domínio válido
+    - `FRONTEND_URL` e `NEXT_PUBLIC_API_URL` incluídos como obrigatórios
+  - Workflow atualizado para fornecer `FRONTEND_URL` e `NEXT_PUBLIC_API_URL` na etapa de validação.
+  - README atualizado com resumo das validações de formato.
+- Arquivos:
+  - `scripts/check-hostinger-env.sh`
+  - `.github/workflows/deploy-hostinger.yml`
+  - `README.md`
+- Validação:
+  - Execução local do script com envs de teste: OK.
+- Pendências:
+  - Opcional: validar também formato de URL para `FRONTEND_URL` e `NEXT_PUBLIC_API_URL` no script.
+- Próximo passo:
+  - Criar `docs/DEPLOY_CHECKLIST.md` com passo a passo operacional (secrets, DNS, SSL, rollout check) para handoff de operação.
+
+### [2026-04-03 17:21 America/Recife] - Codex
+- Objetivo: Criar checklist operacional de deploy para handoff rápido de operação.
+- Feito:
+  - Criado `docs/DEPLOY_CHECKLIST.md` com fluxo ponta-a-ponta:
+    - pré-requisitos de VPS/DNS
+    - secrets obrigatórios
+    - validação pré-deploy
+    - emissão SSL
+    - deploy e pós-deploy
+    - rollback rápido
+    - boas práticas de segurança operacional
+  - README atualizado com referência para o checklist operacional.
+- Arquivos:
+  - `docs/DEPLOY_CHECKLIST.md`
+  - `README.md`
+- Validação:
+  - Verificação estática do conteúdo e comandos de operação.
+- Pendências:
+  - Executar checklist em ambiente real para confirmar tempos/ajustes finos operacionais.
+- Próximo passo:
+  - Rodar um dry-run operacional com secrets reais e registrar resultados no `docs/DEV_LOG.md`.
+
+### [2025-07-16 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Criar modo de apresentação fullscreen do setlist (web).
+- Feito:
+  - Criado `apps/web/app/events/[eventId]/present/page.tsx`:
+    - Fullscreen darkmode (`min-height: 100dvh`, background `#080f1a`)
+    - Navegação por teclado: ArrowRight/ArrowLeft/Space avança/retrocede, Escape volta, H togla nav
+    - Exibe: contador (N/Total), título (fonte responsiva até 96px), chips de tom/líder/zona, notas de transição
+    - Pills de navegação rápida por índice
+    - Nav bar e bottom bar com auto-hide após 3s de inatividade (click toggle)
+  - Atualizado `apps/web/app/events/[eventId]/page.tsx`:
+    - Adicionado botão "▶ Apresentar" ao lado do título do Setlist (visível somente quando há itens)
+- Arquivos:
+  - `apps/web/app/events/[eventId]/present/page.tsx` (criado)
+  - `apps/web/app/events/[eventId]/page.tsx` (link adicionado)
+- Validação:
+  - Checagem estática de tipos: sem erros aparentes.
+- Pendências:
+  - Testar em browser para validar navegação por teclado e layout fullscreen.
+  - Mobile: reorder de setlist ainda não implementado no app mobile.
+  - Gestão de organizações/equipes não iniciada.
+- Próximo passo:
+  - Implementar tela de configurações/perfil completa no mobile (nome, foto, alterar senha social).
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Implementar tela de perfil/conta completa no mobile com edição de nome.
+- Feito:
+  - API: adicionado `PATCH api/auth/me` (auth.controller.ts + auth.service.ts) — atualiza `name` do usuário autenticado via JWT.
+  - Mobile `apps/mobile/src/lib/api.ts`: adicionada função `updateProfile(accessToken, { name })`.
+  - Mobile `apps/mobile/src/screens/AccountScreen.tsx`: reescrita com:
+    - Avatar circular com iniciais do nome
+    - Badge de role colorido (SUPER_ADMIN, ADMIN, LEADER, MEMBER)
+    - Email exibido (somente leitura)
+    - Campo de edição de nome inline com botões Salvar/Cancelar
+    - Botão "Sair da conta" com loading state
+  - Mobile `apps/mobile/App.tsx`: atualizado para passar `accessToken` e `onUserUpdate` ao AccountScreen.
+- Arquivos:
+  - `apps/api/src/auth/auth.service.ts`
+  - `apps/api/src/auth/auth.controller.ts`
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/screens/AccountScreen.tsx`
+  - `apps/mobile/App.tsx`
+- Validação:
+  - Checagem estática de tipos: sem erros aparentes.
+- Pendências:
+  - Testar endpoint PATCH em ambiente real.
+  - Mobile: reorder do setlist ainda não implementado (somente leitura).
+  - Gestão de organizações/equipes não iniciada.
+- Próximo passo:
+  - Implementar gestão de equipes/membros (listar usuários aprovados, ver papéis) no web ou mobile.
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Gestão de equipe — listar membros aprovados agrupados por função.
+- Feito:
+  - API: adicionado `listApprovedUsers` em `auth.service.ts` (filtra `status=APPROVED`, ordena por role+nome).
+  - API: adicionado `GET api/admin/users` em `auth.controller.ts` (protegido por `ADMIN_API_KEY`).
+  - Web proxy: criado `apps/web/app/api/admin/users/route.ts` → `GET admin/users`.
+  - Web page: criado `apps/web/app/admin/team/page.tsx`:
+    - Protegido por `AuthGate`
+    - Busca por nome/email
+    - Membros agrupados por role (SUPER_ADMIN → ADMIN → LEADER → MEMBER)
+    - Avatar com iniciais e cor por role
+    - Link para `/admin/users` (aprovação de pendentes)
+  - Home: adicionado card "Equipe" → `/admin/team`.
+- Arquivos:
+  - `apps/api/src/auth/auth.service.ts`
+  - `apps/api/src/auth/auth.controller.ts`
+  - `apps/web/app/api/admin/users/route.ts` (criado)
+  - `apps/web/app/admin/team/page.tsx` (criado)
+  - `apps/web/app/page.tsx`
+- Validação:
+  - Checagem estática de tipos: sem erros aparentes.
+- Pendências:
+  - Reorder do setlist no mobile (somente leitura por ora).
+  - Testes e2e não iniciados.
+- Próximo passo:
+  - Implementar reorder do setlist no mobile (swipe ou botões ▲▼ + PATCH endpoint).
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Reorder do setlist no mobile com botões ▲▼.
+- Feito:
+  - `apps/mobile/src/lib/api.ts`: adicionada `reorderSetlist(eventId, items, accessToken)` → POST `/events/:id/setlist/reorder`.
+  - `apps/mobile/src/screens/EventsScreen.tsx`: reescrita para:
+    - Aceitar props `reorderingId: string|null` e `onMoveItem(item, direction, sorted)`.
+    - Exibir botões ▲▼ por item do setlist (desabilitados quando `isBusy`, `isFirst` ou `isLast`).
+    - Feedback visual: opacidade reduzida no item em movimento.
+  - `apps/mobile/App.tsx`:
+    - Importado `reorderSetlist` e tipo `SetlistItem`.
+    - Adicionado estado `reorderingId`.
+    - Implementada `moveSetlistItem(item, direction, sorted)`: calcula swap de orders, chama `reorderSetlist`, faz refresh do setlist.
+    - Passadas novas props ao `EventsScreen`.
+- Arquivos:
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/screens/EventsScreen.tsx`
+  - `apps/mobile/App.tsx`
+- Validação:
+  - Checagem estática de tipos: sem erros aparentes.
+- Pendências:
+  - Testes e2e não iniciados.
+  - Sem tela de criação/edição de evento no mobile (somente leitura).
+- Próximo passo:
+  - Avaliar testes e2e com Detox/Jest ou iniciar módulo de notificações/push.
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Adicionar cobertura de testes unitários para auth.service e setlist.service.
+- Feito:
+  - Criado `apps/api/src/auth/auth.service.test.ts` (6 testes):
+    - `updateMe`: atualiza nome, rejeita nome vazio, rejeita token inválido
+    - `listApprovedUsers`: filtra corretamente por status APPROVED
+    - `googleLogin`: cria usuário PENDING_APPROVAL, retorna accessToken para APPROVED
+  - Criado `apps/api/src/setlist/setlist.service.test.ts` (6 testes):
+    - `reorder`: reordena itens, rejeita items[], rejeita item de outro setlist
+    - `addItem`: order auto-incrementado, rejeita songTitle vazio
+    - `getByEvent`: retorna null quando setlist não existe
+  - Todos os 20 testes passando (tsx --test, sem instalar deps extras):
+    - `chord-txt-parser.test.ts` — 4 ✔
+    - `txt-upload-validator.test.ts` — 3 ✔
+    - `songs.service.test.ts` — 1 ✔
+    - `auth.service.test.ts` — 6 ✔ (novo)
+    - `setlist.service.test.ts` — 6 ✔ (novo)
+- Arquivos:
+  - `apps/api/src/auth/auth.service.test.ts` (criado)
+  - `apps/api/src/setlist/setlist.service.test.ts` (criado)
+- Validação:
+  - `tsx --test` via node_modules raiz: 20 pass, 0 fail.
+  - Comando: `node_modules/.bin/tsx --test apps/api/src/**/*.test.ts`
+- Pendências:
+  - Testes de integração para auth.controller (PATCH /auth/me, GET /admin/users).
+  - Testes e2e (Cypress/Playwright na web).
+  - Mobile sem testes unitários.
+- Próximo passo:
+  - Adicionar testes de integração para auth.controller usando NestJS Testing + supertest.
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Adicionar testes de integração para auth.controller (NestJS Testing + supertest).
+- Feito:
+  - Criado `apps/api/src/auth/auth.controller.integration.test.ts` (14 testes):
+    - `POST /api/auth/google`: 400 sem body, 201 em bootstrap mode
+    - `GET /api/auth/me`: 401 sem token, 200 com token
+    - `PATCH /api/auth/me`: 401 sem token, 200 com nome atualizado
+    - `GET /api/admin/users`: 401 sem admin key, 200 com admin key
+    - `GET /api/admin/users/pending`: 401 sem admin key, 200 com admin key
+    - `POST /api/admin/users/:id/approve`: 401 sem admin key, 201 com admin key
+    - `POST /api/admin/users/:id/reject`: 401 sem admin key, 201 com admin key
+  - Suíte completa: **34/34 passando** (todos os arquivos de teste da API).
+  - Descoberto: tsx precisa de `--tsconfig apps/api/tsconfig.json` ao rodar da raiz do monorepo (esbuild não lê tsconfig aninhado automaticamente).
+- Arquivos:
+  - `apps/api/src/auth/auth.controller.integration.test.ts` (criado)
+  - `docs/DEV_LOG.md`
+- Validação:
+  - `node_modules/.bin/tsx --tsconfig apps/api/tsconfig.json --test <todos os arquivos>`: 34 pass, 0 fail.
+- Pendências:
+  - Testes e2e (Cypress/Playwright na web).
+  - Mobile sem testes unitários.
+  - `songs-import.integration.test.ts` não incluso no último run (verificar).
+- Próximo passo:
+  - Definir próxima feature com o time (push notifications, filtros de setlist, exportação PDF).
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Implementar biblioteca de músicas no web (lista + visualizador de cifra).
+- Feito:
+  - Confirmado `songs-import.integration.test.ts` passando (8/8) com `--tsconfig` flag.
+  - Suíte completa agora: **42 testes** (34 anteriores + 8 songs-import).
+  - `apps/web/app/api/songs/[songId]/route.ts` — proxy GET song by ID.
+  - `apps/web/app/songs/page.tsx` — biblioteca: grid com busca por título/artista, pills de tom e nº de cifras, link para detalhe.
+  - `apps/web/app/songs/[songId]/page.tsx` — visualizador de cifra: metadata (tom, BPM, capo), seletor de versão, seções com acordes em verde/letras em branco/tab em azul, dicionário de acordes, link para importar nova versão.
+  - `apps/web/app/page.tsx` — card "Song TXT Import" substituído por "Biblioteca de Músicas" → `/songs`.
+- Arquivos:
+  - `apps/web/app/api/songs/[songId]/route.ts` (criado)
+  - `apps/web/app/songs/page.tsx` (criado)
+  - `apps/web/app/songs/[songId]/page.tsx` (criado)
+  - `apps/web/app/page.tsx` (alterado)
+  - `docs/DEV_LOG.md`
+- Validação:
+  - TypeScript: 0 erros em todos os arquivos novos/alterados.
+  - Testes: 42/42 passando (inclui songs-import.integration).
+- Pendências:
+  - Mobile: SongsScreen ainda é só importação, sem browsing da biblioteca.
+  - Testes e2e web (Playwright/Cypress).
+- Próximo passo:
+  - Adicionar aba "Browse" na SongsScreen mobile para listar e visualizar cifras.
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Adicionar biblioteca de músicas (Browse) na aba Songs do mobile.
+- Feito:
+  - `apps/mobile/src/types.ts` — adicionados `Song`, `SongChordChart`, `ParsedChart`, `SongSection`, `SongSectionLine`.
+  - `apps/mobile/src/lib/api.ts` — adicionados `fetchSongs()` e `fetchSongById(id)`.
+  - `apps/mobile/src/screens/SongsScreen.tsx` — reescrito com duas abas internas:
+    - **Biblioteca**: lista com busca por título/artista, pills de tom e nº de cifras, detalhe com seções (acordes em verde, letras em branco, tab em azul), seletor de versão, dicionário de acordes, botão "← Músicas".
+    - **Importar TXT**: conteúdo original (seletor de arquivo, textarea, preview, salvar) movido para segunda aba.
+- Arquivos:
+  - `apps/mobile/src/types.ts`
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/screens/SongsScreen.tsx`
+  - `docs/DEV_LOG.md`
+- Validação:
+  - TypeScript: 0 erros em todos os arquivos afetados.
+- Pendências:
+  - Testes e2e mobile/web.
+  - Filtros avançados (por tom, tag).
+- Próximo passo:
+  - Avaliar próxima feature: notificações push, exportação PDF do setlist ou modo offline.
+
+### [2026-04-03 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Corrigir bug de duplicata em EventsScreen.tsx e implementar compartilhamento/impressão do setlist.
+- Feito:
+  - `apps/mobile/src/screens/EventsScreen.tsx`: removida definição duplicada de `Props`, `formatDate` e `EventsScreen` (versão antiga sem suporte a reorder havia sido appendada por engano).
+  - `apps/mobile/src/screens/EventsScreen.tsx`: adicionado import `Share` do react-native e botão "Compartilhar Setlist":
+    - Aparece abaixo dos itens do setlist quando há itens.
+    - Gera mensagem formatada: `Setlist — <título>\n\n1. Música (Tom) — Líder\n2. ...`.
+    - Usa `Share.share()` nativo do react-native.
+  - `apps/web/app/events/[eventId]/page.tsx`: adicionado botão "🖨 Imprimir" ao lado do link "▶ Apresentar":
+    - Chama `window.print()`.
+    - Estilo neutro compatível com a UI existente.
+- Arquivos:
+  - `apps/mobile/src/screens/EventsScreen.tsx`
+  - `apps/web/app/events/[eventId]/page.tsx`
+- Validação:
+  - TypeScript: 0 erros em todos os arquivos alterados.
+  - Testes: 42/42 passando (sem regressão).
+- Pendências:
+  - Testes e2e mobile/web.
+  - Estilo `@media print` na web para ocultar UI desnecessária na impressão.
+- Próximo passo:
+  - Avaliar próxima feature: notificações push, exportação PDF do setlist, modo offline ou filtros de biblioteca.

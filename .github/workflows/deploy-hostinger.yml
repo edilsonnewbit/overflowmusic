@@ -1,0 +1,156 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/edilsonnewbit/music-overflow
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-api:latest
+            ${{ env.IMAGE_PREFIX }}-api:${{ env.IMAGE_TAG }}
+
+      - name: Build and push Worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/worker
+          file: ./apps/worker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-worker:latest
+            ${{ env.IMAGE_PREFIX }}-worker:${{ env.IMAGE_TAG }}
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/web
+          file: ./apps/web/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-web:latest
+            ${{ env.IMAGE_PREFIX }}-web:${{ env.IMAGE_TAG }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://music.overflowmvmt.com/api
+
+      - name: Validate deploy environment variables
+        run: bash ./scripts/check-hostinger-env.sh
+        env:
+          HOSTINGER_API_KEY: ${{ secrets.HOSTINGER_API_KEY }}
+          HOSTINGER_VM_ID: ${{ vars.HOSTINGER_VM_ID }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          FRONTEND_URL: https://music.overflowmvmt.com
+          NEXT_PUBLIC_API_URL: https://music.overflowmvmt.com/api
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_IDS: ${{ secrets.GOOGLE_CLIENT_IDS }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_ALLOWED_DOMAIN: ${{ secrets.GOOGLE_ALLOWED_DOMAIN }}
+          AUTH_BOOTSTRAP_MODE: ${{ secrets.AUTH_BOOTSTRAP_MODE }}
+          WEB_LOGIN_FALLBACK_ENABLED: ${{ secrets.WEB_LOGIN_FALLBACK_ENABLED }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+
+      - name: Deploy on Hostinger VPS
+        uses: hostinger/deploy-on-vps@v2
+        with:
+          api-key: ${{ secrets.HOSTINGER_API_KEY }}
+          virtual-machine: ${{ vars.HOSTINGER_VM_ID }}
+          project-name: music-overflow
+          docker-compose-path: docker-compose.yml
+          environment-variables: |
+            IMAGE_TAG=${{ env.IMAGE_TAG }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            ADMIN_API_KEY=${{ secrets.ADMIN_API_KEY }}
+            FRONTEND_URL=https://music.overflowmvmt.com
+            NEXT_PUBLIC_API_URL=https://music.overflowmvmt.com/api
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_IDS=${{ secrets.GOOGLE_CLIENT_IDS }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            GOOGLE_ALLOWED_DOMAIN=${{ secrets.GOOGLE_ALLOWED_DOMAIN }}
+            AUTH_BOOTSTRAP_MODE=${{ secrets.AUTH_BOOTSTRAP_MODE }}
+            WEB_LOGIN_FALLBACK_ENABLED=${{ secrets.WEB_LOGIN_FALLBACK_ENABLED }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            SMTP_HOST=${{ secrets.SMTP_HOST }}
+            SMTP_PORT=${{ secrets.SMTP_PORT }}
+            SMTP_USER=${{ secrets.SMTP_USER }}
+            SMTP_PASS=${{ secrets.SMTP_PASS }}
+            SMTP_FROM=${{ secrets.SMTP_FROM }}
+
+      - name: Wait before forcing restart
+        run: sleep 15
+
+      - name: Force restart via second deploy
+        uses: hostinger/deploy-on-vps@v2
+        with:
+          api-key: ${{ secrets.HOSTINGER_API_KEY }}
+          virtual-machine: ${{ vars.HOSTINGER_VM_ID }}
+          project-name: music-overflow
+          docker-compose-path: docker-compose.yml
+          environment-variables: |
+            IMAGE_TAG=${{ env.IMAGE_TAG }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            ADMIN_API_KEY=${{ secrets.ADMIN_API_KEY }}
+            FRONTEND_URL=https://music.overflowmvmt.com
+            NEXT_PUBLIC_API_URL=https://music.overflowmvmt.com/api
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_IDS=${{ secrets.GOOGLE_CLIENT_IDS }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            GOOGLE_ALLOWED_DOMAIN=${{ secrets.GOOGLE_ALLOWED_DOMAIN }}
+            AUTH_BOOTSTRAP_MODE=${{ secrets.AUTH_BOOTSTRAP_MODE }}
+            WEB_LOGIN_FALLBACK_ENABLED=${{ secrets.WEB_LOGIN_FALLBACK_ENABLED }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            SMTP_HOST=${{ secrets.SMTP_HOST }}
+            SMTP_PORT=${{ secrets.SMTP_PORT }}
+            SMTP_USER=${{ secrets.SMTP_USER }}
+            SMTP_PASS=${{ secrets.SMTP_PASS }}
+            SMTP_FROM=${{ secrets.SMTP_FROM }}
+
+      - name: Verify API rollout version
+        run: |
+          set -euo pipefail
+          sleep 30
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            RESPONSE=$(curl -sS -H "Authorization: Bearer ${{ secrets.ADMIN_API_KEY }}" https://music.overflowmvmt.com/api/admin/auth/check || true)
+            echo "Tentativa $i/10: $RESPONSE"
+            if echo "$RESPONSE" | grep -q '"ok":true' && echo "$RESPONSE" | grep -q '"version":"${{ env.IMAGE_TAG }}"'; then
+              echo "Rollout confirmado com versão ${{ env.IMAGE_TAG }}"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Falha: produção não refletiu o commit ${{ env.IMAGE_TAG }}"
+          exit 1

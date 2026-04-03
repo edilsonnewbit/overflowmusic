@@ -1,0 +1,27 @@
+{
+  "name": "@overflow/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~55.0.8",
+    "expo-auth-session": "^55.0.12",
+    "expo-document-picker": "^55.0.11",
+    "expo-file-system": "^55.0.14",
+    "expo-status-bar": "~3.0.8",
+    "expo-web-browser": "^55.0.12",
+    "react": "19.1.1",
+    "react-native": "0.82.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "^5.7.2"
+  }
+}

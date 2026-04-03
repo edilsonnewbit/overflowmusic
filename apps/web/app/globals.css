@@ -1,0 +1,135 @@
+:root {
+  --bg: #07101d;
+  --bg-soft: #0e1f33;
+  --card: #122840;
+  --card-soft: #1b3756;
+  --line: #2d4b6d;
+  --text: #f4f8ff;
+  --muted: #b3c6e0;
+  --accent: #1ecad3;
+  --accent-2: #7cf2a2;
+  --danger: #ff6c7a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Avenir Next", "Montserrat", "Nunito Sans", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 700px at 20% -20%, #1d4f80 0%, rgba(29, 79, 128, 0) 60%),
+    radial-gradient(1000px 600px at 90% 10%, #1f3f69 0%, rgba(31, 63, 105, 0) 60%),
+    linear-gradient(180deg, #091323 0%, #060c17 100%);
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  padding-top: 74px;
+}
+
+.global-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgba(45, 75, 109, 0.9);
+  background: rgba(8, 16, 28, 0.86);
+  backdrop-filter: blur(10px);
+}
+
+.global-header-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 10px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.brand-block {
+  display: grid;
+  gap: 2px;
+}
+
+.brand-kicker {
+  margin: 0;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  font-size: 10px;
+}
+
+.brand-title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.header-nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.header-nav a {
+  text-decoration: none;
+  color: var(--muted);
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.header-nav a.active {
+  color: var(--text);
+  border-color: rgba(49, 85, 124, 1);
+  background: rgba(18, 40, 64, 0.7);
+}
+
+.auth-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.login-link {
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid rgba(49, 85, 124, 1);
+  background: rgba(22, 52, 83, 0.9);
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.logout-btn {
+  border: 1px solid rgba(128, 65, 76, 1);
+  background: rgba(74, 31, 41, 0.95);
+  color: #ffd8dd;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 6px 10px;
+  cursor: pointer;
+}

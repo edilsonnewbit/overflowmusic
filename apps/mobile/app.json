@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Overflow Music",
+    "slug": "overflow-music",
+    "scheme": "overflowmusic",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.overflow.music"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#07101d"
+      },
+      "package": "com.overflow.music"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
