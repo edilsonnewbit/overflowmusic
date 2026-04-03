@@ -21,6 +21,7 @@ import {
   reorderSetlist,
   updateChecklistItem,
   updateEvent,
+  updateSetlistItem,
 } from "./src/lib/api";
 import { TOKEN_KEY } from "./src/lib/config";
 import { registerForPushNotificationsAsync } from "./src/lib/notifications";
@@ -300,6 +301,27 @@ export default function App() {
     }
   }
 
+  async function handleUpdateSetlistItem(
+    itemId: string,
+    input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string },
+  ) {
+    if (!activeEventId) return;
+    setEventsStatus("Salvando item...");
+    try {
+      const result = await updateSetlistItem(activeEventId, itemId, input, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao editar item.");
+        return;
+      }
+      const fresh = await fetchEventSetlist(activeEventId);
+      setEventSetlist(fresh.setlist);
+      void setCache(cacheSetlistKey(activeEventId), fresh.setlist);
+      setEventsStatus("Item atualizado.");
+    } catch {
+      setEventsStatus("Erro de rede ao editar item.");
+    }
+  }
+
   async function handleCreateEvent(input: { title: string; dateTime: string; location?: string }) {
     setCreatingEvent(true);
     setEventsStatus("Criando evento...");
@@ -494,6 +516,7 @@ export default function App() {
           onSelectEvent={selectEvent}
           onMoveItem={moveSetlistItem}
           onRemoveItem={handleRemoveSetlistItem}
+          onUpdateSetlistItem={handleUpdateSetlistItem}
           statusText={eventsStatus}
           onCreateEvent={handleCreateEvent}
           creatingEvent={creatingEvent}

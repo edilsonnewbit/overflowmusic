@@ -313,6 +313,29 @@ export async function removeSetlistItem(
   return { ok: true };
 }
 
+export async function updateSetlistItem(
+  eventId: string,
+  itemId: string,
+  input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string },
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await fetch(
+    `${API_BASE}/events/${encodeURIComponent(eventId)}/setlist/items/${encodeURIComponent(itemId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+      body: JSON.stringify(input),
+    },
+  );
+  const body = await parseJson(response);
+  if (!response.ok) {
+    return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao editar item." };
+  }
+  return { ok: true };
+}
+
 export async function fetchEventSetlist(eventId: string): Promise<{ ok: boolean; setlist: EventSetlist; message?: string }> {
   const response = await fetch(`${API_BASE}/events/${encodeURIComponent(eventId)}/setlist`, { method: "GET" });
   const body = await parseJson(response);

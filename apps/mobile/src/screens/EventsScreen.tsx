@@ -13,6 +13,7 @@ type Props = {
   onSelectEvent: (eventId: string) => Promise<void>;
   onMoveItem: (item: SetlistItem, direction: "up" | "down", sorted: SetlistItem[]) => Promise<void>;
   onRemoveItem: (itemId: string) => Promise<void>;
+  onUpdateSetlistItem: (itemId: string, input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string }) => Promise<void>;
   statusText: string;
   onCreateEvent: (input: { title: string; dateTime: string; location?: string }) => Promise<void>;
   creatingEvent: boolean;
@@ -34,6 +35,7 @@ export function EventsScreen({
   onSelectEvent,
   onMoveItem,
   onRemoveItem,
+  onUpdateSetlistItem,
   statusText,
   onCreateEvent,
   creatingEvent,
@@ -112,6 +114,34 @@ export function EventsScreen({
     () => [...(setlist?.items ?? [])].sort((a, b) => a.order - b.order),
     [setlist],
   );
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [itemEditKey, setItemEditKey] = useState("");
+  const [itemEditLeader, setItemEditLeader] = useState("");
+  const [itemEditZone, setItemEditZone] = useState("");
+  const [itemEditNotes, setItemEditNotes] = useState("");
+  const [itemEditSaving, setItemEditSaving] = useState(false);
+
+  function startItemEdit(item: SetlistItem) {
+    setEditingItemId(item.id);
+    setItemEditKey(item.key ?? "");
+    setItemEditLeader(item.leaderName ?? "");
+    setItemEditZone(item.zone ?? "");
+    setItemEditNotes(item.transitionNotes ?? "");
+  }
+
+  async function submitItemEdit() {
+    if (!editingItemId) return;
+    setItemEditSaving(true);
+    await onUpdateSetlistItem(editingItemId, {
+      key: itemEditKey.trim() || undefined,
+      leaderName: itemEditLeader.trim() || undefined,
+      zone: itemEditZone.trim() || undefined,
+      transitionNotes: itemEditNotes.trim() || undefined,
+    });
+    setItemEditSaving(false);
+    setEditingItemId(null);
+  }
 
   const isBusy = reorderingId !== null || loadingSetlist;
 
@@ -322,9 +352,24 @@ export function EventsScreen({
 
                       {/* Content */}
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.primaryButtonText, { color: "#e8f2ff" }]}>
-                          {idx + 1}. {item.songTitle}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <Text style={[styles.primaryButtonText, { color: "#e8f2ff", flex: 1 }]}>
+                            {idx + 1}. {item.songTitle}
+                          </Text>
+                          <Pressable
+                            onPress={() =>
+                              editingItemId === item.id
+                                ? setEditingItemId(null)
+                                : startItemEdit(item)
+                            }
+                            style={{ paddingHorizontal: 6 }}
+                            accessibilityLabel="Editar item do setlist"
+                          >
+                            <Text style={{ color: "#7cf2a2", fontSize: 14 }}>
+                              {editingItemId === item.id ? "✕" : "✏"}
+                            </Text>
+                          </Pressable>
+                        </View>
                         <Text style={styles.helper}>
                           {[
                             item.key && `Tom: ${item.key}`,
@@ -339,6 +384,59 @@ export function EventsScreen({
                             {item.transitionNotes}
                           </Text>
                         ) : null}
+
+                        {editingItemId === item.id && (
+                          <View style={{ marginTop: 8, gap: 6 }}>
+                            <TextInput
+                              style={formInputStyle}
+                              placeholder="Tom (ex: C, D#)"
+                              placeholderTextColor="#6a8a9a"
+                              value={itemEditKey}
+                              onChangeText={setItemEditKey}
+                              editable={!itemEditSaving}
+                              autoCapitalize="characters"
+                            />
+                            <TextInput
+                              style={formInputStyle}
+                              placeholder="Líder vocal"
+                              placeholderTextColor="#6a8a9a"
+                              value={itemEditLeader}
+                              onChangeText={setItemEditLeader}
+                              editable={!itemEditSaving}
+                            />
+                            <TextInput
+                              style={formInputStyle}
+                              placeholder="Zona (ex: Z1, Z3)"
+                              placeholderTextColor="#6a8a9a"
+                              value={itemEditZone}
+                              onChangeText={setItemEditZone}
+                              editable={!itemEditSaving}
+                              autoCapitalize="characters"
+                            />
+                            <TextInput
+                              style={formInputStyle}
+                              placeholder="Notas de transição"
+                              placeholderTextColor="#6a8a9a"
+                              value={itemEditNotes}
+                              onChangeText={setItemEditNotes}
+                              editable={!itemEditSaving}
+                            />
+                            <Pressable
+                              style={[
+                                styles.primaryButton,
+                                { backgroundColor: itemEditSaving ? "#2a3a2a" : "#1e5a7a", paddingVertical: 8 },
+                              ]}
+                              onPress={() => void submitItemEdit()}
+                              disabled={itemEditSaving}
+                            >
+                              {itemEditSaving ? (
+                                <ActivityIndicator color="#7cf2a2" />
+                              ) : (
+                                <Text style={styles.primaryButtonText}>Salvar</Text>
+                              )}
+                            </Pressable>
+                          </View>
+                        )}
                       </View>
                     </View>
                   );
