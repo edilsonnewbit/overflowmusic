@@ -12,6 +12,7 @@ type Props = {
   reorderingId: string | null;
   onSelectEvent: (eventId: string) => Promise<void>;
   onMoveItem: (item: SetlistItem, direction: "up" | "down", sorted: SetlistItem[]) => Promise<void>;
+  onRemoveItem: (itemId: string) => Promise<void>;
   statusText: string;
   onCreateEvent: (input: { title: string; dateTime: string; location?: string }) => Promise<void>;
   creatingEvent: boolean;
@@ -30,6 +31,7 @@ export function EventsScreen({
   reorderingId,
   onSelectEvent,
   onMoveItem,
+  onRemoveItem,
   statusText,
   onCreateEvent,
   creatingEvent,
@@ -192,6 +194,14 @@ export function EventsScreen({
                           style={[orderBtnStyle, (isBusy || isLast) && { opacity: 0.25 }]}
                         >
                           <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▼</Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={isBusy}
+                          onPress={() => void onRemoveItem(item.id)}
+                          style={[orderBtnStyle, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
+                          accessibilityLabel={`Remover ${item.songTitle} do setlist`}
+                        >
+                          <Text style={{ color: "#f28c8c", fontSize: 11, lineHeight: 14 }}>✕</Text>
                         </Pressable>
                       </View>
 

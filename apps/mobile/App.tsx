@@ -6,6 +6,7 @@ import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-n
 import * as Notifications from "expo-notifications";
 import { BottomTabs, type MobileTab } from "./src/components/BottomTabs";
 import {
+  addSetlistItem,
   authGoogle,
   createEvent,
   fetchChecklistTemplates,
@@ -15,6 +16,7 @@ import {
   fetchMe,
   importSongTxt,
   previewSongTxt,
+  removeSetlistItem,
   reorderSetlist,
   updateChecklistItem,
 } from "./src/lib/api";
@@ -259,6 +261,43 @@ export default function App() {
     }
   }
 
+  async function handleAddToSetlist(songTitle: string, key?: string) {
+    if (!activeEventId) return;
+    setEventsStatus("Adicionando ao setlist...");
+    try {
+      const result = await addSetlistItem(activeEventId, { songTitle, key }, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao adicionar.");
+        return;
+      }
+      const fresh = await fetchEventSetlist(activeEventId);
+      setEventSetlist(fresh.setlist);
+      void setCache(cacheSetlistKey(activeEventId), fresh.setlist);
+      setEventsStatus(`"${songTitle}" adicionada ao setlist.`);
+    } catch {
+      setEventsStatus("Erro de rede ao adicionar música.");
+    }
+  }
+
+  async function handleRemoveSetlistItem(itemId: string) {
+    if (!activeEventId) return;
+    setReorderingId(itemId);
+    try {
+      const result = await removeSetlistItem(activeEventId, itemId, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao remover.");
+        return;
+      }
+      const fresh = await fetchEventSetlist(activeEventId);
+      setEventSetlist(fresh.setlist);
+      void setCache(cacheSetlistKey(activeEventId), fresh.setlist);
+    } catch {
+      setEventsStatus("Erro de rede ao remover item.");
+    } finally {
+      setReorderingId(null);
+    }
+  }
+
   async function handleCreateEvent(input: { title: string; dateTime: string; location?: string }) {
     setCreatingEvent(true);
     setEventsStatus("Criando evento...");
@@ -415,6 +454,7 @@ export default function App() {
           reorderingId={reorderingId}
           onSelectEvent={selectEvent}
           onMoveItem={moveSetlistItem}
+          onRemoveItem={handleRemoveSetlistItem}
           statusText={eventsStatus}
           onCreateEvent={handleCreateEvent}
           creatingEvent={creatingEvent}
@@ -431,6 +471,8 @@ export default function App() {
           onImport={saveSongTxt}
           loadingPreview={loadingSongPreview}
           loadingImport={loadingSongImport}
+          activeEventId={activeEventId}
+          onAddToSetlist={handleAddToSetlist}
         />
       );
     }
