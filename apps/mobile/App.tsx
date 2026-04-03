@@ -6,6 +6,7 @@ import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-n
 import { BottomTabs, type MobileTab } from "./src/components/BottomTabs";
 import {
   authGoogle,
+  createEvent,
   fetchChecklistTemplates,
   fetchEventChecklist,
   fetchEventSetlist,
@@ -60,6 +61,7 @@ export default function App() {
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [eventsStatus, setEventsStatus] = useState("Carregue os eventos.");
   const [isOffline, setIsOffline] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
 
   const isLoggedIn = Boolean(user && accessToken);
 
@@ -236,6 +238,24 @@ export default function App() {
     }
   }
 
+  async function handleCreateEvent(input: { title: string; dateTime: string; location?: string }) {
+    setCreatingEvent(true);
+    setEventsStatus("Criando evento...");
+    try {
+      const result = await createEvent(input, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao criar evento.");
+        return;
+      }
+      setEventsStatus(`Evento "${result.event?.title ?? ""}" criado.`);
+      await loadEventsList();
+    } catch {
+      setEventsStatus("Erro de rede ao criar evento.");
+    } finally {
+      setCreatingEvent(false);
+    }
+  }
+
   async function loadChecklist(eventId: string) {
     if (loadingChecklist) {
       return;
@@ -375,6 +395,8 @@ export default function App() {
           onSelectEvent={selectEvent}
           onMoveItem={moveSetlistItem}
           statusText={eventsStatus}
+          onCreateEvent={handleCreateEvent}
+          creatingEvent={creatingEvent}
         />
       );
     }
