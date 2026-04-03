@@ -9,6 +9,7 @@ import {
   addSetlistItem,
   authGoogle,
   createEvent,
+  deleteEvent,
   fetchChecklistTemplates,
   fetchEventChecklist,
   fetchEventSetlist,
@@ -19,6 +20,7 @@ import {
   removeSetlistItem,
   reorderSetlist,
   updateChecklistItem,
+  updateEvent,
 } from "./src/lib/api";
 import { TOKEN_KEY } from "./src/lib/config";
 import { registerForPushNotificationsAsync } from "./src/lib/notifications";
@@ -316,6 +318,43 @@ export default function App() {
     }
   }
 
+  async function handleUpdateEvent(
+    id: string,
+    input: { title?: string; dateTime?: string; location?: string },
+  ) {
+    setEventsStatus("Salvando alterações...");
+    try {
+      const result = await updateEvent(id, input, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao atualizar evento.");
+        return;
+      }
+      setEventsStatus(`Evento atualizado.`);
+      await loadEventsList();
+    } catch {
+      setEventsStatus("Erro de rede ao atualizar evento.");
+    }
+  }
+
+  async function handleDeleteEvent(id: string) {
+    setEventsStatus("Excluindo evento...");
+    try {
+      const result = await deleteEvent(id, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao excluir evento.");
+        return;
+      }
+      setEventsStatus("Evento excluído.");
+      if (activeEventId === id) {
+        setActiveEventId(null);
+        setEventSetlist(null);
+      }
+      await loadEventsList();
+    } catch {
+      setEventsStatus("Erro de rede ao excluir evento.");
+    }
+  }
+
   async function loadChecklist(eventId: string) {
     if (loadingChecklist) {
       return;
@@ -458,6 +497,8 @@ export default function App() {
           statusText={eventsStatus}
           onCreateEvent={handleCreateEvent}
           creatingEvent={creatingEvent}
+          onUpdateEvent={handleUpdateEvent}
+          onDeleteEvent={handleDeleteEvent}
         />
       );
     }

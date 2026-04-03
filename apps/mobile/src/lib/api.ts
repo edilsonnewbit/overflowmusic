@@ -225,6 +225,51 @@ export async function createEvent(
   return { ok: true, event: body.event as MusicEvent };
 }
 
+export async function updateEvent(
+  id: string,
+  input: { title?: string; dateTime?: string; location?: string },
+  accessToken?: string | null,
+): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
+  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await fetch(`${API_BASE}/events/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${bearerToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+  const body = await parseJson(response);
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: typeof body.message === "string" ? body.message : "Falha ao atualizar evento.",
+    };
+  }
+  return { ok: true, event: body.event as MusicEvent };
+}
+
+export async function deleteEvent(
+  id: string,
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await fetch(`${API_BASE}/events/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${bearerToken}` },
+  });
+  if (!response.ok) {
+    const body = await parseJson(response);
+    return {
+      ok: false,
+      message: typeof body.message === "string" ? body.message : "Falha ao excluir evento.",
+    };
+  }
+  return { ok: true };
+}
+
 export async function addSetlistItem(
   eventId: string,
   input: { songTitle: string; key?: string },
