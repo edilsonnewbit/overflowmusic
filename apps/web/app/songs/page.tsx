@@ -26,6 +26,8 @@ function SongsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [keyFilter, setKeyFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
 
   useEffect(() => {
     void loadSongs();
@@ -46,12 +48,20 @@ function SongsContent() {
     }
   }
 
+  const allKeys = Array.from(new Set(songs.map((s) => s.defaultKey).filter(Boolean) as string[])).sort();
+  const allTags = Array.from(
+    new Set(songs.flatMap((s) => (Array.isArray(s.tags) ? (s.tags as string[]) : [])))
+  ).sort();
+
   const filtered = songs.filter((s) => {
     const q = search.toLowerCase();
-    return (
-      s.title.toLowerCase().includes(q) ||
-      (s.artist || "").toLowerCase().includes(q)
-    );
+    const matchSearch =
+      s.title.toLowerCase().includes(q) || (s.artist || "").toLowerCase().includes(q);
+    const matchKey = keyFilter ? s.defaultKey === keyFilter : true;
+    const matchTag = tagFilter
+      ? Array.isArray(s.tags) && (s.tags as string[]).includes(tagFilter)
+      : true;
+    return matchSearch && matchKey && matchTag;
   });
 
   return (
@@ -74,6 +84,41 @@ function SongsContent() {
           onChange={(e) => setSearch(e.target.value)}
           style={searchStyle}
         />
+
+        {/* filters */}
+        {!loading && (allKeys.length > 0 || allTags.length > 0) && (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+            {allKeys.length > 0 && (
+              <select
+                value={keyFilter}
+                onChange={(e) => setKeyFilter(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">Todos os tons</option>
+                {allKeys.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            )}
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+                style={tagFilter === tag ? activeTagBtnStyle : tagBtnStyle}
+              >
+                {tag}
+              </button>
+            ))}
+            {(keyFilter || tagFilter) && (
+              <button
+                onClick={() => { setKeyFilter(""); setTagFilter(""); }}
+                style={{ ...tagBtnStyle, color: "#f87171", borderColor: "#f87171" }}
+              >
+                ✕ Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
 
         {loading && <p style={{ color: "#b3c6e0" }}>Carregando músicas...</p>}
         {error && <p style={{ color: "#f87171" }}>{error}</p>}
@@ -178,3 +223,30 @@ function pillStyle(bg: string, color: string): CSSProperties {
     fontWeight: 600,
   };
 }
+
+const selectStyle: CSSProperties = {
+  background: "#0d2035",
+  color: "#e8f1fb",
+  border: "1px solid #2d4b6d",
+  borderRadius: 8,
+  padding: "6px 12px",
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+const tagBtnStyle: CSSProperties = {
+  background: "transparent",
+  color: "#b3c6e0",
+  border: "1px solid #2d4b6d",
+  borderRadius: 20,
+  padding: "4px 12px",
+  fontSize: 12,
+  cursor: "pointer",
+};
+
+const activeTagBtnStyle: CSSProperties = {
+  ...tagBtnStyle,
+  background: "#1b3756",
+  color: "#7cf2a2",
+  borderColor: "#7cf2a2",
+};

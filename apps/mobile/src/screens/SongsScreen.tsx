@@ -81,6 +81,8 @@ function BrowseTab() {
   const [error, setError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(false);
   const [search, setSearch] = useState("");
+  const [keyFilter, setKeyFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
   const [selected, setSelected] = useState<Song | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
@@ -141,9 +143,22 @@ function BrowseTab() {
     );
   }
 
+  const allKeys = Array.from(
+    new Set(songs.map((s) => s.defaultKey).filter(Boolean) as string[])
+  ).sort();
+  const allTags = Array.from(
+    new Set(songs.flatMap((s) => (Array.isArray(s.tags) ? (s.tags as string[]) : [])))
+  ).sort();
+
   const filtered = songs.filter((s) => {
     const q = search.toLowerCase();
-    return s.title.toLowerCase().includes(q) || (s.artist || "").toLowerCase().includes(q);
+    const matchSearch =
+      s.title.toLowerCase().includes(q) || (s.artist || "").toLowerCase().includes(q);
+    const matchKey = keyFilter ? s.defaultKey === keyFilter : true;
+    const matchTag = tagFilter
+      ? Array.isArray(s.tags) && (s.tags as string[]).includes(tagFilter)
+      : true;
+    return matchSearch && matchKey && matchTag;
   });
 
   return (
@@ -155,6 +170,56 @@ function BrowseTab() {
         value={search}
         onChangeText={setSearch}
       />
+
+      {/* key filter */}
+      {!loading && allKeys.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, gap: 6, paddingBottom: 6 }}
+        >
+          <Pressable
+            onPress={() => setKeyFilter("")}
+            style={keyFilter === "" ? activeFilterChipStyle : filterChipStyle}
+          >
+            <Text style={{ fontSize: 12, color: keyFilter === "" ? "#7cf2a2" : "#b3c6e0" }}>
+              Todos os tons
+            </Text>
+          </Pressable>
+          {allKeys.map((k) => (
+            <Pressable
+              key={k}
+              onPress={() => setKeyFilter(keyFilter === k ? "" : k)}
+              style={keyFilter === k ? activeFilterChipStyle : filterChipStyle}
+            >
+              <Text style={{ fontSize: 12, color: keyFilter === k ? "#7cf2a2" : "#b3c6e0" }}>
+                {k}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* tag filter */}
+      {!loading && allTags.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, gap: 6, paddingBottom: 8 }}
+        >
+          {allTags.map((tag) => (
+            <Pressable
+              key={tag}
+              onPress={() => setTagFilter(tagFilter === tag ? "" : tag)}
+              style={tagFilter === tag ? activeFilterChipStyle : filterChipStyle}
+            >
+              <Text style={{ fontSize: 12, color: tagFilter === tag ? "#7cf2a2" : "#b3c6e0" }}>
+                {tag}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
 
       {loading && (
         <View style={{ alignItems: "center", marginTop: 24 }}>
@@ -589,6 +654,21 @@ const dictItemStyle = {
   borderRadius: 8,
   paddingHorizontal: 10,
   paddingVertical: 4,
+};
+
+const filterChipStyle = {
+  paddingHorizontal: 12,
+  paddingVertical: 5,
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: "#2d4b6d",
+  backgroundColor: "transparent",
+};
+
+const activeFilterChipStyle = {
+  ...filterChipStyle,
+  borderColor: "#7cf2a2",
+  backgroundColor: "#1b3756",
 };
 
 
