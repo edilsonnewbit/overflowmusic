@@ -20,4 +20,4 @@ COPY --from=builder /app/prisma ./prisma
 COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 EXPOSE 3001
-CMD ["node", "dist/main.js"]
+ENTRYPOINT ["/app/entrypoint.sh"]
