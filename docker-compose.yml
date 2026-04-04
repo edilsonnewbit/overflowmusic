@@ -28,12 +28,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.music-api.rule=Host(`music.overflowmvmt.com`) && PathPrefix(`/api`)
-      - traefik.http.routers.music-api.entrypoints=websecure
-      - traefik.http.routers.music-api.tls.certresolver=letsencrypt
-      - traefik.http.services.music-api.loadbalancer.server.port=3001
 
   worker:
     image: ghcr.io/edilsonnewbit/music-overflow-worker:${IMAGE_TAG:-latest}
