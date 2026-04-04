@@ -79,7 +79,7 @@ function EditChartContent({
 
   async function handlePreview() {
     try {
-      const res = await fetch("/api/songs/import/preview", {
+      const res = await fetch("/api/songs/import/txt/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: rawText }),

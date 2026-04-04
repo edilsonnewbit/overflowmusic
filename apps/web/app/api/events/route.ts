@@ -19,7 +19,16 @@ export async function POST(request: NextRequest) {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    const body = await response.json();
+    const text = await response.text();
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return NextResponse.json(
+        { ok: false, message: `API returned non-JSON (status ${response.status}): ${text.slice(0, 300)}` },
+        { status: 502 },
+      );
+    }
     return NextResponse.json(body, { status: response.status });
   } catch (error) {
     const message = error instanceof Error ? error.message : "internal error";
