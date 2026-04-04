@@ -10,20 +10,15 @@ REQUIRED_VARS=(
   "JWT_SECRET"
   "FRONTEND_URL"
   "NEXT_PUBLIC_API_URL"
-  "GOOGLE_ALLOWED_DOMAIN"
   "AUTH_BOOTSTRAP_MODE"
   "WEB_LOGIN_FALLBACK_ENABLED"
-  "SMTP_HOST"
-  "SMTP_PORT"
-  "SMTP_USER"
-  "SMTP_PASS"
-  "SMTP_FROM"
 )
 
 OPTIONAL_WARN_VARS=(
   "GOOGLE_CLIENT_ID"
   "GOOGLE_CLIENT_IDS"
   "GOOGLE_CLIENT_SECRET"
+  "GOOGLE_ALLOWED_DOMAIN"
 )
 
 missing_required=()
@@ -64,17 +59,7 @@ if [ "${WEB_LOGIN_FALLBACK_ENABLED}" != "true" ] && [ "${WEB_LOGIN_FALLBACK_ENAB
   exit 1
 fi
 
-if ! [[ "${SMTP_PORT}" =~ ^[0-9]+$ ]]; then
-  echo "[deploy-check] SMTP_PORT deve ser numerico."
-  exit 1
-fi
-
-if [ "${SMTP_PORT}" -lt 1 ] || [ "${SMTP_PORT}" -gt 65535 ]; then
-  echo "[deploy-check] SMTP_PORT fora da faixa valida (1-65535)."
-  exit 1
-fi
-
-if ! [[ "${GOOGLE_ALLOWED_DOMAIN}" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+if [ -n "${GOOGLE_ALLOWED_DOMAIN:-}" ] && ! [[ "${GOOGLE_ALLOWED_DOMAIN}" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
   echo "[deploy-check] GOOGLE_ALLOWED_DOMAIN invalido (ex.: overflowmvmt.com)."
   exit 1
 fi
