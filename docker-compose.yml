@@ -55,7 +55,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       AUTH_BOOTSTRAP_MODE: ${AUTH_BOOTSTRAP_MODE}
       WEB_LOGIN_FALLBACK_ENABLED: ${WEB_LOGIN_FALLBACK_ENABLED:-false}
-      API_INTERNAL_URL: http://api:3001
+      API_INTERNAL_URL: http://api:3001/api
     depends_on:
       - api
     labels:

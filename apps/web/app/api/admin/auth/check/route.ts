@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   if (!adminKey || incoming !== `Bearer ${adminKey}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const upstream = await serverApiFetch("api/admin/auth/check", {
+  const upstream = await serverApiFetch("admin/auth/check", {
     authMode: "admin",
   });
   const data = await upstream.json() as unknown;
