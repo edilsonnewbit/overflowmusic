@@ -9,14 +9,17 @@ COPY apps/web/package.json ./apps/web/package.json
 RUN npm install --workspace=apps/web --ignore-scripts
 
 FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-# Copy sources needed for Next.js build
-# NÃO copiar package.json raiz: Turbopack detectaria /app como workspace root
-# e falharia por não encontrar next/package.json a partir daí
-COPY packages/types ./packages/types
-COPY apps/web ./apps/web
+# WORKDIR direto no projeto web — sem node_modules em /app, Turbopack não
+# infere /app como workspace root e encontra next em ./node_modules/next
 WORKDIR /app/apps/web
+# Copiar node_modules para dentro do projeto (não para /app)
+COPY --from=deps /app/node_modules ./node_modules
+# O npm workspaces cria um symlink /app/node_modules/@overflow/types -> ../../packages/types
+# que fica quebrado aqui. Removemos e colocamos o source real no lugar.
+RUN rm -rf ./node_modules/@overflow/types
+COPY packages/types ./node_modules/@overflow/types
+# Copiar source do app web (sem node_modules — clean checkout no CI)
+COPY apps/web ./
 RUN mkdir -p public
 # NEXT_PUBLIC_* vars are baked in at build time — pass them via --build-arg
 ARG NEXT_PUBLIC_API_URL=https://music.overflowmvmt.com/api
