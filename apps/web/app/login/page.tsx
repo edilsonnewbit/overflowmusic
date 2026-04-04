@@ -47,6 +47,7 @@ export default function LoginPage() {
   const [clientId, setClientId] = useState("");
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
   const [statusText, setStatusText] = useState("Carregando login Google...");
+  const [loginStatus, setLoginStatus] = useState<"idle" | "pending_approval" | "rejected" | "error">("idle");
   const [loading, setLoading] = useState(false);
   const [gisReady, setGisReady] = useState(false);
 
@@ -167,6 +168,7 @@ export default function LoginPage() {
 
       const body = (await response.json()) as LoginResponse;
       if (!response.ok) {
+        setLoginStatus("error");
         setStatusText(body.message || "Falha no login");
         return;
       }
@@ -178,17 +180,19 @@ export default function LoginPage() {
       }
 
       if (body.status === "PENDING_APPROVAL") {
-        setStatusText("Sua conta está aguardando aprovação de um administrador.");
+        setLoginStatus("pending_approval");
         return;
       }
 
       if (body.status === "REJECTED") {
-        setStatusText("Sua solicitação foi rejeitada. Procure um administrador.");
+        setLoginStatus("rejected");
         return;
       }
 
+      setLoginStatus("error");
       setStatusText("Resposta de login inválida.");
     } catch {
+      setLoginStatus("error");
       setStatusText("Erro inesperado no login.");
     } finally {
       setLoading(false);
@@ -226,23 +230,82 @@ export default function LoginPage() {
         <h1 style={{ margin: 0 }}>Login</h1>
         <p style={{ margin: 0, color: "#b3c6e0" }}>Entre com Google para acessar áreas operacionais.</p>
 
-        <div
-          style={{
-            background: "rgba(9, 25, 40, 0.88)",
-            border: "1px solid #31557c",
-            borderRadius: 12,
-            padding: 14,
-            display: "grid",
-            gap: 10,
-            justifyItems: "start",
-          }}
-        >
-          <p style={{ margin: 0, color: "#d6e5f8" }}>Google Sign-In</p>
-          <div ref={googleButtonRef} />
-          {!gisReady ? <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>Carregando botão Google...</p> : null}
-        </div>
+        {loginStatus === "pending_approval" ? (
+          <div
+            style={{
+              background: "rgba(255, 200, 0, 0.10)",
+              border: "1px solid #f59e0b",
+              borderRadius: 12,
+              padding: 16,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <p style={{ margin: 0, fontWeight: 700, color: "#fbbf24", fontSize: 15 }}>
+              ⏳ Aguardando aprovação
+            </p>
+            <p style={{ margin: 0, color: "#d6c87a", fontSize: 13, lineHeight: 1.5 }}>
+              Sua conta Google foi reconhecida, mas ainda não foi aprovada por um administrador.
+              Assim que for aprovada, você poderá entrar normalmente.
+            </p>
+            <button
+              onClick={() => { setLoginStatus("idle"); setStatusText("Use o botão Google para entrar."); }}
+              style={{ ...buttonStyle, background: "rgba(255,200,0,0.15)", color: "#fbbf24", marginTop: 4 }}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : loginStatus === "rejected" ? (
+          <div
+            style={{
+              background: "rgba(220, 38, 38, 0.10)",
+              border: "1px solid #ef4444",
+              borderRadius: 12,
+              padding: 16,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <p style={{ margin: 0, fontWeight: 700, color: "#f87171", fontSize: 15 }}>
+              ✗ Acesso negado
+            </p>
+            <p style={{ margin: 0, color: "#fca5a5", fontSize: 13 }}>
+              Sua solicitação de acesso foi rejeitada. Procure um administrador para mais informações.
+            </p>
+          </div>
+        ) : loginStatus === "error" ? (
+          <div
+            style={{
+              background: "rgba(220, 38, 38, 0.10)",
+              border: "1px solid #ef4444",
+              borderRadius: 12,
+              padding: 16,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <p style={{ margin: 0, fontWeight: 700, color: "#f87171", fontSize: 15 }}>Erro no login</p>
+            <p style={{ margin: 0, color: "#fca5a5", fontSize: 13 }}>{statusText}</p>
+          </div>
+        ) : (
+          <div
+            style={{
+              background: "rgba(9, 25, 40, 0.88)",
+              border: "1px solid #31557c",
+              borderRadius: 12,
+              padding: 14,
+              display: "grid",
+              gap: 10,
+              justifyItems: "start",
+            }}
+          >
+            <p style={{ margin: 0, color: "#d6e5f8" }}>Google Sign-In</p>
+            <div ref={googleButtonRef} />
+            {!gisReady ? <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>Carregando botão Google...</p> : null}
+          </div>
+        )}
 
-        {fallbackEnabled ? (
+        {loginStatus === "idle" && fallbackEnabled ? (
           <details style={{ background: "rgba(9, 25, 40, 0.88)", border: "1px solid #31557c", borderRadius: 12, padding: 12 }}>
             <summary style={{ cursor: "pointer", color: "#d6e5f8" }}>Fallback manual (debug/bootstrap)</summary>
             <form onSubmit={submitFallback} style={{ display: "grid", gap: 10, marginTop: 10 }}>
@@ -266,7 +329,7 @@ export default function LoginPage() {
           </details>
         ) : null}
 
-        <p style={{ margin: 0, color: "#1ecad3" }}>{statusText}</p>
+        {loginStatus === "idle" ? <p style={{ margin: 0, color: "#1ecad3" }}>{statusText}</p> : null}
       </section>
     </main>
   );

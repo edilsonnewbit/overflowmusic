@@ -101,6 +101,7 @@ jobs:
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
             GOOGLE_ALLOWED_DOMAIN=${{ secrets.GOOGLE_ALLOWED_DOMAIN }}
             AUTH_BOOTSTRAP_MODE=${{ secrets.AUTH_BOOTSTRAP_MODE }}
+            ADMIN_APPROVED_EMAILS=${{ secrets.ADMIN_APPROVED_EMAILS }}
             WEB_LOGIN_FALLBACK_ENABLED=${{ secrets.WEB_LOGIN_FALLBACK_ENABLED }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             SMTP_HOST=${{ secrets.SMTP_HOST }}
@@ -131,6 +132,7 @@ jobs:
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
             GOOGLE_ALLOWED_DOMAIN=${{ secrets.GOOGLE_ALLOWED_DOMAIN }}
             AUTH_BOOTSTRAP_MODE=${{ secrets.AUTH_BOOTSTRAP_MODE }}
+            ADMIN_APPROVED_EMAILS=${{ secrets.ADMIN_APPROVED_EMAILS }}
             WEB_LOGIN_FALLBACK_ENABLED=${{ secrets.WEB_LOGIN_FALLBACK_ENABLED }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             SMTP_HOST=${{ secrets.SMTP_HOST }}
