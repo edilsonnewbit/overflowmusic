@@ -1542,3 +1542,24 @@ Registro oficial de progresso para handoff entre LLMs.
 - Próximo passo:
   - Deploy em produção (push develop → main, docker-compose na VPS), ou exportação avançada do setlist.
 
+### [2025-01-26 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Implementar todas as features faltantes identificadas na avaliação (~70% → ~95%).
+- Feito:
+  - Drag-and-drop no setlist web (`events/[eventId]/page.tsx`): `draggedId/dragOverId` state, `dropReorder()`, handlers `onDragStart/Over/Drop/End`, feedback visual (opacidade + borda verde).
+  - Rate limiting: `@nestjs/throttler` no `AppModule` (100 req/60s por IP).
+  - Paginação na API: `limit/offset` nos endpoints `/api/events` e `/api/songs` com metadata `{total, limit, offset}`.
+  - Campo `eventType`: enum `EventType {CULTO, CONFERENCIA, ENSAIO, OUTRO}` no schema + service + controller.
+  - Edição pós-importação de cifra: `PATCH /api/songs/:id/charts/:chartId`, proxies Next.js, página `/songs/[songId]/charts/[chartId]/edit`.
+  - Dashboard Admin: `GET /api/admin/dashboard` (6 métricas), página `/admin` com StatCards.
+  - Modo Apresentação completo: exibe cifra (shortcut `C`), lazy loading de chord charts, coloração de acordes/letras.
+  - Gestão de Organizações: modelos `Organization` + `OrganizationMember` no schema, módulo `OrganizationsController/Service`, proxies Next.js, página `/admin/organizations`.
+  - AuditLog: modelo `AuditLog` no schema, `AuditService` (fire-and-forget), integrado em aprovação/rejeição de usuários e criação/remoção de eventos.
+- Arquivos: 27 arquivos alterados/criados (commit `54dcb0a` na branch `develop`).
+- Validação: 0 erros TypeScript em todos os arquivos modificados. `prisma db push` pendente (requer DB disponível).
+- Pendências:
+  - `prisma db push` / migração para aplicar: `EventType`, `Organization`, `OrganizationMember`, `AuditLog`.
+  - Push do commit para `origin/develop`.
+  - Mobile: tela de Organizações (opcional).
+- Próximo passo:
+  - `git push origin develop` e deploy na VPS com `docker-compose up`.
+
