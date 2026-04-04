@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { QueueService } from "./queue.service";
 
 type ExpoPushMessage = {
   to: string;
@@ -12,7 +13,10 @@ type ExpoPushMessage = {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly queue: QueueService,
+  ) {}
 
   async registerToken(userId: string, token: string, platform?: string): Promise<void> {
     await this.prisma.pushToken.upsert({
@@ -26,8 +30,19 @@ export class NotificationsService {
     const rows = await this.prisma.pushToken.findMany({ select: { token: true } });
     if (rows.length === 0) return;
 
-    const messages: ExpoPushMessage[] = rows.map((r: { token: string }) => ({
-      to: r.token,
+    const tokens = rows.map((r: { token: string }) => r.token);
+
+    // Try to enqueue — if Redis is unavailable, fall back to synchronous send
+    const enqueued = await this.queue.enqueuePush({ title, body, tokens, data });
+    if (enqueued) {
+      this.logger.log(`Enqueued push job for ${tokens.length} token(s)`);
+      return;
+    }
+
+    // Fallback: send synchronously (same behaviour as before)
+    this.logger.warn("Queue unavailable — sending push synchronously");
+    const messages: ExpoPushMessage[] = tokens.map((to) => ({
+      to,
       title,
       body,
       data: data ?? {},

@@ -3,15 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
-
-type Song = {
-  id: string;
-  title: string;
-  artist: string | null;
-  defaultKey: string | null;
-  tags: string[] | null;
-  chordCharts: { id: string; version: number }[];
-};
+import type { Song } from "@overflow/types";
 
 export default function SongsPage() {
   return (

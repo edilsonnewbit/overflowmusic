@@ -19,6 +19,7 @@ import {
   previewSongTxt,
   removeSetlistItem,
   reorderSetlist,
+  setUnauthorizedHandler,
   updateChecklistItem,
   updateEvent,
   updateSetlistItem,
@@ -93,6 +94,13 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      void logout("Sessão expirada. Faça login novamente.");
+    });
+    return () => setUnauthorizedHandler(() => {});
+  }, []);
+
   async function bootstrapSession() {
     setLoadingSession(true);
     try {
@@ -157,7 +165,7 @@ export default function App() {
     }
   }
 
-  async function logout() {
+  async function logout(statusMessage = "Sessão encerrada.") {
     await AsyncStorage.removeItem(TOKEN_KEY);
     setAccessToken(null);
     setUser(null);
@@ -171,7 +179,7 @@ export default function App() {
     setEventSetlist(null);
     setActiveTab("events");
     setIsOffline(false);
-    setStatusText("Sessão encerrada.");
+    setStatusText(statusMessage);
   }
 
   async function loadTemplates() {

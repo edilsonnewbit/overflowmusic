@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-
-type AuthUser = {
-  id: string;
-  name: string;
-  role: "SUPER_ADMIN" | "ADMIN" | "LEADER" | "MEMBER";
-};
+import type { AuthUser } from "@overflow/types";
 
 type SessionPayload = {
   ok: boolean;

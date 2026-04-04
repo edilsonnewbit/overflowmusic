@@ -3,48 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
-
-// ── types ─────────────────────────────────────────────────────────────────────
-
-type SectionLine = {
-  type: "chords" | "lyrics" | "tab" | "text";
-  content: string;
-};
-
-type ParsedSection = {
-  name: string;
-  lines: SectionLine[];
-};
-
-type ParsedChart = {
-  title: string;
-  artist: string | null;
-  sections: ParsedSection[];
-  chordDictionary: Record<string, string>;
-  metadata: {
-    suggestedKey: string | null;
-    bpm: number | null;
-    capo: number | null;
-  };
-};
-
-type ChordChart = {
-  id: string;
-  version: number;
-  sourceType: string;
-  structuredContent: ParsedChart | null;
-  rawContent: string | null;
-  createdAt: string;
-};
-
-type Song = {
-  id: string;
-  title: string;
-  artist: string | null;
-  defaultKey: string | null;
-  tags: string[] | null;
-  chordCharts: ChordChart[];
-};
+import type { Song, SongSectionLine } from "@overflow/types";
 
 // ── page ─────────────────────────────────────────────────────────────────────
 
@@ -105,7 +64,7 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   }
 
   const chart = song.chordCharts[activeChartIndex] ?? null;
-  const parsed = chart?.structuredContent ?? null;
+  const parsed = chart?.parsedJson ?? null;
   const meta = parsed?.metadata;
 
   return (
@@ -166,9 +125,9 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
         )}
 
         {/* raw fallback */}
-        {chart && !parsed && chart.rawContent && (
+        {chart && !parsed && chart.rawText && (
           <pre style={{ ...chartContainerStyle, whiteSpace: "pre-wrap", color: "#d6e5f8", fontSize: 14 }}>
-            {chart.rawContent}
+            {chart.rawText}
           </pre>
         )}
 
@@ -264,7 +223,7 @@ const sectionNameStyle: CSSProperties = {
   fontFamily: "inherit",
 };
 
-function lineStyle(type: SectionLine["type"]): CSSProperties {
+function lineStyle(type: SongSectionLine["type"]): CSSProperties {
   const base: CSSProperties = {
     margin: "0 0 2px",
     whiteSpace: "pre",

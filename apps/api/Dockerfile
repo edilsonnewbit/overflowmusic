@@ -18,6 +18,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh \
+    && addgroup -S app && adduser -S app -G app \
+    && chown -R app:app /app
+USER app
 EXPOSE 3001
 ENTRYPOINT ["/app/entrypoint.sh"]

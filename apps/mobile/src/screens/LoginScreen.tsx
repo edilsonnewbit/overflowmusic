@@ -38,6 +38,7 @@ export function LoginScreen({ onSubmit }: Props) {
       redirectUri,
       responseType: AuthSession.ResponseType.IdToken,
       scopes: ["openid", "profile", "email"],
+      usePKCE: false,
       extraParams: {
         nonce: "overflow-music-login",
       },

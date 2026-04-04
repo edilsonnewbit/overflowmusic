@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Patch, Put, UnauthorizedException } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Patch, Put } from "@nestjs/common";
 import { AuthService } from "../auth/auth.service";
 import { ChecklistRunsService } from "./checklist-runs.service";
 
@@ -23,8 +23,6 @@ type UpdateRunItemBody = {
 
 @Controller("api/events/:eventId/checklist")
 export class ChecklistRunsController {
-  private readonly adminApiKey = process.env.ADMIN_API_KEY || "";
-
   constructor(
     private readonly checklistRunsService: ChecklistRunsService,
     private readonly authService: AuthService,
@@ -41,7 +39,7 @@ export class ChecklistRunsController {
     @Param("eventId") eventId: string,
     @Body() body: UpsertRunBody,
   ) {
-    await this.assertWriteAccess(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.checklistRunsService.upsertByEvent(eventId, body);
   }
 
@@ -52,20 +50,7 @@ export class ChecklistRunsController {
     @Param("itemId") itemId: string,
     @Body() body: UpdateRunItemBody,
   ) {
-    await this.assertWriteAccess(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.checklistRunsService.updateItem(eventId, itemId, body);
-  }
-
-  private async assertWriteAccess(authorization?: string): Promise<void> {
-    const token = (authorization || "").replace(/^Bearer\s+/i, "");
-    if (!token) {
-      throw new UnauthorizedException("unauthorized");
-    }
-
-    if (this.adminApiKey && token === this.adminApiKey) {
-      return;
-    }
-
-    await this.authService.assertCanManageContent(token);
   }
 }

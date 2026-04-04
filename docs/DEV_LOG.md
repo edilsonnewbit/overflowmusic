@@ -15,6 +15,196 @@ Registro oficial de progresso para handoff entre LLMs.
 
 ---
 
+### [2025-07-15 — GitHub Copilot (Claude Sonnet 4.6)] — Dashboard Mobile (HomeScreen)
+- Objetivo: Fase 6 (cont.) — Tela inicial mobile com resumo do próximo evento, atalhos rápidos e lista de outros eventos.
+- Feito:
+  - Criado `apps/mobile/src/screens/HomeScreen.tsx`: saudação por nome + badge de role, card "Próximo Evento" (verde escuro, mostra título/data pt-BR/localização/dias restantes/count de músicas no setlist, pressable → seleciona evento e navega para /(tabs)/events), atalhos rápidos em grid 2 colunas (Eventos, Músicas, Checklist e ▶ Apresentar se houver próximo evento), lista de outros eventos (até 3, pressables).  Usa `RefreshControl` para atualizar eventos com pull-to-refresh.
+  - Criado `apps/mobile/app/(tabs)/home.tsx`: wrapper SafeAreaView + HomeScreen.
+  - Atualizado `apps/mobile/app/(tabs)/_layout.tsx`: adicionado `<Tabs.Screen name="home">` como **primeiro** tab (ícone 🏠 / label "Início"), mantendo events, checklist, songs, account.
+  - Atualizado `apps/mobile/app/_layout.tsx`: auth guard agora redireciona usuário autenticado saindo do login para `/(tabs)/home` (antes: `/(tabs)/events`); tap em notificação também leva para `/(tabs)/home`.
+- Arquivos:
+  - `apps/mobile/src/screens/HomeScreen.tsx` (CRIADO)
+  - `apps/mobile/app/(tabs)/home.tsx` (CRIADO)
+  - `apps/mobile/app/(tabs)/_layout.tsx` (home tab adicionado como primeiro)
+  - `apps/mobile/app/_layout.tsx` (redirect → home)
+- Validação: `get_errors` em todos os 4 arquivos → 0 erros TS.
+- Pendências: rebuild APK mobile; rebuild imagens Docker; Google OAuth GCP (manual).
+- Próximo passo: Rate limiting por rota sensível na API (auth endpoints: throttle 10 req/min), ou CI/CD — validar pipeline e confirmar que todas as images são buildadas corretamente no Actions.
+
+---
+
+### [2025-07-15 — GitHub Copilot (Claude Sonnet 4.6)] — Rate Limiting por Rota (Fase 6 Hardening)
+- Objetivo: Fase 6 (cont.) — Rate limiting diferenciado: endpoint de login Google limitado a 10 req/min; health endpoints sem throttle.
+- Feito:
+  - Atualizado `ThrottlerModule.forRoot` em `app.module.ts`: dois throttlers nomeados — `global` (100/min, como antes) e `auth` (10/min, para endpoints sensíveis de autenticação).
+  - Adicionado `@Throttle({ auth: { limit: 10, ttl: 60000 } })` no `POST api/auth/google` em `auth.controller.ts` — limita brute-force de Google IdTokens.
+  - Adicionado `@SkipThrottle()` no `AppController` (`app.controller.ts`) — endpoints `/health` e `/api/health` não consomem quota de nenhum throttler.
+- Arquivos:
+  - `apps/api/src/app.module.ts` (ThrottlerModule com dois throttlers nomeados)
+  - `apps/api/src/auth/auth.controller.ts` (import Throttle/SkipThrottle + @Throttle no googleLogin)
+  - `apps/api/src/app.controller.ts` (import SkipThrottle + @SkipThrottle na classe)
+- Validação: `get_errors` em todos 3 arquivos → 0 erros TS.
+- Pendências: rebuild de imagens Docker (API acumulado Fases 1-6); rebuild APK mobile; Google OAuth GCP (manual).
+- Próximo passo: rebuild imagens Docker + deploy para produção, ou rebuild APK mobile com EAS CLI.
+
+---
+
+### [2026-04-04 — GitHub Copilot (Claude Sonnet 4.6)] — Consolidação auth controllers (DEC-003 + Q-003)
+- Objetivo: Remover código duplicado de auth nos controllers de checklist e songs; confirmar que todos os endpoints de escrita aceitam JWT de usuário autorizado (DEC-003 fechado); confirmar remoção de ADMIN_KEY do mobile fonte (Q-003 fechado).
+- Feito:
+  - **`checklist-runs.controller.ts`**: removido `adminApiKey` e `assertWriteAccess` inline; substituídos por `await this.authService.assertAdminKeyOrContentManager(authorization)` diretamente nas actions `PUT` e `PATCH`.
+  - **`checklist-templates.controller.ts`**: idem — removido `adminApiKey` e `assertWriteAccess`; delegado para `authService` em `POST`, `PATCH`, `DELETE`.
+  - **`songs.controller.ts`**: removido `adminApiKey` e lógica inline de `assertWriteAccess`; método agora é thin wrapper que delega para `authService.assertAdminKeyOrContentManager`.
+  - Confirmado que `apps/mobile/src/**` não contém nenhuma referência a `ADMIN_API_KEY` (grep vazio) — Q-003 já estava resolvido na fonte, pendente apenas rebuild do APK.
+  - Events, setlist, organizations e todos os demais controllers de escrita já usam `assertAdminKeyOrContentManager` via `auth.service.ts`.
+- Arquivos:
+  - `apps/api/src/checklist/checklist-runs.controller.ts` (assertWriteAccess inline removido)
+  - `apps/api/src/checklist/checklist-templates.controller.ts` (idem)
+  - `apps/api/src/songs/songs.controller.ts` (adminApiKey removido, assertWriteAccess delegada)
+- Validação: `get_errors` nos 3 arquivos → 0 erros TS.
+- Pendências: rebuild APK mobile (EAS build); rebuild Docker images + deploy produção; Google OAuth GCP (manual).
+- Próximo passo: rebuild Docker images e push para GHCR (CI/CD via push em `main`), ou rebuild APK com EAS CLI.
+
+---
+
+### [2026-04-04 — GitHub Copilot (Claude Sonnet 4.6)] — packages/parser populado (DEC-004)
+- Objetivo: DEC-004 — extrair `parseChordTxt` do `apps/api` para o pacote compartilhado `packages/parser`, usando os tipos de `@overflow/types`, eliminando duplicação e habilitando uso direto no mobile.
+- Feito:
+  - **`packages/parser/package.json`** (CRIADO): pacote `@overflow/parser`, versão 0.1.0, depende de `@overflow/types: *`.
+  - **`packages/parser/tsconfig.json`** (CRIADO): mesma configuração do `packages/types` (target ES2020, moduleResolution bundler, strict).
+  - **`packages/parser/index.ts`** (CRIADO): toda a lógica do parser extraída de `apps/api/src/songs/chord-txt-parser.ts`. Usa tipos compartilhados de `@overflow/types` (`ParsedChart`, `SongSection`, `SongSectionLine`) em vez dos tipos privados anteriores. Exporta `parseChordTxt(rawInput: string): ParsedChart`.
+  - **`apps/api/src/songs/chord-txt-parser.ts`** (MODIFICADO): substituído por barrel de re-export — `export { parseChordTxt } from "@overflow/parser"` + `export type { ParsedChart as ParsedChordTxt } from "@overflow/parser"`. Sem quebra em `songs.service.ts` nem `chord-txt-parser.test.ts`.
+  - **`apps/api/package.json`** (MODIFICADO): adicionados `"@overflow/parser": "*"` e `"@overflow/types": "*"` nas dependencies.
+  - `npm install` executado na raiz para registrar o pacote no workspace.
+- Arquivos:
+  - `packages/parser/package.json` (CRIADO)
+  - `packages/parser/tsconfig.json` (CRIADO)
+  - `packages/parser/index.ts` (CRIADO)
+  - `apps/api/src/songs/chord-txt-parser.ts` (barrel re-export)
+  - `apps/api/package.json` (deps @overflow/parser + @overflow/types)
+- Validação: `get_errors` em `packages/parser/index.ts`, `chord-txt-parser.ts`, `songs.service.ts`, `chord-txt-parser.test.ts` → 0 erros TS.
+- Pendências: rebuild APK mobile; rebuild Docker images + deploy produção; Google OAuth GCP (manual). Mobile pode usar `@overflow/parser` direto se/quando precisar renderizar cifras localmente.
+- Próximo passo: Merge `develop` → `main` para disparar CI/CD pipeline (rebuild Docker + deploy Hostinger), ou adicionar `@overflow/parser` no mobile para renderização local de cifras.
+
+---
+
+### [2026-04-04 — GitHub Copilot (Claude Sonnet 4.6)] — Refresh Token Silencioso (Q-004)
+- Objetivo: Eliminar logout surpresa a cada 7 dias implementando renovação silenciosa de token no mobile.
+- Feito:
+  - **API — `auth.service.ts`**: adicionado método `refreshAccessToken(currentToken)` — verifica JWT, busca usuário no DB, emite novo JWT com TTL fresco (7d). Throws `UnauthorizedException` se token inválido, expirado ou usuário não aprovado.
+  - **API — `auth.controller.ts`**: adicionado `POST /api/auth/refresh` com `@Throttle({ auth: { limit: 10, ttl: 60000 } })` — aceita `Authorization: Bearer <token>`, retorna `{ ok, accessToken, user }`.
+  - **Mobile — `api.ts`**: 
+    - Adicionadas funções `setTokenHandlers(getter, setter)` e `isTokenExpiringSoon(token, withinSeconds=172800)`.
+    - `authFetch` agora intercepta 401: tenta `POST /api/auth/refresh` com token armazenado; se OK, persiste novo token e faz retry da requisição original; se falha, chama `onUnauthorized`.
+    - Adicionado `refreshAccessToken(currentToken)` para uso proativo pelo `SessionContext`.
+  - **Mobile — `SessionContext.tsx`**:
+    - Registra `setTokenHandlers` com `AsyncStorage.getItem/setItem` no `useEffect` (junto com `setUnauthorizedHandler`).
+    - `bootstrapSession` agora checa `isTokenExpiringSoon` (< 2 dias para expirar) → chama `refreshAccessToken` silenciosamente antes de `fetchMe`, persiste novo token.
+- Arquivos:
+  - `apps/api/src/auth/auth.service.ts` (refreshAccessToken method)
+  - `apps/api/src/auth/auth.controller.ts` (POST /api/auth/refresh)
+  - `apps/mobile/src/lib/api.ts` (setTokenHandlers, isTokenExpiringSoon, authFetch com retry, refreshAccessToken)
+  - `apps/mobile/src/context/SessionContext.tsx` (handlers registrados, proactive refresh no bootstrap)
+- Validação: `get_errors` em todos 4 arquivos → 0 erros TS.
+- Pendências: rebuild APK mobile (EAS build); rebuild Docker images + deploy produção; Google OAuth GCP (manual).
+- Próximo passo: push `develop` → `main` para disparar CI/CD (rebuild Docker + deploy Hostinger), ou rebuild APK mobile com EAS CLI.
+
+---
+
+
+- Objetivo: Fase 6 (cont.) — Dashboard real na home do web app com dados ao vivo da API.
+- Feito:
+  - Reescrito `apps/web/app/page.tsx` (Server Component async): busca em paralelo `GET /api/admin/dashboard` (stats: pendingUsers, totalUsers, totalEvents, upcomingEvents, totalSongs, totalChecklists) e `GET /api/events?limit=5` (próximo evento) via `serverApiFetch` (autenticação admin server-side).
+  - Header do dashboard agora exibe badges ao vivo: ⚠ pendentes (link para /admin/users, vermelho se > 0), próximos eventos, total músicas, membros, checklists.
+  - Card "Próximo Evento" em destaque (fundo verde escuro) exibindo título + data localizada (pt-BR) + localização, linkando para /events. Pega o primeiro evento com dateTime >= now ou, fallback, o primeiro evento da lista.
+  - Cards de navegação agora exibem dado contextual: "Aprovação de Usuários" mostra count de pendentes em vermelho; "Equipe" mostra total de membros ativos.
+  - Fallback silencioso se API indisponível (stats null → mostra "stats indisponíveis", sem crash).
+- Arquivos:
+  - `apps/web/app/page.tsx` (reescrito — was: nav hub estático; now: async RSC com dados ao vivo)
+- Validação: `get_errors` → 0 erros TS.
+- Pendências: rebuild imagens Docker; rebuild APK mobile; Google OAuth GCP (manual).
+- Próximo passo: Dashboard mobile — tela inicial com resumo do próximo evento e status rápido (ou push notifications refinadas).
+
+---
+
+
+- Objetivo: Fase 6 — Hardening/go-live: health endpoint real, healthchecks no compose, segurança de containers.
+- Feito:
+  - Aprimorado `apps/api/src/app.controller.ts`: injetados `PrismaService` e `QueueService`; `GET /health` e `GET /api/health` agora retornam `{ ok, service, version, db: "up"|"down", redis: "up"|"down" }` com verificação real (Prisma `SELECT 1` + `redis.ping()`).
+  - Adicionado `isRedisHealthy()` em `apps/api/src/notifications/queue.service.ts`: faz `IORedis.ping()` e retorna `boolean`; graceful (não lança exceção).
+  - Adicionado healthcheck para `api` em `docker-compose.yml`: `wget -qO- http://localhost:3001/health | grep '"ok":true'`, interval 10s, retries 5, start_period 30s.
+  - Adicionado healthcheck para `web` em `docker-compose.yml`: `wget -qO- http://localhost:3000/`, interval 15s, retries 3, start_period 30s. `web` agora depende de `api` com `condition: service_healthy`.
+  - Adicionadas vars `SMTP_HOST/PORT/USER/PASS/FROM` ao serviço `worker` em `docker-compose.yml` — estas estavam faltando, impossibilitando envio de e-mail pelo worker em produção.
+  - Hardened `apps/api/Dockerfile` (final stage): adicionado `addgroup -S app && adduser -S app -G app && chown -R app:app /app` + `USER app` — container da API agora roda sem privilégios de root.
+  - Hardened `apps/worker/Dockerfile`: adicionado mesmo padrão de usuário não-root (`USER app`).
+- Arquivos:
+  - `apps/api/src/app.controller.ts` (injeção PrismaService+QueueService, health assíncrono com DB+Redis)
+  - `apps/api/src/notifications/queue.service.ts` (isRedisHealthy adicionado)
+  - `docker-compose.yml` (healthchecks api/web, vars SMTP worker, web depends api healthy)
+  - `apps/api/Dockerfile` (usuário não-root)
+  - `apps/worker/Dockerfile` (usuário não-root)
+- Validação: `get_errors` em `app.controller.ts` e `queue.service.ts` → 0 erros TS.
+- Pendências: rebuild de imagens Docker (API + worker + web); rebuild APK mobile (acumulado Fases 1-5); Google OAuth GCP (manual).
+- Próximo passo: go-live validação — após rebuild/deploy, verificar `https://music.overflowmvmt.com/api/health` retorna `{"ok":true,"db":"up","redis":"up"}` e CI/CD confirma rollout via `/api/admin/auth/check`.
+
+---
+
+### [2025-07-14 — GitHub Copilot (Claude Sonnet 4.6)] — Worker BullMQ/Redis
+- Objetivo: Fase 5 — Worker real com BullMQ/Redis (substituir placeholder de heartbeat).
+- Feito:
+  - Reescrito `apps/worker/src/worker.js`: BullMQ `Worker` consumindo filas `overflow.push` (push notifications Expo, `concurrency: 3`, 3 tentativas, backoff exponencial) e `overflow.email` (SMTP via nodemailer, `concurrency: 2`, 3 tentativas). Graceful shutdown via SIGTERM/SIGINT. SMTP opcional (só ativa se `SMTP_HOST` declarado).
+  - Atualizado `apps/worker/package.json`: adicionado deps `bullmq ^5.51.0`, `ioredis ^5.6.1`, `nodemailer ^6.9.17`. Versão bumped para 0.2.0.
+  - Corrigido `apps/worker/Dockerfile`: adicionado `RUN npm install --omit=dev` (antes era missing, deps nunca eram instaladas em build).
+  - Criado `apps/api/src/notifications/queue.service.ts`: `QueueService` injectable; conecta ao Redis via `process.env.REDIS_URL`; expõe `enqueuePush()` e `enqueueEmail()`; graceful via `OnModuleDestroy`; retorna `false` (não lança) se Redis indisponível.
+  - Modificado `apps/api/src/notifications/notifications.service.ts`: injeta `QueueService`; `sendToAll()` tenta enfileirar primeiro — se queue indisponível (`false`), cai no fallback síncrono anterior (zero downtime).
+  - Atualizado `apps/api/src/app.module.ts`: adicionado `QueueService` em `providers`.
+  - Instalado `bullmq` + `ioredis` em `apps/api` via `npm install`.
+- Arquivos:
+  - `apps/worker/src/worker.js` (reescrito)
+  - `apps/worker/package.json` (deps adicionadas)
+  - `apps/worker/Dockerfile` (npm install adicionado)
+  - `apps/api/src/notifications/queue.service.ts` (CRIADO)
+  - `apps/api/src/notifications/notifications.service.ts` (QueueService injetado + enqueue com fallback)
+  - `apps/api/src/app.module.ts` (QueueService registrado)
+- Validação: `get_errors` em todos os arquivos TS modificados → 0 erros.
+- Pendências: rebuild de imagens Docker (API + worker) para ativar em produção; rebuild APK mobile (Fases 1-5).
+- Próximo passo: Hardening / go-live (Fase 6 original): testes E2E, observabilidade, checklist de deploy.
+
+---
+
+### [2025-07-14 — GitHub Copilot (Claude Sonnet 4.6)] — Perfil/Conta Web
+- Objetivo: Fase 5 — Perfil/conta de usuário na web (editar nome, visualizar e-mail e role).
+- Feito:
+  - Adicionado `PATCH` em `apps/web/app/api/auth/me/route.ts`: valida token no cookie, encaminha para `PATCH /api/auth/me` do backend com `authMode: "user"`.
+  - Criado `apps/web/app/profile/page.tsx`: client component, carrega sessão via `/api/auth/me`, exibe e-mail e role (read-only com badges coloridos por role), formulário para editar nome com feedback de sucesso/erro e auto-clear após 4s, redireciona para `/login` se sessão inválida.
+  - Alterado `apps/web/components/GlobalHeader.tsx`: substituiu `<p>` com nome/role por `<Link href="/profile">` clicável, com classe `active` no pathname `/profile`.
+- Arquivos:
+  - `apps/web/app/api/auth/me/route.ts` (PATCH adicionado antes do GET existente)
+  - `apps/web/app/profile/page.tsx` (CRIADO)
+  - `apps/web/components/GlobalHeader.tsx` (link para /profile)
+- Validação: `get_errors` nos 3 arquivos → 0 erros TS.
+- Pendências: rebuild APK mobile (Fases 1-5 acumuladas), Google OAuth no GCP (manual), Worker BullMQ.
+- Próximo passo: Worker real com BullMQ/Redis (substituir worker.js atual).
+
+---
+
+### [2025-07-14 — GitHub Copilot (Claude Sonnet 4.6)]
+- Objetivo: Fase 5 — Modo Apresentação Mobile (uso em palco, fullscreen, swipe, cifras).
+- Feito:
+  - Criado `apps/mobile/app/present.tsx`: tela fullscreen dark mode, StatusBar hidden, swipe left/right (PanResponder), pills de navegação, auto-hide nav após 3s, chips de tom/líder/zona, notas de transição, lazy load de cifra via fetchSongs+fetchSongById com cache por título.
+  - Adicionado botão "▶ Apresentar" no `EventsScreen.tsx` (após "Compartilhar Setlist"), navega para `/present` via `router.push`. Importado `useRouter` de expo-router.
+  - Corrigido guard de auth em `app/_layout.tsx`: redirect `user && !inTabs` foi refinado para só redirecionar do `/login` (não de `/present`). Unauthenticated em `/present` → `/login`.
+  - Registrado `<Stack.Screen name="present" options={{ presentation: "fullScreenModal" }} />` no Stack root.
+- Arquivos:
+  - `apps/mobile/app/present.tsx` (CRIADO)
+  - `apps/mobile/src/screens/EventsScreen.tsx` (modificado: import useRouter, const router, botão Apresentar)
+  - `apps/mobile/app/_layout.tsx` (modificado: auth guard refinado, Stack.Screen present modal)
+- Validação: `get_errors` em todos os 3 arquivos → 0 erros TS.
+- Pendências: rebuild APK (Fases 1-5 acumuladas), Google OAuth manual no GCP.
+- Próximo passo: Perfil/conta na web (`/profile` page no web app) ou Worker BullMQ/Redis.
+
+---
+
 ### [2026-04-03 14:40 America/Recife] - Codex
 - Objetivo: Criar sistema de instruções para agentes de IA e fluxo multi-LLM antes da implementação.
 - Feito:
@@ -1583,4 +1773,169 @@ Registro oficial de progresso para handoff entre LLMs.
   - Executar CI após push para confirmar que build passa com as correções.
 - Próximo passo:
   - `git add` + `git commit` + `git push origin develop` e abrir PR para `main`.
+
+---
+
+### [2026-04-04 — GitHub Copilot / Claude Opus 4.6]
+- Objetivo: Análise completa de arquitetura e integração (mobile + web + API) com documentação para agentes de IA.
+- Feito:
+  - Análise profunda de ~50 arquivos em 3 apps (mobile, web, api).
+  - Criado `docs/ARCHITECTURE_ANALYSIS.md` com:
+    - Mapa completo de endpoints e incompatibilidades de auth (JWT vs ADMIN_API_KEY)
+    - 7 problemas de segurança priorizados (S1-S7)
+    - 6 problemas de arquitetura (monolito App.tsx, packages vazios, navigation)
+    - Feature parity matrix Mobile vs Web (16 features)
+    - Mapa de variáveis de ambiente por app
+    - Roadmap priorizado em 5 fases
+  - Atualizado `docs/OPEN_QUESTIONS.md` com Q-003 a Q-008.
+  - Atualizado `docs/TECH_DECISIONS.md` com DEC-003 a DEC-005.
+  - APK Android gerado com fix PKCE (`usePKCE: false`) + Google Client ID embutido (59MB).
+- Arquivos:
+  - `docs/ARCHITECTURE_ANALYSIS.md` (novo — 300+ linhas)
+  - `docs/OPEN_QUESTIONS.md` (atualizado)
+  - `docs/TECH_DECISIONS.md` (atualizado)
+  - `docs/DEV_LOG.md` (esta entrada)
+- Validação:
+  - Análise cruzada de todos os endpoints (48 API, 30+ BFF proxy, 18 mobile api.ts)
+  - Identificados 6 endpoints mobile que falham sem ADMIN_API_KEY (Events/Setlist CRUD)
+  - Confirmado: token JWT de ADMIN/LEADER não é aceito em endpoints Events/Setlist do backend
+- Pendências:
+  - **[URGENTE]** Fase 1 segurança: Unificar auth no backend (aceitar JWT em EvEvents/Setlist)
+  - **[URGENTE]** Remover ADMIN_API_KEY da config mobile
+  - Testar APK com login Google no dispositivo físico
+  - Popular `packages/types/` com interfaces compartilhadas
+  - `prisma db push` para aplicar EventType, Organization, AuditLog
+- Próximo passo:
+  - Fase 1 do roadmap: Corrigir auth no backend — `events.controller.ts` e `setlist.controller.ts` devem aceitar JWT com roles ADMIN/LEADER além de ADMIN_API_KEY. Depois remover `EXPO_PUBLIC_ADMIN_API_KEY` do mobile.
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Fase 1 segurança (DEC-003) — unificar autenticação no backend e remover ADMIN_API_KEY do mobile.
+- Feito:
+  - `auth.service.ts` — adicionado método `assertAdminKeyOrContentManager(authorization)`: aceita ADMIN_API_KEY (fast path) OU JWT de ADMIN/LEADER/SUPER_ADMIN (path com validação DB via `assertCanManageContent`).
+  - `events.controller.ts` — removido `assertAdminKey()` privado e `adminApiKey` field; injetado `AuthService`; todos os handlers de escrita agora usam `await this.authService.assertAdminKeyOrContentManager(auth)`.
+  - `setlist.controller.ts` — mesmo padrão: injetado `AuthService`, handlers de escrita migrados.
+  - `organizations.controller.ts` — removido `requireAdmin()` privado e `adminApiKey` field; injetado `AuthService`; 6 handlers migrados.
+  - `apps/mobile/src/lib/api.ts` — removido import e uso de `ADMIN_API_KEY` em todas as 10 funções; bearerToken agora usa apenas `accessToken` do usuário logado.
+  - `apps/mobile/src/lib/config.ts` — removida exportação `ADMIN_API_KEY`.
+  - `apps/mobile/src/screens/SongsScreen.tsx` — atualizado texto de UI para não mencionar `EXPO_PUBLIC_ADMIN_API_KEY`.
+- Arquivos: 7 arquivos alterados.
+- Validação:
+  - `npx tsc --noEmit` na API: 0 erros no código de produção. 4 erros pré-existentes em arquivos de teste (`auth.service.test.ts`, `setlist.service.test.ts`) — tipo `never` em mocks. Não relacionados às mudanças desta sessão.
+  - Grep confirmou: zero referências a `ADMIN_API_KEY` em `apps/mobile/src/`.
+- Pendências:
+  - Rebuild APK com `ADMIN_API_KEY` removido para distribuição definitiva.
+  - Testar login LEADER/ADMIN no app → deve criar/editar events/setlist sem ADMIN_API_KEY.
+  - Corrigir erros pre-existentes em testes (tipo `never` em mocks).
+  - Fase 2: Feature parity web — tela de organizações/membros.
+  - Fase 3: Push notifications (FCM).
+- Próximo passo:
+  - Testar o fluxo completo no mobile com usuário LEADER/ADMIN logado: criar evento, editar setlist — confirmar que funciona sem ADMIN_API_KEY.
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6] — Fase 2: Auth Consistency
+- Objetivo: TTL de token estendido + detecção automática de sessão expirada no mobile.
+- Feito:
+  - `apps/api/src/auth/auth.service.ts` — TTL de 12h → 7 dias (`60 * 60 * 24 * 7`). Usuários não precisam re-autenticar diariamente.
+  - `apps/mobile/src/lib/api.ts`:
+    - Adicionado `onUnauthorized` callback module-level, `setUnauthorizedHandler(handler)` export público, e `authFetch(url, init)` helper.
+    - `authFetch` chama `onUnauthorized?.()` quando response.status === 401, antes de retornar.
+    - 11 funções que fazem chamadas autenticadas migradas de `fetch(` → `authFetch(`: `updateChecklistItem`, `previewSongTxt`, `importSongTxt`, `createEvent`, `updateEvent`, `deleteEvent`, `addSetlistItem`, `removeSetlistItem`, `updateSetlistItem`, `reorderSetlist`, `updateProfile`.
+  - `apps/mobile/App.tsx`:
+    - Importado `setUnauthorizedHandler`.
+    - `logout()` agora aceita parâmetro opcional `statusMessage` (default: "Sessão encerrada.").
+    - Novo `useEffect` registra handler: quando 401 detectado em qualquer chamada autenticada, executa `logout("Sessão expirada. Faça login novamente.")` automaticamente.
+- Arquivos: 3 arquivos alterados.
+- Validação: `get_errors` — 0 erros em api.ts, App.tsx e auth.service.ts.
+- Pendências:
+  - Rebuild APK com as mudanças de Fase 1+2.
+  - Verificar Google Client IDs multi-plataforma no backend (Fase 2 item 3 ainda aberto).
+  - Fase 3: Popular `packages/types/` com interfaces compartilhadas.
+- Próximo passo:
+  - Verificar `GOOGLE_CLIENT_IDS` no backend — garantir que tokens Android e iOS são aceitos (não só Web). Depois: Fase 3 (shared types).
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6] — Fase 2 item 3: Google Client IDs multi-plataforma
+- Objetivo: Garantir que o backend aceita tokens Google de todas as plataformas (Android, iOS, Web).
+- Feito:
+  - **Diagnóstico**: Backend já suporta `GOOGLE_CLIENT_IDS` (CSV) + `GOOGLE_CLIENT_ID` via `resolveGoogleClientIds()`. `verifyIdToken()` recebe `audience: string[]` — aceita qualquer plataforma configurada. Código estava correto; gap era de configuração e documentação.
+  - `apps/api/src/auth/auth.controller.ts` — adicionado `onModuleInit()` com avisos em produção:
+    - Avisa se `GOOGLE_CLIENT_IDS` vazio e `AUTH_BOOTSTRAP_MODE=false` → login desabilitado
+    - Avisa se `AUTH_BOOTSTRAP_MODE=true` em produção (risco de segurança)
+  - `.env.example` — reescrito completo: inclui todas as variáveis de API, Web, Mobile (Android + iOS + Web Client ID), Redis, SMTP, Docker
+  - `.env.local` — removido `EXPO_PUBLIC_ADMIN_API_KEY` (código que usava foi removido na Fase 1)
+  - `docs/DEPLOY_CHECKLIST.md` — item `GOOGLE_CLIENT_IDS` expandido com instruções sobre Android (SHA-1), iOS (bundle ID), Web Client IDs
+- Arquivos: 4 arquivos alterados.
+- Validação: `get_errors` → 0 erros em `auth.controller.ts`.
+- Pendências:
+  - Rebuild APK após Fase 1+2+2.3 (mudanças de auth).
+  - Preencher `GOOGLE_CLIENT_IDS` no GitHub Secrets (Web + Android + iOS Client IDs do GCP).
+  - Fase 3: Popular `packages/types/` com interfaces compartilhadas.
+- Próximo passo:
+  - Fase 3: Criar `packages/types/index.ts` com interfaces compartilhadas (User, Event, Song, Setlist, Checklist). Atualizar imports no mobile, web e API.
+
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6] — Fase 3: Shared Types (@overflow/types)
+- Objetivo: Criar pacote de tipos compartilhados e eliminar duplicação de tipos entre web e mobile.
+- Feito:
+  - `packages/types/package.json` — pacote `@overflow/types` (privado, versionado 0.1.0)
+  - `packages/types/tsconfig.json` — configuração TS isolada para o pacote
+  - `packages/types/index.ts` — fonte de verdade com 20+ tipos: `AuthUser`, `Song`, `SongChordChart`, `ParsedChart`, `SongSection`, `SongSectionLine`, `MusicEvent`, `SetlistItem`, `EventSetlist`, `ChecklistTemplate`, `ChecklistRunItem`, `ChecklistRun`, `LoginPayload`, `LoginResponse`, enums`UserRole`, `UserStatus`, `EventStatus`, `ChordChartSourceType`
+  - **Bug corrigido**: nomes de campo `rawContent`/`structuredContent` (errados) → `rawText`/`parsedJson` (nomes reais do Prisma schema) em `SongChordChart`. Atualizado em `SongsScreen.tsx` (mobile) e `songs/[songId]/page.tsx` (web).
+  - `apps/mobile/metro.config.js` — criado para o Metro resolver pacotes do monorepo (`watchFolders` + `nodeModulesPaths`)
+  - `apps/mobile/package.json` — adicionado `@overflow/types: "*"`
+  - `apps/mobile/src/types.ts` — substituído por re-export de `@overflow/types` (compatibilidade mantida)
+  - `apps/web/package.json` — adicionado `@overflow/types: "*"`
+  - `apps/web/tsconfig.json` — adicionado path `@overflow/types → ../../packages/types/index.ts`
+  - Web: removidos tipos inline duplicados em 8 arquivos: `AuthGate.tsx`, `GlobalHeader.tsx`, `SessionStatusBanner.tsx`, `checklists/page.tsx`, `songs/page.tsx`, `events/[eventId]/page.tsx`, `events/[eventId]/present/page.tsx`, `songs/[songId]/page.tsx`
+- Arquivos alterados: 16 arquivos.
+- Validação: `tsc --noEmit` → 0 erros no mobile e 0 erros no web.
+- Pendências:
+  - Rebuild APK com mudanças de Fase 1+2+3.
+  - Configurar Google OAuth IDs no GCP e preencher env vars.
+  - Fase 4: Navegação com expo-router (substituir BottomTabs manual).
+- Próximo passo:
+  - Fase 4: Migrar navegação mobile de BottomTabs manual para expo-router com Stack + Tabs.
+
+---
+
+### [2026-04-04 18:25 America/Recife] — GitHub Copilot (Claude Sonnet 4.6) — Fase 4: expo-router
+- Objetivo: Migrar navegação mobile de BottomTabs manual para expo-router com Stack + Tabs.
+- Feito:
+  - Instalado `expo-router ~55.0.10`, `react-native-safe-area-context`, `react-native-screens`, `expo-linking`, `expo-constants` via `npx expo install` (plugin expo-router registrado automaticamente no `app.json`).
+  - Criado `apps/mobile/src/context/SessionContext.tsx`:
+    - Extrai TODA a lógica de App.tsx para um contexto React reutilizável.
+    - Expõe: auth (accessToken, user, loadingSession, isLoggedIn, statusText, login, logout, updateUser), eventos (events, activeEventId, eventSetlist, handlers de CRUD), checklist (templates, eventId, eventChecklist, loadChecklist, toggleChecklistItem), songs (songPreview, songImportResult, loadSongPreview, saveSongTxt).
+    - Usa `accessTokenRef` para closures estáveis em handlers assíncronos.
+  - Criado `apps/mobile/app/_layout.tsx` (Root Layout):
+    - Configura `Notifications.setNotificationHandler` global.
+    - `SessionProvider` envolve tudo.
+    - `ProtectedLayout` (client): auth redirect (user ↔ /login, user → /(tabs)/events), notification tap → `router.replace("/(tabs)/events")`.
+    - Loading screen enquanto `loadingSession=true`.
+  - Criado `apps/mobile/app/(tabs)/_layout.tsx`: Tabs com 4 abas (Eventos, Checklist, Músicas, Conta), tabBarStyle tematizado (#0b1828).
+  - Criado `apps/mobile/app/(tabs)/events.tsx` — render de `EventsScreen` com props via `useSession()`.
+  - Criado `apps/mobile/app/(tabs)/checklist.tsx` — render de `ChecklistScreen` com props via `useSession()`.
+  - Criado `apps/mobile/app/(tabs)/songs.tsx` — render de `SongsScreen` com props via `useSession()`.
+  - Criado `apps/mobile/app/(tabs)/account.tsx` — render de `AccountScreen` com `updateUser` via `useSession()`.
+  - Criado `apps/mobile/app/login.tsx` — render de `LoginScreen` com `login` via `useSession()`.
+  - Atualizado `apps/mobile/package.json`: `"main": "expo-router/entry"` (era `"node_modules/expo/AppEntry.js"`).
+- Arquivos:
+  - `apps/mobile/src/context/SessionContext.tsx` (novo)
+  - `apps/mobile/app/_layout.tsx` (novo)
+  - `apps/mobile/app/(tabs)/_layout.tsx` (novo)
+  - `apps/mobile/app/(tabs)/events.tsx` (novo)
+  - `apps/mobile/app/(tabs)/checklist.tsx` (novo)
+  - `apps/mobile/app/(tabs)/songs.tsx` (novo)
+  - `apps/mobile/app/(tabs)/account.tsx` (novo)
+  - `apps/mobile/app/login.tsx` (novo)
+  - `apps/mobile/package.json` (main entry atualizado)
+  - `apps/mobile/package.json` (dependências expo-router adicionadas)
+  - `apps/mobile/app.json` (plugin expo-router adicionado automaticamente)
+- Validação:
+  - `tsc --noEmit` com `apps/mobile/tsconfig.json`: **EXIT:0 (0 erros)**.
+  - `get_errors` em todos os 8 novos arquivos: **0 erros**.
+- Nota: `App.tsx` na raiz do mobile foi mantido para compatibilidade de referências, mas não é mais o entry point. A lógica foi migrada para `SessionContext.tsx`.
+- Pendências:
+  - Rebuild APK com mudanças de Fase 1+2+3+4.
+  - Testar navegação em Expo Go ou simulador (taps nas tabs, auth redirect, notification tap).
+  - Configurar Google OAuth IDs no GCP.
+- Próximo passo:
+  - Testar app no dispositivo/Expo Go e confirmar que navegação funciona como esperado.
 

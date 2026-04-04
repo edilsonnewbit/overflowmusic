@@ -2,52 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import type { SetlistItem, EventSetlist, SongChordChart, SongSectionLine } from "@overflow/types";
 
-type SetlistItem = {
-  id: string;
-  order: number;
-  songTitle: string;
-  key: string | null;
-  leaderName: string | null;
-  zone: string | null;
-  transitionNotes: string | null;
-};
-
-type Setlist = {
-  id: string;
-  title: string | null;
-  items: SetlistItem[];
-};
+type Setlist = NonNullable<EventSetlist>;
 
 type Event = {
   id: string;
   title: string;
   dateTime: string;
   setlist: Setlist | null;
-};
-
-type SectionLine = {
-  type: "chords" | "lyrics" | "tab" | "text";
-  content: string;
-};
-
-type ParsedSection = {
-  name: string;
-  lines: SectionLine[];
-};
-
-type ParsedChart = {
-  title: string;
-  artist: string | null;
-  sections: ParsedSection[];
-  metadata: { suggestedKey: string | null };
-};
-
-type ChordChart = {
-  id: string;
-  version: number;
-  parsedJson: ParsedChart | null;
-  rawText: string | null;
 };
 
 type PageProps = {
@@ -63,8 +26,8 @@ export default function PresentPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [showNav, setShowNav] = useState(true);
   const [showCifra, setShowCifra] = useState(false);
-  const [chartMap, setChartMap] = useState<Record<string, ChordChart | null>>({});
-  const chartCacheRef = useRef<Record<string, ChordChart | null>>({});
+  const [chartMap, setChartMap] = useState<Record<string, SongChordChart | null>>({});
+  const chartCacheRef = useRef<Record<string, SongChordChart | null>>({});
 
   useEffect(() => {
     void params.then(({ eventId: id }) => setEventId(id));
@@ -99,7 +62,7 @@ export default function PresentPage({ params }: PageProps) {
       if (!body.ok || !body.songs?.length) return;
       const songId = body.songs[0].id;
       const chartsRes = await fetch(`/api/songs/${songId}/charts`);
-      const chartsBody = (await chartsRes.json()) as { ok: boolean; charts?: ChordChart[] };
+      const chartsBody = (await chartsRes.json()) as { ok: boolean; charts?: SongChordChart[] };
       if (!chartsBody.ok || !chartsBody.charts?.length) return;
       chartCacheRef.current[cacheKey] = chartsBody.charts[0];
     } finally {
@@ -357,7 +320,7 @@ const sectionNameStyle: React.CSSProperties = {
   fontSize: 13, letterSpacing: 1, textTransform: "uppercase", fontFamily: "inherit",
 };
 
-function lineStyle(type: SectionLine["type"]): React.CSSProperties {
+function lineStyle(type: SongSectionLine["type"]): React.CSSProperties {
   const base: React.CSSProperties = {
     margin: "0 0 2px", whiteSpace: "pre",
     fontFamily: "'Courier New', Courier, monospace", fontSize: 14, lineHeight: 1.6,

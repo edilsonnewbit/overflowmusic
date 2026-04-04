@@ -28,6 +28,17 @@
     "web": {
       "bundler": "metro"
     },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "ndkVersion": "27.0.12077973"
+          }
+        }
+      ],
+      "expo-router"
+    ],
     "extra": {
       "eas": {
         "projectId": "4364d312-b105-4bed-b74f-c192ae1149a3"

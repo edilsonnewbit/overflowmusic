@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Share, Text, TextInput, View } from "react-native";
+import { useRouter } from "expo-router";
 import type { EventSetlist, MusicEvent, SetlistItem } from "../types";
 import { styles } from "../styles";
 
@@ -42,6 +43,7 @@ export function EventsScreen({
   onUpdateEvent,
   onDeleteEvent,
 }: Props) {
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [formTitle, setFormTitle] = useState("");
   const [formDate, setFormDate] = useState("");
@@ -457,6 +459,13 @@ export function EventsScreen({
                   }}
                 >
                   <Text style={styles.primaryButtonText}>Compartilhar Setlist</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.primaryButton, { marginTop: 8, backgroundColor: "#1a4a3a" }]}
+                  onPress={() => router.push("/present")}
+                  accessibilityLabel="Iniciar modo apresentação"
+                >
+                  <Text style={styles.primaryButtonText}>▶ Apresentar</Text>
                 </Pressable>
               </>
             )}

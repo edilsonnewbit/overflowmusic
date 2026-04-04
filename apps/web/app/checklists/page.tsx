@@ -3,26 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
-
-type ChecklistTemplate = {
-  id: string;
-  name: string;
-  items: string[];
-};
-
-type ChecklistRunItem = {
-  id: string;
-  label: string;
-  checked: boolean;
-  checkedByName: string | null;
-  order: number;
-};
-
-type ChecklistRun = {
-  id: string;
-  eventId: string;
-  items: ChecklistRunItem[];
-};
+import type { ChecklistTemplate, ChecklistRunItem, ChecklistRun } from "@overflow/types";
 
 type ApiResult<T> = {
   ok: boolean;

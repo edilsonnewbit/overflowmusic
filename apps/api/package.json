@@ -16,7 +16,11 @@
     "@nestjs/platform-express": "^10.4.8",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "^5.22.0",
+    "bullmq": "^5.73.0",
+    "@overflow/parser": "*",
+    "@overflow/types": "*",
     "google-auth-library": "^9.15.0",
+    "ioredis": "^5.10.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },

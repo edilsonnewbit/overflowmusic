@@ -23,7 +23,7 @@ type DbUserRecord = {
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly jwtSecret = process.env.JWT_SECRET || "dev_secret_change_me";
-  private readonly tokenTtlSeconds = 60 * 60 * 12;
+  private readonly tokenTtlSeconds = 60 * 60 * 24 * 7;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -96,6 +96,30 @@ export class AuthService implements OnModuleInit {
     }
 
     return { ok: true, user: this.toAuthUser(user) };
+  }
+
+  /**
+   * Renews an access token without requiring re-authentication.
+   * Accepts a valid, non-expired JWT and issues a new one with a fresh 7-day TTL.
+   * Only works while the current token is still valid — the mobile app should
+   * call this before the token expires (e.g., when exp < 2 days away).
+   */
+  async refreshAccessToken(currentToken: string): Promise<{ ok: true; accessToken: string; user: AuthUser }> {
+    const payload = this.verifyToken(currentToken); // throws if expired or invalid
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.status !== "APPROVED") {
+      throw new UnauthorizedException("unauthorized");
+    }
+
+    const accessToken = this.signToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role as UserRole,
+      iat: this.nowSeconds(),
+      exp: this.nowSeconds() + this.tokenTtlSeconds,
+    });
+
+    return { ok: true, accessToken, user: this.toAuthUser(user) };
   }
 
   async updateMe(accessToken: string, data: { name?: string }): Promise<{ ok: true; user: AuthUser }> {
@@ -209,6 +233,25 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException("unauthorized");
     }
   }
+
+  /**
+   * Accepts either the ADMIN_API_KEY (server-to-server) or a valid JWT
+   * from a user with role SUPER_ADMIN | ADMIN | LEADER.
+   * This allows the mobile app to use its JWT without needing the API key.
+   */
+  async assertAdminKeyOrContentManager(authorization: string | undefined): Promise<void> {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
+    // Fast path: server-to-server ADMIN_API_KEY
+    if (this.adminApiKey && token === this.adminApiKey) return;
+    // JWT path: validates signature, expiry, DB status, and role
+    try {
+      await this.assertCanManageContent(token);
+    } catch {
+      throw new UnauthorizedException("unauthorized");
+    }
+  }
+
+  private readonly adminApiKey = process.env.ADMIN_API_KEY || "";
 
   private async seedAdminUsers(): Promise<void> {
     const adminEmails = (process.env.ADMIN_APPROVED_EMAILS || "")

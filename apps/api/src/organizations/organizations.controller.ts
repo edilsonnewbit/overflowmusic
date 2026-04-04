@@ -8,20 +8,16 @@ import {
   Patch,
   Post,
   Query,
-  UnauthorizedException,
 } from "@nestjs/common";
 import { OrganizationsService } from "./organizations.service";
+import { AuthService } from "../auth/auth.service";
 
 @Controller("api/organizations")
 export class OrganizationsController {
-  private readonly adminApiKey = process.env.ADMIN_API_KEY || "";
-
-  constructor(private readonly orgsService: OrganizationsService) {}
-
-  private requireAdmin(authHeader: string | undefined) {
-    const key = (authHeader || "").replace(/^Bearer\s+/i, "").trim();
-    if (!key || key !== this.adminApiKey) throw new UnauthorizedException("Admin key required");
-  }
+  constructor(
+    private readonly orgsService: OrganizationsService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Get()
   async list(
@@ -44,7 +40,7 @@ export class OrganizationsController {
     @Headers("authorization") auth: string | undefined,
     @Body() body: { name: string; slug?: string },
   ) {
-    this.requireAdmin(auth);
+    await this.authService.assertAdminKeyOrContentManager(auth);
     return this.orgsService.create({ name: body.name, slug: body.slug || body.name });
   }
 
@@ -54,7 +50,7 @@ export class OrganizationsController {
     @Param("id") id: string,
     @Body() body: { name?: string },
   ) {
-    this.requireAdmin(auth);
+    await this.authService.assertAdminKeyOrContentManager(auth);
     return this.orgsService.update(id, body);
   }
 
@@ -63,7 +59,7 @@ export class OrganizationsController {
     @Headers("authorization") auth: string | undefined,
     @Param("id") id: string,
   ) {
-    this.requireAdmin(auth);
+    await this.authService.assertAdminKeyOrContentManager(auth);
     return this.orgsService.remove(id);
   }
 
@@ -73,7 +69,7 @@ export class OrganizationsController {
     @Param("id") orgId: string,
     @Body() body: { userId: string; role?: "OWNER" | "ADMIN" | "MEMBER"; instrument?: string },
   ) {
-    this.requireAdmin(auth);
+    await this.authService.assertAdminKeyOrContentManager(auth);
     return this.orgsService.addMember(orgId, body);
   }
 
@@ -84,7 +80,7 @@ export class OrganizationsController {
     @Param("memberId") memberId: string,
     @Body() body: { role?: "OWNER" | "ADMIN" | "MEMBER"; instrument?: string },
   ) {
-    this.requireAdmin(auth);
+    await this.authService.assertAdminKeyOrContentManager(auth);
     return this.orgsService.updateMember(orgId, memberId, body);
   }
 
@@ -94,7 +90,7 @@ export class OrganizationsController {
     @Param("id") orgId: string,
     @Param("memberId") memberId: string,
   ) {
-    this.requireAdmin(auth);
+    await this.authService.assertAdminKeyOrContentManager(auth);
     return this.orgsService.removeMember(orgId, memberId);
   }
 }

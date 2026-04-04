@@ -128,7 +128,7 @@ function BrowseTab({
 
   async function openSong(song: Song) {
     // If song has no chart content yet, fetch full detail
-    const hasDetail = song.chordCharts.some((c) => c.structuredContent || c.rawContent);
+    const hasDetail = song.chordCharts.some((c) => c.parsedJson || c.rawText);
     if (hasDetail) {
       setSelected(song);
       return;
@@ -300,7 +300,7 @@ function BrowseTab({
 function SongDetail({ song, onBack }: { song: Song; onBack: () => void }) {
   const [chartIndex, setChartIndex] = useState(0);
   const chart = song.chordCharts[chartIndex] ?? null;
-  const parsed = chart?.structuredContent ?? null;
+  const parsed = chart?.parsedJson ?? null;
   const meta = parsed?.metadata;
 
   return (
@@ -377,10 +377,10 @@ function SongDetail({ song, onBack }: { song: Song; onBack: () => void }) {
             </View>
           ))}
         </View>
-      ) : chart?.rawContent ? (
+      ) : chart?.rawText ? (
         <View style={chartBoxStyle}>
           <Text style={{ color: "#d6e5f8", fontFamily: "monospace", fontSize: 13 }}>
-            {chart.rawContent}
+            {chart.rawText}
           </Text>
         </View>
       ) : (
@@ -466,7 +466,7 @@ function ImportTab({
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Importar Cifra TXT</Text>
         <Text style={styles.cardDescription}>
-          Requer usuário autorizado (ou EXPO_PUBLIC_ADMIN_API_KEY em fallback).
+          Requer usuário autorizado (LEADER, ADMIN ou SUPER_ADMIN).
         </Text>
 
         <Pressable

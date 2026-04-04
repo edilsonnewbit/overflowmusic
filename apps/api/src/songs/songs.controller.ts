@@ -8,7 +8,6 @@ import {
   Patch,
   Post,
   Query,
-  UnauthorizedException,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
@@ -41,8 +40,6 @@ type PreviewTxtBody = {
 
 @Controller("api/songs")
 export class SongsController {
-  private readonly adminApiKey = process.env.ADMIN_API_KEY || "";
-
   constructor(
     private readonly songsService: SongsService,
     private readonly authService: AuthService,
@@ -156,15 +153,6 @@ export class SongsController {
   }
 
   private async assertWriteAccess(authorization?: string): Promise<void> {
-    const token = (authorization || "").replace(/^Bearer\s+/i, "");
-    if (!token) {
-      throw new UnauthorizedException("unauthorized");
-    }
-
-    if (this.adminApiKey && token === this.adminApiKey) {
-      return;
-    }
-
-    await this.authService.assertCanManageContent(token);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
   }
 }
