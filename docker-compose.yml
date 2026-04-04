@@ -34,10 +34,6 @@ services:
       - traefik.http.routers.music-api.entrypoints=websecure
       - traefik.http.routers.music-api.tls.certresolver=letsencrypt
       - traefik.http.services.music-api.loadbalancer.server.port=3001
-      - traefik.docker.network=traefik-proxy
-    networks:
-      - default
-      - traefik-proxy
 
   worker:
     image: ghcr.io/edilsonnewbit/music-overflow-worker:${IMAGE_TAG:-latest}
@@ -73,10 +69,6 @@ services:
       - traefik.http.routers.music-web.entrypoints=websecure
       - traefik.http.routers.music-web.tls.certresolver=letsencrypt
       - traefik.http.services.music-web.loadbalancer.server.port=3000
-      - traefik.docker.network=traefik-proxy
-    networks:
-      - default
-      - traefik-proxy
 
   postgres:
     image: postgres:16-alpine
@@ -104,10 +96,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
-networks:
-  traefik-proxy:
-    external: true
 
 volumes:
   postgres_data:
