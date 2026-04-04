@@ -27,9 +27,13 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 FROM node:20-alpine AS runner
-WORKDIR /app
+# WORKDIR deve ser o mesmo que o do builder para que os caminhos internos
+# do server.js (gerados em /app/apps/web) resolvam corretamente em runtime
+WORKDIR /app/apps/web
 ENV NODE_ENV=production
 ENV PORT=3000
+# Garante que o servidor escuta em todas as interfaces (não só localhost)
+ENV HOSTNAME=0.0.0.0
 
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./.next/static
