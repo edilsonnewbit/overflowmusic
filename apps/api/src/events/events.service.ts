@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
 
 type CreateEventInput = {
   title: string;
@@ -13,7 +14,10 @@ type UpdateEventInput = Partial<CreateEventInput>;
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async list() {
     const events = await this.prisma.event.findMany({
@@ -64,6 +68,8 @@ export class EventsService {
         status: input.status || "DRAFT",
       },
     });
+
+    void this.notifications.sendNewEventNotification(title);
 
     return { ok: true, event };
   }

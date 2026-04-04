@@ -17,7 +17,9 @@
       "adaptiveIcon": {
         "backgroundColor": "#07101d"
       },
-      "package": "com.overflow.music"
+      "package": "com.overflow.music",
+      "googleServicesFile": "./google-services.json",
+      "permissions": ["RECEIVE_BOOT_COMPLETED", "VIBRATE", "POST_NOTIFICATIONS"]
     },
     "web": {
       "bundler": "metro"

@@ -1,10 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { CACHE_EVENTS, cacheSetlistKey, getCache, setCache } from "./src/lib/cache";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-native";
+import * as Notifications from "expo-notifications";
 import { BottomTabs, type MobileTab } from "./src/components/BottomTabs";
 import {
   authGoogle,
+  createEvent,
   fetchChecklistTemplates,
   fetchEventChecklist,
   fetchEventSetlist,
@@ -16,6 +19,7 @@ import {
   updateChecklistItem,
 } from "./src/lib/api";
 import { TOKEN_KEY } from "./src/lib/config";
+import { registerForPushNotificationsAsync } from "./src/lib/notifications";
 import { AccountScreen } from "./src/screens/AccountScreen";
 import { ChecklistScreen } from "./src/screens/ChecklistScreen";
 import { EventsScreen } from "./src/screens/EventsScreen";
@@ -58,11 +62,30 @@ export default function App() {
   const [loadingSetlist, setLoadingSetlist] = useState(false);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [eventsStatus, setEventsStatus] = useState("Carregue os eventos.");
+  const [isOffline, setIsOffline] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+
+  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
+  const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   const isLoggedIn = Boolean(user && accessToken);
 
   useEffect(() => {
     void bootstrapSession();
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(() => {
+      // Notificação recebida em foreground — já exibida pelo handler global
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {
+      // Usuário tocou na notificação → navegar para eventos
+      setActiveTab("events");
+    });
+
+    return () => {
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
   }, []);
 
   async function bootstrapSession() {
@@ -78,6 +101,7 @@ export default function App() {
       setAccessToken(savedToken);
       setUser(me);
       setStatusText(`Sessão ativa: ${me.name}`);
+      void registerForPushNotificationsAsync(savedToken);
       await loadTemplates();
       await loadEventsList();
     } catch {
@@ -116,6 +140,7 @@ export default function App() {
         setAccessToken(body.accessToken);
         setUser(me);
         setStatusText(`Login aprovado: ${me.name}`);
+        void registerForPushNotificationsAsync(body.accessToken);
         await loadTemplates();
         await loadEventsList();
         return;
@@ -140,6 +165,7 @@ export default function App() {
     setActiveEventId(null);
     setEventSetlist(null);
     setActiveTab("events");
+    setIsOffline(false);
     setStatusText("Sessão encerrada.");
   }
 
@@ -155,14 +181,26 @@ export default function App() {
   async function loadEventsList() {
     setLoadingEvents(true);
     setEventsStatus("Carregando eventos...");
+
+    const cached = await getCache<MusicEvent[]>(CACHE_EVENTS);
+    if (cached) {
+      setEvents(cached);
+    }
+
     try {
       const result = await fetchEvents();
-      setEvents(result.events);
-      setEventsStatus(
-        result.ok ? `${result.events.length} evento(s) encontrado(s).` : result.message ?? "Falha.",
-      );
+      if (result.ok) {
+        setEvents(result.events);
+        void setCache(CACHE_EVENTS, result.events);
+        setIsOffline(false);
+        setEventsStatus(`${result.events.length} evento(s) encontrado(s).`);
+      } else {
+        if (!cached) setEvents([]);
+        setEventsStatus(result.message ?? "Falha.");
+      }
     } catch {
-      setEventsStatus("Erro de rede ao carregar eventos.");
+      setIsOffline(true);
+      setEventsStatus(cached ? "Dados em cache (offline)." : "Sem conexão com o servidor.");
     } finally {
       setLoadingEvents(false);
     }
@@ -170,13 +208,20 @@ export default function App() {
 
   async function selectEvent(id: string) {
     setActiveEventId(id);
-    setEventSetlist(null);
     setLoadingSetlist(true);
+
+    const cached = await getCache<EventSetlist>(cacheSetlistKey(id));
+    setEventSetlist(cached ?? null);
+
     try {
       const result = await fetchEventSetlist(id);
-      setEventSetlist(result.setlist);
+      if (result.ok) {
+        setEventSetlist(result.setlist);
+        void setCache(cacheSetlistKey(id), result.setlist);
+        setIsOffline(false);
+      }
     } catch {
-      setEventSetlist(null);
+      setIsOffline(true);
     } finally {
       setLoadingSetlist(false);
     }
@@ -211,6 +256,24 @@ export default function App() {
       setStatusText("Erro de rede ao reordenar.");
     } finally {
       setReorderingId(null);
+    }
+  }
+
+  async function handleCreateEvent(input: { title: string; dateTime: string; location?: string }) {
+    setCreatingEvent(true);
+    setEventsStatus("Criando evento...");
+    try {
+      const result = await createEvent(input, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao criar evento.");
+        return;
+      }
+      setEventsStatus(`Evento "${result.event?.title ?? ""}" criado.`);
+      await loadEventsList();
+    } catch {
+      setEventsStatus("Erro de rede ao criar evento.");
+    } finally {
+      setCreatingEvent(false);
     }
   }
 
@@ -353,6 +416,8 @@ export default function App() {
           onSelectEvent={selectEvent}
           onMoveItem={moveSetlistItem}
           statusText={eventsStatus}
+          onCreateEvent={handleCreateEvent}
+          creatingEvent={creatingEvent}
         />
       );
     }
@@ -420,6 +485,13 @@ export default function App() {
           <Text style={styles.statusText}>{statusText}</Text>
         </View>
 
+        {isLoggedIn && isOffline && (
+          <View style={{ backgroundColor: "#7a3f00", padding: 8, borderRadius: 8, marginBottom: 8 }}>
+            <Text style={{ color: "#ffd4a0", fontSize: 12, textAlign: "center" }}>
+              ⚠ Modo offline — exibindo dados em cache
+            </Text>
+          </View>
+        )}
         {!isLoggedIn ? <LoginScreen onSubmit={login} /> : renderLoggedArea()}
       </ScrollView>
 

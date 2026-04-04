@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { fetchSongById, fetchSongs } from "../lib/api";
+import { CACHE_SONGS, getCache, setCache } from "../lib/cache";
 import { styles } from "../styles";
 import type { Song, SongImportResult, SongPreview, SongSection } from "../types";
 
@@ -78,7 +79,10 @@ function BrowseTab() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isStale, setIsStale] = useState(false);
   const [search, setSearch] = useState("");
+  const [keyFilter, setKeyFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
   const [selected, setSelected] = useState<Song | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
@@ -89,12 +93,24 @@ function BrowseTab() {
   async function loadSongs() {
     setLoading(true);
     setError(null);
+
+    const cached = await getCache<Song[]>(CACHE_SONGS);
+    if (cached) {
+      setSongs(cached);
+    }
+
     try {
       const result = await fetchSongs();
       if (!result.ok) throw new Error(result.message);
       setSongs(result.songs);
+      void setCache(CACHE_SONGS, result.songs);
+      setIsStale(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao carregar músicas.");
+      if (cached) {
+        setIsStale(true);
+      } else {
+        setError(e instanceof Error ? e.message : "Erro ao carregar músicas.");
+      }
     } finally {
       setLoading(false);
     }
@@ -127,9 +143,22 @@ function BrowseTab() {
     );
   }
 
+  const allKeys = Array.from(
+    new Set(songs.map((s) => s.defaultKey).filter(Boolean) as string[])
+  ).sort();
+  const allTags = Array.from(
+    new Set(songs.flatMap((s) => (Array.isArray(s.tags) ? (s.tags as string[]) : [])))
+  ).sort();
+
   const filtered = songs.filter((s) => {
     const q = search.toLowerCase();
-    return s.title.toLowerCase().includes(q) || (s.artist || "").toLowerCase().includes(q);
+    const matchSearch =
+      s.title.toLowerCase().includes(q) || (s.artist || "").toLowerCase().includes(q);
+    const matchKey = keyFilter ? s.defaultKey === keyFilter : true;
+    const matchTag = tagFilter
+      ? Array.isArray(s.tags) && (s.tags as string[]).includes(tagFilter)
+      : true;
+    return matchSearch && matchKey && matchTag;
   });
 
   return (
@@ -142,11 +171,66 @@ function BrowseTab() {
         onChangeText={setSearch}
       />
 
+      {/* key filter */}
+      {!loading && allKeys.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, gap: 6, paddingBottom: 6 }}
+        >
+          <Pressable
+            onPress={() => setKeyFilter("")}
+            style={keyFilter === "" ? activeFilterChipStyle : filterChipStyle}
+          >
+            <Text style={{ fontSize: 12, color: keyFilter === "" ? "#7cf2a2" : "#b3c6e0" }}>
+              Todos os tons
+            </Text>
+          </Pressable>
+          {allKeys.map((k) => (
+            <Pressable
+              key={k}
+              onPress={() => setKeyFilter(keyFilter === k ? "" : k)}
+              style={keyFilter === k ? activeFilterChipStyle : filterChipStyle}
+            >
+              <Text style={{ fontSize: 12, color: keyFilter === k ? "#7cf2a2" : "#b3c6e0" }}>
+                {k}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* tag filter */}
+      {!loading && allTags.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12, gap: 6, paddingBottom: 8 }}
+        >
+          {allTags.map((tag) => (
+            <Pressable
+              key={tag}
+              onPress={() => setTagFilter(tagFilter === tag ? "" : tag)}
+              style={tagFilter === tag ? activeFilterChipStyle : filterChipStyle}
+            >
+              <Text style={{ fontSize: 12, color: tagFilter === tag ? "#7cf2a2" : "#b3c6e0" }}>
+                {tag}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
       {loading && (
         <View style={{ alignItems: "center", marginTop: 24 }}>
           <ActivityIndicator color="#1ecad3" />
           <Text style={{ color: "#b3c6e0", marginTop: 8 }}>Carregando músicas...</Text>
         </View>
+      )}
+      {isStale && !loading && (
+        <Text style={{ color: "#f59e0b", marginHorizontal: 12, marginBottom: 4, fontSize: 12 }}>
+          ⚠ Dados em cache — sem conexão com o servidor
+        </Text>
       )}
       {error && <Text style={{ color: "#f87171", margin: 12 }}>{error}</Text>}
       {loadingDetail && (
@@ -570,6 +654,21 @@ const dictItemStyle = {
   borderRadius: 8,
   paddingHorizontal: 10,
   paddingVertical: 4,
+};
+
+const filterChipStyle = {
+  paddingHorizontal: 12,
+  paddingVertical: 5,
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: "#2d4b6d",
+  backgroundColor: "transparent",
+};
+
+const activeFilterChipStyle = {
+  ...filterChipStyle,
+  borderColor: "#7cf2a2",
+  backgroundColor: "#1b3756",
 };
 
 
