@@ -20,7 +20,7 @@ test("SongsService.importTxt: usa metadata.suggestedKey ao criar nova música", 
     },
   };
 
-  const service = new SongsService(prismaMock as never);
+  const service = new SongsService(prismaMock as any);
 
   const content = `Artista - Musica
 Tom: A

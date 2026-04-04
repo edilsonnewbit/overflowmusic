@@ -56,7 +56,7 @@ function makeSetlistPrisma(items: FakeItem[] = []) {
 }
 
 function makeService(items: FakeItem[] = []): SetlistService {
-  return new SetlistService(makeSetlistPrisma(items) as never);
+  return new SetlistService(makeSetlistPrisma(items) as any);
 }
 
 // ── reorder ───────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ test("SetlistService.reorder: reordena itens corretamente", async () => {
     $transaction: async (ops: Array<Promise<unknown>>) => Promise.all(ops),
   };
 
-  const service = new SetlistService(prisma as never);
+  const service = new SetlistService(prisma as any);
   const result = await service.reorder("ev1", {
     items: [
       { id: "i1", order: 2 },
@@ -146,7 +146,7 @@ test("SetlistService.addItem: adiciona item com order auto-incrementado", async 
     },
   };
 
-  const service = new SetlistService(prisma as never);
+  const service = new SetlistService(prisma as any);
   const result = await service.addItem("ev1", { songTitle: "Song B" });
 
   assert.equal(result.ok, true);
@@ -175,7 +175,7 @@ test("SetlistService.getByEvent: retorna null quando não existe setlist", async
     $transaction: async (ops: Array<Promise<unknown>>) => Promise.all(ops),
   };
 
-  const service = new SetlistService(prisma as never);
+  const service = new SetlistService(prisma as any);
   const result = await service.getByEvent("ev1");
   assert.equal(result.ok, true);
   assert.equal(result.setlist, null);

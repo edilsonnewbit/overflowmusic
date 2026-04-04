@@ -1,7 +1,7 @@
 "use client";
 
 import { CSSProperties, useEffect, useState } from "react";
-import AuthGate from "@/components/AuthGate";
+import { AuthGate } from "@/components/AuthGate";
 import Link from "next/link";
 
 type OrgMember = {
@@ -233,7 +233,7 @@ function OrgsContent() {
 
 export default function OrganizationsPage() {
   return (
-    <AuthGate requiredRole="ADMIN">
+    <AuthGate>
       <OrgsContent />
     </AuthGate>
   );

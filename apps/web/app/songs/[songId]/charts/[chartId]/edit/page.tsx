@@ -41,7 +41,7 @@ function EditChartContent({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [preview, setPreview] = useState<unknown>(null);
+  const [preview, setPreview] = useState<object | null>(null);
 
   useEffect(() => {
     void params.then((p) => setIds(p));
@@ -84,8 +84,8 @@ function EditChartContent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: rawText }),
       });
-      const body = (await res.json()) as { ok: boolean; parsed?: unknown };
-      if (body.ok) setPreview(body.parsed);
+      const body = (await res.json()) as { ok: boolean; parsed?: object };
+      if (body.ok) setPreview(body.parsed ?? null);
     } catch {
       setStatus("Erro ao gerar pré-visualização.");
     }

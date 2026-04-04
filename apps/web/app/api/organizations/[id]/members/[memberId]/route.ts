@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverApiFetch } from "@/lib/server-api";
 
-type Params = { params: { id: string; memberId: string } };
+type Params = { params: Promise<{ id: string; memberId: string }> };
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const { id, memberId } = await params;
   const body = await req.json() as unknown;
-  const upstream = await serverApiFetch(`organizations/${params.id}/members/${params.memberId}`, {
+  const upstream = await serverApiFetch(`organizations/${id}/members/${memberId}`, {
     method: "PATCH",
     body: JSON.stringify(body),
     authMode: "admin",
@@ -15,7 +16,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const upstream = await serverApiFetch(`organizations/${params.id}/members/${params.memberId}`, {
+  const { id, memberId } = await params;
+  const upstream = await serverApiFetch(`organizations/${id}/members/${memberId}`, {
     method: "DELETE",
     authMode: "admin",
   });

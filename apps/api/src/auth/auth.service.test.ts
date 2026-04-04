@@ -40,7 +40,7 @@ function makePrisma(overrides: Record<string, unknown> = {}) {
 function makeService(prismaOverrides: Record<string, unknown> = {}): AuthService {
   process.env.JWT_SECRET = "test_secret";
   const prisma = makePrisma(prismaOverrides);
-  return new AuthService(prisma as never);
+  return new AuthService(prisma as any);
 }
 
 /** Generates a valid JWT for sub `userId` with role `role` via the service internals */
@@ -68,7 +68,7 @@ async function makeToken(service: AuthService, userId: string, role = "MEMBER"):
       upsert: async () => ({}),
     },
   };
-  const svc = new AuthService(prismaWithApproved as never);
+  const svc = new AuthService(prismaWithApproved as any);
   const result = await svc.googleLogin({
     email: "user@test.com",
     name: "Test User",
@@ -130,7 +130,7 @@ test("AuthService.updateMe: atualiza nome do usuário aprovado", async () => {
   };
 
   process.env.JWT_SECRET = "test_secret";
-  const service = new AuthService(prisma as never);
+  const service = new AuthService(prisma as any);
   const token = await makeToken(service, "u1");
 
   const result = await service.updateMe(token, { name: "Novo Nome" });
@@ -158,7 +158,7 @@ test("AuthService.updateMe: rejeita nome vazio", async () => {
     },
   };
   process.env.JWT_SECRET = "test_secret";
-  const service = new AuthService(prisma as never);
+  const service = new AuthService(prisma as any);
   const token = await makeToken(service, "u1");
 
   await assert.rejects(
@@ -205,7 +205,7 @@ test("AuthService.listApprovedUsers: retorna apenas usuários APPROVED", async (
     },
   };
   process.env.JWT_SECRET = "test_secret";
-  const service = new AuthService(prisma as never);
+  const service = new AuthService(prisma as any);
   const result = await service.listApprovedUsers();
 
   assert.equal(result.ok, true);
@@ -235,7 +235,7 @@ test("AuthService.googleLogin: cria usuário novo com PENDING_APPROVAL", async (
     },
   };
   process.env.JWT_SECRET = "test_secret";
-  const service = new AuthService(prisma as never);
+  const service = new AuthService(prisma as any);
   const result = await service.googleLogin({
     email: "new@test.com",
     name: "New User",
@@ -265,7 +265,7 @@ test("AuthService.googleLogin: retorna accessToken para usuário APPROVED", asyn
     },
   };
   process.env.JWT_SECRET = "test_secret";
-  const service = new AuthService(prisma as never);
+  const service = new AuthService(prisma as any);
   const result = await service.googleLogin({
     email: "bob@test.com",
     name: "Bob",

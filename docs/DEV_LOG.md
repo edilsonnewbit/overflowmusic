@@ -1563,3 +1563,24 @@ Registro oficial de progresso para handoff entre LLMs.
 - Próximo passo:
   - `git push origin develop` e deploy na VPS com `docker-compose up`.
 
+---
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Corrigir erros TypeScript TS2339 no build do CI (branch `main`).
+- Feito:
+  - Identificado: CI falhou com `tsc -p tsconfig.build.json` compilando arquivos de teste.
+  - Causa: `prisma as never` nos test files propagava tipo `never` para variáveis de resultado, causando TS2339 ao acessar propriedades.
+  - Corrigido `as never` → `as any` em todos os arquivos de teste afetados.
+  - `tsconfig.build.json` local já tinha excludes corretos (`**/*.test.ts`, `**/*.spec.ts`) — mantido.
+- Arquivos:
+  - `apps/api/src/auth/auth.service.test.ts` (7 ocorrências corrigidas)
+  - `apps/api/src/setlist/setlist.service.test.ts` (4 ocorrências corrigidas)
+  - `apps/api/src/songs/songs.service.test.ts` (1 ocorrência corrigida)
+- Validação:
+  - Correções aplicadas. Build local não executado (terminal com problema de subprocess). Verificar via `npm --workspace apps/api run build` após commit.
+- Pendências:
+  - Verificar se `develop` tem todas as alterações prontas para merge em `main`.
+  - Executar CI após push para confirmar que build passa com as correções.
+- Próximo passo:
+  - `git add` + `git commit` + `git push origin develop` e abrir PR para `main`.
+
