@@ -82,7 +82,9 @@ export class EventsService {
       },
     });
 
-    void this.notifications.sendNewEventNotification(title);
+    this.notifications.sendNewEventNotification(title).catch(() => {
+      // fire-and-forget — never crash the main flow
+    });
 
     return { ok: true, event };
   }
