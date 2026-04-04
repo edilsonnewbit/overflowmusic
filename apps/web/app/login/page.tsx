@@ -57,16 +57,24 @@ export default function LoginPage() {
       try {
         const response = await fetch("/api/auth/google/config", { method: "GET" });
         const body = (await response.json()) as GoogleConfigResponse;
-        if (!response.ok || !body.clientId) {
+
+        if (mounted) {
+          setFallbackEnabled(Boolean(body.fallbackEnabled));
+        }
+
+        if (!body.clientId) {
           if (mounted) {
-            setStatusText(body.message || "Falha ao carregar GOOGLE_CLIENT_ID");
+            setStatusText(
+              body.fallbackEnabled
+                ? "Google não configurado. Use o fallback manual abaixo."
+                : (body.message || "Falha ao carregar GOOGLE_CLIENT_ID"),
+            );
           }
           return;
         }
 
         if (mounted) {
           setClientId(body.clientId);
-          setFallbackEnabled(Boolean(body.fallbackEnabled));
           setStatusText(
             body.fallbackEnabled
               ? "Use o botão Google para entrar. Fallback manual disponível abaixo."

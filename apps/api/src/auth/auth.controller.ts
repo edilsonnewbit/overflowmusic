@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { OAuth2Client } from "google-auth-library";
 import { AuthService } from "./auth.service";
+import { AuditService } from "../audit/audit.service";
 import { UserRole } from "./auth.types";
 
 type GoogleLoginBody = {
@@ -32,7 +33,10 @@ export class AuthController {
   private readonly authBootstrapMode = process.env.AUTH_BOOTSTRAP_MODE === "true";
   private readonly oauthClient = new OAuth2Client();
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Post("api/auth/google")
   async googleLogin(@Body() body: GoogleLoginBody) {
@@ -88,6 +92,12 @@ export class AuthController {
     return this.authService.listPendingUsers();
   }
 
+  @Get("api/admin/dashboard")
+  async dashboard(@Headers("authorization") authorization?: string) {
+    this.assertAdminKey(authorization);
+    return this.authService.getDashboardStats();
+  }
+
   @Post("api/admin/users/:userId/approve")
   async approveUser(
     @Headers("authorization") authorization: string | undefined,
@@ -95,7 +105,9 @@ export class AuthController {
     @Body() body: ApproveBody,
   ) {
     this.assertAdminKey(authorization);
-    return this.authService.approveUser(userId, body.role || "MEMBER");
+    const result = await this.authService.approveUser(userId, body.role || "MEMBER");
+    void this.auditService.log({ action: "user.approved", resourceType: "User", resourceId: userId, metadata: { role: body.role || "MEMBER" } });
+    return result;
   }
 
   @Post("api/admin/users/:userId/reject")
@@ -104,7 +116,9 @@ export class AuthController {
     @Param("userId") userId: string,
   ) {
     this.assertAdminKey(authorization);
-    return this.authService.rejectUser(userId);
+    const result = await this.authService.rejectUser(userId);
+    void this.auditService.log({ action: "user.rejected", resourceType: "User", resourceId: userId });
+    return result;
   }
 
   private assertAdminKey(authorization?: string): void {

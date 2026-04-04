@@ -1436,3 +1436,151 @@ Registro oficial de progresso para handoff entre LLMs.
   - Estilo `@media print` na web para ocultar UI desnecessária na impressão.
 - Próximo passo:
   - Avaliar próxima feature: notificações push, exportação PDF do setlist, modo offline ou filtros de biblioteca.
+
+---
+
+### [2025-07-14 19:30 America/Recife] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Criar eventos no mobile (mobile era somente leitura para eventos).
+- Feito:
+  - `createEvent()` adicionado em `apps/mobile/src/lib/api.ts` (POST /api/events com ADMIN_API_KEY Bearer).
+  - Formulário colapsável "＋ Novo Evento" em `apps/mobile/src/screens/EventsScreen.tsx` (título, data/hora ISO, local opcional + validação local).
+  - Handler `handleCreateEvent` e estado `creatingEvent` adicionados em `apps/mobile/App.tsx`.
+  - Props `onCreateEvent` e `creatingEvent` passadas de `App.tsx` → `EventsScreen`.
+- Arquivos:
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/screens/EventsScreen.tsx`
+  - `apps/mobile/App.tsx`
+- Validação:
+  - TypeScript: 0 erros nos 3 arquivos.
+  - Commit: `7f7f43a feat(mobile): criar novo evento no mobile` → pushed origin/develop.
+- Pendências:
+  - Testes e2e mobile/web.
+  - Validação de formato de data no server (já ocorre, mas UI pode guiar melhor com datepicker nativo).
+- Próximo passo:
+  - Avaliar próxima feature: notificações push, exportação PDF do setlist ou edição de eventos no mobile/web.
+
+---
+
+### [2026-04-03 19:56 America/Recife] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Notificações push no mobile via Expo + backend.
+- Feito:
+  - Prisma: modelo `PushToken` (userId, token único, platform, timestamps, relação com User).
+  - API: `NotificationsService` (registerToken, sendToAll, sendNewEventNotification via Expo push API).
+  - API: `NotificationsController` → `POST /api/notifications/register` (requer JWT Bearer).
+  - API: `EventsService.create()` chama `sendNewEventNotification` após criar evento.
+  - API: `AppModule` registra NotificationsController e NotificationsService.
+  - Mobile: `expo-notifications` ~55.0.16 + `expo-device` ~55.0.12 instalados via `npx expo install`.
+  - Mobile: `src/lib/notifications.ts` com `registerForPushNotificationsAsync` (solicita permissão, canal Android, obtém ExpoPushToken, registra no backend).
+  - Mobile: `App.tsx` registra token no login/bootstrap, adiciona listener de notificação (tap → navega para aba events).
+  - `app.json`: permissões Android de notificação adicionadas.
+- Arquivos:
+  - `apps/api/prisma/schema.prisma`
+  - `apps/api/src/notifications/notifications.service.ts` (novo)
+  - `apps/api/src/notifications/notifications.controller.ts` (novo)
+  - `apps/api/src/events/events.service.ts`
+  - `apps/api/src/app.module.ts`
+  - `apps/mobile/package.json`
+  - `apps/mobile/app.json`
+  - `apps/mobile/src/lib/notifications.ts` (novo)
+  - `apps/mobile/App.tsx`
+- Validação:
+  - `tsc --noEmit` sem erros no módulo de notificações.
+  - Mobile: 0 erros TypeScript nos arquivos alterados.
+  - Commit: `f05d13f feat(notifications): push notifications com Expo (mobile + API)` → pushed origin/develop.
+- Pendências:
+  - `prisma db push` em produção (sem DB local).
+  - Configurar FCM/APNs credentials no EAS para builds standalone (tokens Expo funcionam no Expo Go).
+  - Adicionar `googleServicesFile` (google-services.json) para Android nativo.
+- Próximo passo:
+  - Exportação PDF do setlist, edição de eventos no mobile/web, ou deploy e testes em produção.
+
+---
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Adicionar músicas ao setlist a partir da biblioteca de músicas no mobile, e remover itens do setlist.
+- Feito:
+  - `api.ts`: adicionadas `addSetlistItem()` (`POST /api/events/:id/setlist/items`) e `removeSetlistItem()` (`DELETE /api/events/:id/setlist/items/:itemId`)
+  - `SongsScreen.tsx`: props `activeEventId` + `onAddToSetlist` adicionadas; `BrowseTab` atualizado para receber props; cada linha de música exibe botão "＋" (verde) quando há evento ativo — aciona `onAddToSetlist`
+  - `EventsScreen.tsx`: prop `onRemoveItem` adicionada; botão "✕" (vermelho) adicionado em cada item do setlist ao lado dos botões ▲▼
+  - `App.tsx`: importados `addSetlistItem` e `removeSetlistItem`; handlers `handleAddToSetlist` + `handleRemoveSetlistItem` implementados (refresh de setlist + cache); props passadas a `SongsScreen` e `EventsScreen`
+- Arquivos: `apps/mobile/src/lib/api.ts`, `apps/mobile/src/screens/SongsScreen.tsx`, `apps/mobile/src/screens/EventsScreen.tsx`, `apps/mobile/App.tsx`
+- Validação: 0 erros TypeScript em todos os 4 arquivos
+- Commit: `122180d feat(mobile): adicionar e remover músicas do setlist pela biblioteca` (develop)
+- Pendências:
+  - Testes end-to-end no dispositivo fisico/simulador.
+  - Próximas features: exportação PDF do setlist, edição de eventos no mobile/web.
+- Próximo passo:
+  - Exportação PDF/compartilhamento do setlist completo, ou deploy em produção.
+
+---
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Editar e excluir eventos no mobile.
+- Feito:
+  - `api.ts`: adicionadas `updateEvent()` (`PATCH /api/events/:id`) e `deleteEvent()` (`DELETE /api/events/:id`)
+  - `EventsScreen.tsx`: props `onUpdateEvent` + `onDeleteEvent`; ícone ✏ em cada card abre formulário inline pré-preenchido; ícone 🗑 dispara `Alert.alert` de confirmação antes de excluir; formulário inline de edição com validação de campos
+  - `App.tsx`: handlers `handleUpdateEvent` + `handleDeleteEvent` (refresh lista + limpeza de activeEventId/setlist ao excluir evento ativo); props passadas a `EventsScreen`
+- Arquivos: `apps/mobile/src/lib/api.ts`, `apps/mobile/src/screens/EventsScreen.tsx`, `apps/mobile/App.tsx`
+- Validação: 0 erros TypeScript
+- Commit: `9772b00 feat(mobile): editar e excluir eventos` (develop)
+- Pendências: nenhuma bloqueante.
+- Próximo passo:
+  - Exportação/compartilhamento do setlist em PDF ou texto formatado, ou deploy em produção.
+
+---
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Editar itens do setlist inline no mobile (tom, líder, zona, notas de transição).
+- Feito:
+  - `api.ts`: adicionada `updateSetlistItem()` (`PATCH /api/events/:eventId/setlist/items/:itemId`)
+  - `EventsScreen.tsx`: prop `onUpdateSetlistItem`; botão ✏ em cada item abre formulário inline pré-preenchido com key/leaderName/zone/transitionNotes; ✕ fecha sem salvar
+  - `App.tsx`: handler `handleUpdateSetlistItem` (atualiza via API → refresh setlist + cache); prop passada a `EventsScreen`
+- Arquivos: `apps/mobile/src/lib/api.ts`, `apps/mobile/src/screens/EventsScreen.tsx`, `apps/mobile/App.tsx`
+- Validação: 0 erros TypeScript
+- Commit: `ec93858 feat(mobile): editar itens do setlist (tom, líder, zona, notas)` (develop)
+- Pendências: nenhuma bloqueante.
+- Próximo passo:
+  - Deploy em produção (push develop → main, docker-compose na VPS), ou exportação avançada do setlist.
+
+### [2025-01-26 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Implementar todas as features faltantes identificadas na avaliação (~70% → ~95%).
+- Feito:
+  - Drag-and-drop no setlist web (`events/[eventId]/page.tsx`): `draggedId/dragOverId` state, `dropReorder()`, handlers `onDragStart/Over/Drop/End`, feedback visual (opacidade + borda verde).
+  - Rate limiting: `@nestjs/throttler` no `AppModule` (100 req/60s por IP).
+  - Paginação na API: `limit/offset` nos endpoints `/api/events` e `/api/songs` com metadata `{total, limit, offset}`.
+  - Campo `eventType`: enum `EventType {CULTO, CONFERENCIA, ENSAIO, OUTRO}` no schema + service + controller.
+  - Edição pós-importação de cifra: `PATCH /api/songs/:id/charts/:chartId`, proxies Next.js, página `/songs/[songId]/charts/[chartId]/edit`.
+  - Dashboard Admin: `GET /api/admin/dashboard` (6 métricas), página `/admin` com StatCards.
+  - Modo Apresentação completo: exibe cifra (shortcut `C`), lazy loading de chord charts, coloração de acordes/letras.
+  - Gestão de Organizações: modelos `Organization` + `OrganizationMember` no schema, módulo `OrganizationsController/Service`, proxies Next.js, página `/admin/organizations`.
+  - AuditLog: modelo `AuditLog` no schema, `AuditService` (fire-and-forget), integrado em aprovação/rejeição de usuários e criação/remoção de eventos.
+- Arquivos: 27 arquivos alterados/criados (commit `54dcb0a` na branch `develop`).
+- Validação: 0 erros TypeScript em todos os arquivos modificados. `prisma db push` pendente (requer DB disponível).
+- Pendências:
+  - `prisma db push` / migração para aplicar: `EventType`, `Organization`, `OrganizationMember`, `AuditLog`.
+  - Push do commit para `origin/develop`.
+  - Mobile: tela de Organizações (opcional).
+- Próximo passo:
+  - `git push origin develop` e deploy na VPS com `docker-compose up`.
+
+---
+
+### [2026-04-04 — GitHub Copilot / Claude Sonnet 4.6]
+- Objetivo: Corrigir erros TypeScript TS2339 no build do CI (branch `main`).
+- Feito:
+  - Identificado: CI falhou com `tsc -p tsconfig.build.json` compilando arquivos de teste.
+  - Causa: `prisma as never` nos test files propagava tipo `never` para variáveis de resultado, causando TS2339 ao acessar propriedades.
+  - Corrigido `as never` → `as any` em todos os arquivos de teste afetados.
+  - `tsconfig.build.json` local já tinha excludes corretos (`**/*.test.ts`, `**/*.spec.ts`) — mantido.
+- Arquivos:
+  - `apps/api/src/auth/auth.service.test.ts` (7 ocorrências corrigidas)
+  - `apps/api/src/setlist/setlist.service.test.ts` (4 ocorrências corrigidas)
+  - `apps/api/src/songs/songs.service.test.ts` (1 ocorrência corrigida)
+- Validação:
+  - Correções aplicadas. Build local não executado (terminal com problema de subprocess). Verificar via `npm --workspace apps/api run build` após commit.
+- Pendências:
+  - Verificar se `develop` tem todas as alterações prontas para merge em `main`.
+  - Executar CI após push para confirmar que build passa com as correções.
+- Próximo passo:
+  - `git add` + `git commit` + `git push origin develop` e abrir PR para `main`.
+

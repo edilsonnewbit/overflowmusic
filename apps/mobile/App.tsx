@@ -6,8 +6,10 @@ import { ActivityIndicator, SafeAreaView, ScrollView, Text, View } from "react-n
 import * as Notifications from "expo-notifications";
 import { BottomTabs, type MobileTab } from "./src/components/BottomTabs";
 import {
+  addSetlistItem,
   authGoogle,
   createEvent,
+  deleteEvent,
   fetchChecklistTemplates,
   fetchEventChecklist,
   fetchEventSetlist,
@@ -15,8 +17,11 @@ import {
   fetchMe,
   importSongTxt,
   previewSongTxt,
+  removeSetlistItem,
   reorderSetlist,
   updateChecklistItem,
+  updateEvent,
+  updateSetlistItem,
 } from "./src/lib/api";
 import { TOKEN_KEY } from "./src/lib/config";
 import { registerForPushNotificationsAsync } from "./src/lib/notifications";
@@ -259,6 +264,64 @@ export default function App() {
     }
   }
 
+  async function handleAddToSetlist(songTitle: string, key?: string) {
+    if (!activeEventId) return;
+    setEventsStatus("Adicionando ao setlist...");
+    try {
+      const result = await addSetlistItem(activeEventId, { songTitle, key }, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao adicionar.");
+        return;
+      }
+      const fresh = await fetchEventSetlist(activeEventId);
+      setEventSetlist(fresh.setlist);
+      void setCache(cacheSetlistKey(activeEventId), fresh.setlist);
+      setEventsStatus(`"${songTitle}" adicionada ao setlist.`);
+    } catch {
+      setEventsStatus("Erro de rede ao adicionar música.");
+    }
+  }
+
+  async function handleRemoveSetlistItem(itemId: string) {
+    if (!activeEventId) return;
+    setReorderingId(itemId);
+    try {
+      const result = await removeSetlistItem(activeEventId, itemId, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao remover.");
+        return;
+      }
+      const fresh = await fetchEventSetlist(activeEventId);
+      setEventSetlist(fresh.setlist);
+      void setCache(cacheSetlistKey(activeEventId), fresh.setlist);
+    } catch {
+      setEventsStatus("Erro de rede ao remover item.");
+    } finally {
+      setReorderingId(null);
+    }
+  }
+
+  async function handleUpdateSetlistItem(
+    itemId: string,
+    input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string },
+  ) {
+    if (!activeEventId) return;
+    setEventsStatus("Salvando item...");
+    try {
+      const result = await updateSetlistItem(activeEventId, itemId, input, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao editar item.");
+        return;
+      }
+      const fresh = await fetchEventSetlist(activeEventId);
+      setEventSetlist(fresh.setlist);
+      void setCache(cacheSetlistKey(activeEventId), fresh.setlist);
+      setEventsStatus("Item atualizado.");
+    } catch {
+      setEventsStatus("Erro de rede ao editar item.");
+    }
+  }
+
   async function handleCreateEvent(input: { title: string; dateTime: string; location?: string }) {
     setCreatingEvent(true);
     setEventsStatus("Criando evento...");
@@ -274,6 +337,43 @@ export default function App() {
       setEventsStatus("Erro de rede ao criar evento.");
     } finally {
       setCreatingEvent(false);
+    }
+  }
+
+  async function handleUpdateEvent(
+    id: string,
+    input: { title?: string; dateTime?: string; location?: string },
+  ) {
+    setEventsStatus("Salvando alterações...");
+    try {
+      const result = await updateEvent(id, input, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao atualizar evento.");
+        return;
+      }
+      setEventsStatus(`Evento atualizado.`);
+      await loadEventsList();
+    } catch {
+      setEventsStatus("Erro de rede ao atualizar evento.");
+    }
+  }
+
+  async function handleDeleteEvent(id: string) {
+    setEventsStatus("Excluindo evento...");
+    try {
+      const result = await deleteEvent(id, accessToken);
+      if (!result.ok) {
+        setEventsStatus(result.message ?? "Falha ao excluir evento.");
+        return;
+      }
+      setEventsStatus("Evento excluído.");
+      if (activeEventId === id) {
+        setActiveEventId(null);
+        setEventSetlist(null);
+      }
+      await loadEventsList();
+    } catch {
+      setEventsStatus("Erro de rede ao excluir evento.");
     }
   }
 
@@ -415,9 +515,13 @@ export default function App() {
           reorderingId={reorderingId}
           onSelectEvent={selectEvent}
           onMoveItem={moveSetlistItem}
+          onRemoveItem={handleRemoveSetlistItem}
+          onUpdateSetlistItem={handleUpdateSetlistItem}
           statusText={eventsStatus}
           onCreateEvent={handleCreateEvent}
           creatingEvent={creatingEvent}
+          onUpdateEvent={handleUpdateEvent}
+          onDeleteEvent={handleDeleteEvent}
         />
       );
     }
@@ -431,6 +535,8 @@ export default function App() {
           onImport={saveSongTxt}
           loadingPreview={loadingSongPreview}
           loadingImport={loadingSongImport}
+          activeEventId={activeEventId}
+          onAddToSetlist={handleAddToSetlist}
         />
       );
     }

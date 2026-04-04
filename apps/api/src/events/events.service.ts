@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { EventType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 
@@ -7,6 +8,7 @@ type CreateEventInput = {
   dateTime: string;
   location?: string;
   description?: string;
+  eventType?: EventType;
   status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
 };
 
@@ -19,12 +21,22 @@ export class EventsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async list() {
-    const events = await this.prisma.event.findMany({
-      orderBy: { dateTime: "asc" },
-    });
+  async list(params: { limit?: number; offset?: number; status?: string } = {}) {
+    const limit = Math.min(params.limit ?? 50, 200);
+    const offset = params.offset ?? 0;
+    const where = params.status ? { status: params.status as "DRAFT" | "PUBLISHED" | "ARCHIVED" } : undefined;
 
-    return { ok: true, events };
+    const [events, total] = await Promise.all([
+      this.prisma.event.findMany({
+        where,
+        orderBy: { dateTime: "asc" },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.event.count({ where }),
+    ]);
+
+    return { ok: true, events, total, limit, offset };
   }
 
   async getById(id: string) {
@@ -65,6 +77,7 @@ export class EventsService {
         dateTime,
         location: input.location?.trim() || null,
         description: input.description?.trim() || null,
+        eventType: input.eventType || "CULTO",
         status: input.status || "DRAFT",
       },
     });
@@ -85,6 +98,7 @@ export class EventsService {
       dateTime?: Date;
       location?: string | null;
       description?: string | null;
+      eventType?: EventType;
       status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
     } = {};
 
@@ -114,6 +128,10 @@ export class EventsService {
 
     if (input.status) {
       data.status = input.status;
+    }
+
+    if (input.eventType) {
+      data.eventType = input.eventType;
     }
 
     const event = await this.prisma.event.update({

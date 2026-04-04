@@ -23,6 +23,8 @@ type Props = {
   onImport: (content: string) => Promise<void>;
   loadingPreview: boolean;
   loadingImport: boolean;
+  activeEventId: string | null;
+  onAddToSetlist: (songTitle: string, key?: string) => Promise<void>;
 };
 
 export function SongsScreen({
@@ -32,6 +34,8 @@ export function SongsScreen({
   onImport,
   loadingPreview,
   loadingImport,
+  activeEventId,
+  onAddToSetlist,
 }: Props) {
   const [tab, setTab] = useState<Tab>("browse");
 
@@ -58,7 +62,7 @@ export function SongsScreen({
       </View>
 
       {tab === "browse" ? (
-        <BrowseTab />
+        <BrowseTab activeEventId={activeEventId} onAddToSetlist={onAddToSetlist} />
       ) : (
         <ImportTab
           preview={preview}
@@ -75,7 +79,13 @@ export function SongsScreen({
 
 // ── Browse Tab ────────────────────────────────────────────────────────────────
 
-function BrowseTab() {
+function BrowseTab({
+  activeEventId,
+  onAddToSetlist,
+}: {
+  activeEventId: string | null;
+  onAddToSetlist: (songTitle: string, key?: string) => Promise<void>;
+}) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -242,26 +252,38 @@ function BrowseTab() {
       <ScrollView>
         {!loading &&
           filtered.map((song) => (
-            <Pressable
+            <View
               key={song.id}
-              onPress={() => void openSong(song)}
-              style={songRowStyle}
+              style={[songRowStyle, { flexDirection: "row", alignItems: "center", paddingRight: 4 }]}
             >
-              <Text style={{ color: "#f4f8ff", fontWeight: "700", fontSize: 15 }}>
-                {song.title}
-              </Text>
-              {song.artist ? (
-                <Text style={{ color: "#b3c6e0", fontSize: 12, marginTop: 2 }}>{song.artist}</Text>
+              <Pressable style={{ flex: 1 }} onPress={() => void openSong(song)}>
+                <Text style={{ color: "#f4f8ff", fontWeight: "700", fontSize: 15 }}>
+                  {song.title}
+                </Text>
+                {song.artist ? (
+                  <Text style={{ color: "#b3c6e0", fontSize: 12, marginTop: 2 }}>{song.artist}</Text>
+                ) : null}
+                <View style={{ flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                  {song.defaultKey ? (
+                    <Text style={pillStyle}>Tom: {song.defaultKey}</Text>
+                  ) : null}
+                  {song.chordCharts.length > 0 ? (
+                    <Text style={pillStyle}>{song.chordCharts.length} cifra(s)</Text>
+                  ) : null}
+                </View>
+              </Pressable>
+              {activeEventId ? (
+                <Pressable
+                  onPress={() =>
+                    void onAddToSetlist(song.title, song.defaultKey ?? undefined)
+                  }
+                  style={{ paddingHorizontal: 10, paddingVertical: 8 }}
+                  accessibilityLabel={`Adicionar ${song.title} ao setlist`}
+                >
+                  <Text style={{ color: "#7cf2a2", fontSize: 24, fontWeight: "700" }}>＋</Text>
+                </Pressable>
               ) : null}
-              <View style={{ flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-                {song.defaultKey ? (
-                  <Text style={pillStyle}>Tom: {song.defaultKey}</Text>
-                ) : null}
-                {song.chordCharts.length > 0 ? (
-                  <Text style={pillStyle}>{song.chordCharts.length} cifra(s)</Text>
-                ) : null}
-              </View>
-            </Pressable>
+            </View>
           ))}
         {!loading && filtered.length === 0 && !error && (
           <Text style={{ color: "#b3c6e0", margin: 16 }}>

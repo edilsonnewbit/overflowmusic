@@ -187,11 +187,19 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
           </div>
         )}
 
-        {/* import link */}
-        <div style={{ marginTop: 28 }}>
+        {/* import link + edit link */}
+        <div style={{ marginTop: 28, display: "flex", gap: 16, flexWrap: "wrap" }}>
           <Link href="/songs/import" style={importLinkStyle}>
             + Importar nova versão
           </Link>
+          {chart && song && (
+            <Link
+              href={`/songs/${song.id}/charts/${chart.id}/edit`}
+              style={{ ...importLinkStyle, borderColor: "#fbbf24", color: "#fbbf24" }}
+            >
+              ✏ Editar cifra v{chart.version}
+            </Link>
+          )}
         </div>
       </div>
     </main>
