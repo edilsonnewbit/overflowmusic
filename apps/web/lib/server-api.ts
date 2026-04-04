@@ -1,4 +1,9 @@
-const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://music.overflowmvmt.com/api";
+// API_INTERNAL_URL is used server-side in Docker (e.g. http://api:3001/api).
+// Falls back to NEXT_PUBLIC_API_URL for local-without-docker or to keep backward compat.
+const baseUrl =
+  process.env.API_INTERNAL_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://music.overflowmvmt.com/api";
 const adminApiKey = process.env.ADMIN_API_KEY || "";
 
 function getAdminAuthHeader() {
