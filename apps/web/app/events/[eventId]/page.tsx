@@ -65,6 +65,8 @@ export default function EventDetailPage({ params }: PageProps) {
   const [addingItem, setAddingItem] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   useEffect(() => {
     void params.then(({ eventId: id }) => {
@@ -175,6 +177,36 @@ export default function EventDetailPage({ params }: PageProps) {
     }
   }
 
+  async function dropReorder(sourceId: string, targetId: string) {
+    if (!eventId || !event?.setlist || sourceId === targetId) return;
+    const sorted = [...event.setlist.items].sort((a, b) => a.order - b.order);
+    const sourceIdx = sorted.findIndex((it) => it.id === sourceId);
+    const targetIdx = sorted.findIndex((it) => it.id === targetId);
+    if (sourceIdx === -1 || targetIdx === -1) return;
+
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(sourceIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+    const newOrder = reordered.map((it, i) => ({ id: it.id, order: i + 1 }));
+
+    setReorderingId(sourceId);
+    setStatus("Reordenando...");
+    try {
+      const response = await fetch(`/api/events/${eventId}/setlist/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: newOrder }),
+      });
+      await parseJson<unknown>(response);
+      setStatus("OK");
+      await loadEvent(eventId);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao reordenar.");
+    } finally {
+      setReorderingId(null);
+    }
+  }
+
   function formatDate(iso: string) {
     return new Date(iso).toLocaleString("pt-BR", { dateStyle: "long", timeStyle: "short" });
   }
@@ -245,7 +277,26 @@ export default function EventDetailPage({ params }: PageProps) {
                       const isMoving = reorderingId === item.id;
                       const isDeleting = deletingItemId === item.id;
                       return (
-                        <li key={item.id} style={itemCardStyle}>
+                        <li
+                          key={item.id}
+                          draggable={!isBusy}
+                          onDragStart={() => setDraggedId(item.id)}
+                          onDragOver={(e) => { e.preventDefault(); setDragOverId(item.id); }}
+                          onDrop={() => {
+                            if (draggedId) void dropReorder(draggedId, item.id);
+                            setDraggedId(null);
+                            setDragOverId(null);
+                          }}
+                          onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
+                          style={{
+                            ...itemCardStyle,
+                            opacity: draggedId === item.id ? 0.4 : 1,
+                            border: dragOverId === item.id && draggedId !== item.id
+                              ? "2px solid #7cf2a2"
+                              : itemCardStyle.border,
+                            cursor: isBusy ? "default" : "grab",
+                          }}
+                        >
                           <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                             <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0, paddingTop: 2 }}>
                               <button

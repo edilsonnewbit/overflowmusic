@@ -7,15 +7,18 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UnauthorizedException,
 } from "@nestjs/common";
 import { EventsService } from "./events.service";
+import { AuditService } from "../audit/audit.service";
 
 type CreateEventBody = {
   title: string;
   dateTime: string;
   location?: string;
   description?: string;
+  eventType?: "CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO";
   status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
 };
 
@@ -25,11 +28,22 @@ type UpdateEventBody = Partial<CreateEventBody>;
 export class EventsController {
   private readonly adminApiKey = process.env.ADMIN_API_KEY || "";
 
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(
+    private readonly eventsService: EventsService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get()
-  async list() {
-    return this.eventsService.list();
+  async list(
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+    @Query("status") status?: string,
+  ) {
+    return this.eventsService.list({
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+      status,
+    });
   }
 
   @Get(":id")
@@ -40,7 +54,9 @@ export class EventsController {
   @Post()
   async create(@Headers("authorization") authorization: string | undefined, @Body() body: CreateEventBody) {
     this.assertAdminKey(authorization);
-    return this.eventsService.create(body);
+    const result = await this.eventsService.create(body);
+    if (result.ok) void this.auditService.log({ action: "event.created", resourceType: "Event", resourceId: result.event?.id, metadata: { title: body.title } });
+    return result;
   }
 
   @Patch(":id")
@@ -56,7 +72,9 @@ export class EventsController {
   @Delete(":id")
   async remove(@Headers("authorization") authorization: string | undefined, @Param("id") id: string) {
     this.assertAdminKey(authorization);
-    return this.eventsService.remove(id);
+    const result = await this.eventsService.remove(id);
+    void this.auditService.log({ action: "event.deleted", resourceType: "Event", resourceId: id });
+    return result;
   }
 
   private assertAdminKey(authorization?: string): void {

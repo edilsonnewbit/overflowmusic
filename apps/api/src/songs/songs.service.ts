@@ -21,18 +21,31 @@ type ImportTxtInput = {
 export class SongsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list() {
-    const songs = await this.prisma.song.findMany({
-      orderBy: { title: "asc" },
-      include: {
-        chordCharts: {
-          orderBy: { version: "desc" },
-          take: 1,
-        },
-      },
-    });
+  async list(params: { limit?: number; offset?: number; search?: string; key?: string; tags?: string } = {}) {
+    const limit = Math.min(params.limit ?? 50, 200);
+    const offset = params.offset ?? 0;
+    const where: Record<string, unknown> = {};
+    if (params.search) where.title = { contains: params.search, mode: "insensitive" };
+    if (params.key) where.defaultKey = { equals: params.key, mode: "insensitive" };
+    if (params.tags) where.tags = { path: [], array_contains: params.tags.split(",").map((t) => t.trim()) };
 
-    return { ok: true, songs };
+    const [songs, total] = await Promise.all([
+      this.prisma.song.findMany({
+        where,
+        orderBy: { title: "asc" },
+        take: limit,
+        skip: offset,
+        include: {
+          chordCharts: {
+            orderBy: { version: "desc" },
+            take: 1,
+          },
+        },
+      }),
+      this.prisma.song.count({ where }),
+    ]);
+
+    return { ok: true, songs, total, limit, offset };
   }
 
   async getById(id: string) {
@@ -186,6 +199,30 @@ export class SongsService {
     });
 
     return { ok: true, charts };
+  }
+
+  async updateChart(songId: string, chartId: string, rawText: string) {
+    const chart = await this.prisma.chordChart.findUnique({ where: { id: chartId } });
+    if (!chart || chart.songId !== songId) {
+      throw new BadRequestException("chart not found");
+    }
+
+    const content = (rawText || "").trim();
+    if (!content) {
+      throw new BadRequestException("rawText is required");
+    }
+
+    const parsed = parseChordTxt(content);
+
+    const updated = await this.prisma.chordChart.update({
+      where: { id: chartId },
+      data: {
+        rawText: content,
+        parsedJson: parsed as Prisma.InputJsonValue,
+      },
+    });
+
+    return { ok: true, chordChart: updated, parsed };
   }
 
   private parseImportContent(rawContent: string): { content: string; parsed: ReturnType<typeof parseChordTxt> } {

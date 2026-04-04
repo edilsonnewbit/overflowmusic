@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UnauthorizedException,
   UploadedFile,
   UseInterceptors,
@@ -48,8 +49,20 @@ export class SongsController {
   ) {}
 
   @Get()
-  async list() {
-    return this.songsService.list();
+  async list(
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+    @Query("search") search?: string,
+    @Query("key") key?: string,
+    @Query("tags") tags?: string,
+  ) {
+    return this.songsService.list({
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+      search,
+      key,
+      tags,
+    });
   }
 
   @Get(":id")
@@ -60,6 +73,17 @@ export class SongsController {
   @Get(":id/charts")
   async listCharts(@Param("id") id: string) {
     return this.songsService.listCharts(id);
+  }
+
+  @Patch(":id/charts/:chartId")
+  async updateChart(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Param("chartId") chartId: string,
+    @Body() body: { rawText: string },
+  ) {
+    await this.assertWriteAccess(authorization);
+    return this.songsService.updateChart(id, chartId, body.rawText);
   }
 
   @Post()

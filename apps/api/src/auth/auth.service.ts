@@ -171,6 +171,33 @@ export class AuthService implements OnModuleInit {
     return { ok: true, user: this.toAuthUser(updated) };
   }
 
+  async getDashboardStats(): Promise<{
+    ok: true;
+    stats: {
+      pendingUsers: number;
+      totalUsers: number;
+      totalEvents: number;
+      upcomingEvents: number;
+      totalSongs: number;
+      totalChecklists: number;
+    };
+  }> {
+    const now = new Date();
+    const [pendingUsers, totalUsers, totalEvents, upcomingEvents, totalSongs, totalChecklists] = await Promise.all([
+      this.prisma.user.count({ where: { status: "PENDING_APPROVAL" } }),
+      this.prisma.user.count({ where: { status: "APPROVED" } }),
+      this.prisma.event.count(),
+      this.prisma.event.count({ where: { dateTime: { gte: now } } }),
+      this.prisma.song.count(),
+      this.prisma.checklistRun.count(),
+    ]);
+
+    return {
+      ok: true,
+      stats: { pendingUsers, totalUsers, totalEvents, upcomingEvents, totalSongs, totalChecklists },
+    };
+  }
+
   async assertCanManageContent(accessToken: string): Promise<void> {
     const payload = this.verifyToken(accessToken);
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
