@@ -9,6 +9,7 @@ import {
   Post,
   UnauthorizedException,
 } from "@nestjs/common";
+import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import { OAuth2Client } from "google-auth-library";
 import { AuthService } from "./auth.service";
 import { AuditService } from "../audit/audit.service";
@@ -33,11 +34,25 @@ export class AuthController {
   private readonly authBootstrapMode = process.env.AUTH_BOOTSTRAP_MODE === "true";
   private readonly oauthClient = new OAuth2Client();
 
+  onModuleInit(): void {
+    const isProd = process.env.NODE_ENV === "production";
+    if (isProd && !this.authBootstrapMode && this.googleClientIds.length === 0) {
+      console.warn(
+        "[AuthController] AVISO: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_IDS não configurado. " +
+          "Login com Google estará desabilitado em produção.",
+      );
+    }
+    if (isProd && this.authBootstrapMode) {
+      console.warn("[AuthController] AVISO: AUTH_BOOTSTRAP_MODE=true em produção. Desative em produção.");
+    }
+  }
+
   constructor(
     private readonly authService: AuthService,
     private readonly auditService: AuditService,
   ) {}
 
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
   @Post("api/auth/google")
   async googleLogin(@Body() body: GoogleLoginBody) {
     if (body.idToken) {
@@ -65,6 +80,17 @@ export class AuthController {
     }
 
     return this.authService.getMe(token);
+  }
+
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
+  @Post("api/auth/refresh")
+  async refreshToken(@Headers("authorization") authorization?: string) {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "");
+    if (!token) {
+      throw new UnauthorizedException("missing bearer token");
+    }
+
+    return this.authService.refreshAccessToken(token);
   }
 
   @Patch("api/auth/me")

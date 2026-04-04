@@ -13,11 +13,15 @@ Checklist operacional para deploy em `https://music.overflowmvmt.com` (Hostinger
 - `REDIS_PASSWORD`
 - `ADMIN_API_KEY`
 - `JWT_SECRET`
-- `GOOGLE_CLIENT_IDS` (recomendado) ou `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_IDS` — incluir **Web, Android e iOS** separados por vírgula: `web-id,android-id,ios-id`
+  - O backend aceita tokens de qualquer Client ID listado aqui
+  - Android: OAuth client type "Android" (package `com.overflowmusic.app`, SHA-1 do keystore)
+  - iOS: OAuth client type "iOS" (bundle ID `com.overflowmusic.app`)
+  - Web: OAuth client type "Web" (authorized redirect URIs inclui domínio)
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_ALLOWED_DOMAIN`
-- `AUTH_BOOTSTRAP_MODE` (`true`/`false`)
-- `WEB_LOGIN_FALLBACK_ENABLED` (`true`/`false`)
+- `AUTH_BOOTSTRAP_MODE` — DEVE ser `false` em produção
+- `WEB_LOGIN_FALLBACK_ENABLED` — `false` em produção
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USER`

@@ -8,9 +8,9 @@ import {
   Patch,
   Post,
   Put,
-  UnauthorizedException,
 } from "@nestjs/common";
 import { SetlistService } from "./setlist.service";
+import { AuthService } from "../auth/auth.service";
 
 type UpsertSetlistBody = {
   title?: string;
@@ -34,9 +34,10 @@ type ReorderBody = {
 
 @Controller("api/events/:eventId/setlist")
 export class SetlistController {
-  private readonly adminApiKey = process.env.ADMIN_API_KEY || "";
-
-  constructor(private readonly setlistService: SetlistService) {}
+  constructor(
+    private readonly setlistService: SetlistService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Get()
   async getByEvent(@Param("eventId") eventId: string) {
@@ -49,7 +50,7 @@ export class SetlistController {
     @Param("eventId") eventId: string,
     @Body() body: UpsertSetlistBody,
   ) {
-    this.assertAdminKey(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.setlistService.upsertByEvent(eventId, body);
   }
 
@@ -59,7 +60,7 @@ export class SetlistController {
     @Param("eventId") eventId: string,
     @Body() body: CreateSetlistItemBody,
   ) {
-    this.assertAdminKey(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.setlistService.addItem(eventId, body);
   }
 
@@ -70,7 +71,7 @@ export class SetlistController {
     @Param("itemId") itemId: string,
     @Body() body: UpdateSetlistItemBody,
   ) {
-    this.assertAdminKey(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.setlistService.updateItem(eventId, itemId, body);
   }
 
@@ -80,7 +81,7 @@ export class SetlistController {
     @Param("eventId") eventId: string,
     @Param("itemId") itemId: string,
   ) {
-    this.assertAdminKey(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.setlistService.removeItem(eventId, itemId);
   }
 
@@ -90,14 +91,7 @@ export class SetlistController {
     @Param("eventId") eventId: string,
     @Body() body: ReorderBody,
   ) {
-    this.assertAdminKey(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.setlistService.reorder(eventId, body);
-  }
-
-  private assertAdminKey(authorization?: string): void {
-    const token = (authorization || "").replace(/^Bearer\s+/i, "");
-    if (!this.adminApiKey || token !== this.adminApiKey) {
-      throw new UnauthorizedException("unauthorized");
-    }
   }
 }

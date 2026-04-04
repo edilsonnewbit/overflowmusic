@@ -2,14 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
-
-type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: "SUPER_ADMIN" | "ADMIN" | "LEADER" | "MEMBER";
-  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
-};
+import type { AuthUser } from "@overflow/types";
 
 type AuthGateProps = {
   children: ReactNode;

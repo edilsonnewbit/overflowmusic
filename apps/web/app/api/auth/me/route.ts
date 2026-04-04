@@ -2,6 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { ACCESS_TOKEN_COOKIE, LOGIN_STATUS_HINT_COOKIE, LoginStatusHint } from "@/lib/auth-cookie";
 import { serverApiFetch } from "@/lib/server-api";
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const token = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value || "";
+    if (!token) {
+      return NextResponse.json({ ok: false, message: "not authenticated" }, { status: 401 });
+    }
+
+    const body = (await request.json()) as { name?: string };
+    if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
+      return NextResponse.json({ ok: false, message: "name is required" }, { status: 400 });
+    }
+
+    const response = await serverApiFetch("auth/me", {
+      method: "PATCH",
+      authMode: "user",
+      userToken: token,
+      body: JSON.stringify({ name: body.name.trim() }),
+    });
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "internal error";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
+}
+
 function readStatusHint(request: NextRequest): LoginStatusHint | null {
   const raw = request.cookies.get(LOGIN_STATUS_HINT_COOKIE)?.value || "";
   if (raw === "PENDING_APPROVAL" || raw === "REJECTED") {

@@ -8,10 +8,10 @@ import {
   Patch,
   Post,
   Query,
-  UnauthorizedException,
 } from "@nestjs/common";
 import { EventsService } from "./events.service";
 import { AuditService } from "../audit/audit.service";
+import { AuthService } from "../auth/auth.service";
 
 type CreateEventBody = {
   title: string;
@@ -26,11 +26,10 @@ type UpdateEventBody = Partial<CreateEventBody>;
 
 @Controller("api/events")
 export class EventsController {
-  private readonly adminApiKey = process.env.ADMIN_API_KEY || "";
-
   constructor(
     private readonly eventsService: EventsService,
     private readonly auditService: AuditService,
+    private readonly authService: AuthService,
   ) {}
 
   @Get()
@@ -53,7 +52,7 @@ export class EventsController {
 
   @Post()
   async create(@Headers("authorization") authorization: string | undefined, @Body() body: CreateEventBody) {
-    this.assertAdminKey(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     const result = await this.eventsService.create(body);
     if (result.ok) void this.auditService.log({ action: "event.created", resourceType: "Event", resourceId: result.event?.id, metadata: { title: body.title } });
     return result;
@@ -65,22 +64,15 @@ export class EventsController {
     @Param("id") id: string,
     @Body() body: UpdateEventBody,
   ) {
-    this.assertAdminKey(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.eventsService.update(id, body);
   }
 
   @Delete(":id")
   async remove(@Headers("authorization") authorization: string | undefined, @Param("id") id: string) {
-    this.assertAdminKey(authorization);
+    await this.authService.assertAdminKeyOrContentManager(authorization);
     const result = await this.eventsService.remove(id);
     void this.auditService.log({ action: "event.deleted", resourceType: "Event", resourceId: id });
     return result;
-  }
-
-  private assertAdminKey(authorization?: string): void {
-    const token = (authorization || "").replace(/^Bearer\s+/i, "");
-    if (!this.adminApiKey || token !== this.adminApiKey) {
-      throw new UnauthorizedException("unauthorized");
-    }
   }
 }

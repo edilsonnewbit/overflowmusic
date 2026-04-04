@@ -17,6 +17,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@overflow/types": [
+        "../../packages/types/index.ts"
       ]
     },
     "resolveJsonModule": true,

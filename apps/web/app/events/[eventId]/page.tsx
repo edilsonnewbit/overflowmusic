@@ -3,25 +3,9 @@
 import Link from "next/link";
 import { CSSProperties, FormEvent, useCallback, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import type { EventStatus, SetlistItem, EventSetlist } from "@overflow/types";
 
-type EventStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
-
-type SetlistItem = {
-  id: string;
-  order: number;
-  songTitle: string;
-  key: string | null;
-  leaderName: string | null;
-  zone: string | null;
-  transitionNotes: string | null;
-};
-
-type Setlist = {
-  id: string;
-  title: string | null;
-  notes: string | null;
-  items: SetlistItem[];
-};
+type Setlist = NonNullable<EventSetlist>;
 
 type Event = {
   id: string;

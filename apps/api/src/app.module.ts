@@ -13,6 +13,7 @@ import { EventsController } from "./events/events.controller";
 import { EventsService } from "./events/events.service";
 import { NotificationsController } from "./notifications/notifications.controller";
 import { NotificationsService } from "./notifications/notifications.service";
+import { QueueService } from "./notifications/queue.service";
 import { OrganizationsController } from "./organizations/organizations.controller";
 import { OrganizationsService } from "./organizations/organizations.service";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -24,7 +25,10 @@ import { SongsService } from "./songs/songs.service";
 @Module({
   imports: [
     PrismaModule,
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ThrottlerModule.forRoot([
+      { name: "global", ttl: 60000, limit: 100 },
+      { name: "auth", ttl: 60000, limit: 10 },
+    ]),
   ],
   controllers: [
     AppController,
@@ -43,6 +47,7 @@ import { SongsService } from "./songs/songs.service";
     AuthService,
     EventsService,
     NotificationsService,
+    QueueService,
     OrganizationsService,
     SetlistService,
     SongsService,

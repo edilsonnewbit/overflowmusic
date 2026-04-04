@@ -1,4 +1,4 @@
-import { ADMIN_API_KEY, API_BASE } from "./config";
+import { API_BASE } from "./config";
 import type {
   AuthUser,
   ChecklistRun,
@@ -14,11 +14,110 @@ import type {
 
 type JsonRecord = Record<string, unknown>;
 
+// ── Token handlers (injectados pelo SessionContext) ───────────────────────────
+
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler;
+}
+
+let getStoredToken: (() => Promise<string | null>) | null = null;
+let persistToken: ((token: string) => Promise<void>) | null = null;
+
+export function setTokenHandlers(
+  getter: () => Promise<string | null>,
+  setter: (token: string) => Promise<void>,
+): void {
+  getStoredToken = getter;
+  persistToken = setter;
+}
+
+// Reads the `exp` claim from a JWT without verifying signature (client-side only).
+function getTokenExpSeconds(token: string): number | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(base64);
+    const payload = JSON.parse(json) as { exp?: unknown };
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+// Returns true if the token is valid and expires within `withinSeconds`.
+export function isTokenExpiringSoon(token: string, withinSeconds = 172800): boolean {
+  const exp = getTokenExpSeconds(token);
+  if (exp === null) return false;
+  return exp - Math.floor(Date.now() / 1000) < withinSeconds;
+}
+
+async function authFetch(url: string, init: RequestInit): Promise<Response> {
+  const response = await fetch(url, init);
+  if (response.status !== 401) return response;
+
+  // On 401 — attempt silent token refresh before giving up.
+  if (getStoredToken && persistToken) {
+    const currentToken = await getStoredToken();
+    if (currentToken) {
+      try {
+        const refreshResp = await fetch(`${API_BASE}/auth/refresh`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${currentToken}` },
+        });
+        if (refreshResp.ok) {
+          const refreshBody = (await refreshResp.json()) as { accessToken?: string };
+          if (typeof refreshBody.accessToken === "string") {
+            await persistToken(refreshBody.accessToken);
+            // Retry original request with fresh token.
+            const retryInit: RequestInit = {
+              ...init,
+              headers: {
+                ...(init.headers as Record<string, string>),
+                Authorization: `Bearer ${refreshBody.accessToken}`,
+              },
+            };
+            return fetch(url, retryInit);
+          }
+        }
+      } catch {
+        // Refresh failed — fall through to onUnauthorized
+      }
+    }
+  }
+
+  onUnauthorized?.();
+  return response;
+}
+
 async function parseJson(response: Response): Promise<JsonRecord> {
   try {
     return (await response.json()) as JsonRecord;
   } catch {
     return {};
+  }
+}
+
+// ── Explicit refresh call (used by SessionContext on bootstrap) ───────────────
+
+export async function refreshAccessToken(
+  currentToken: string,
+): Promise<{ ok: boolean; accessToken?: string; user?: AuthUser }> {
+  try {
+    const response = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${currentToken}` },
+    });
+    const body = await parseJson(response);
+    if (!response.ok) return { ok: false };
+    return {
+      ok: true,
+      accessToken: typeof body.accessToken === "string" ? body.accessToken : undefined,
+      user: (body.user as AuthUser | undefined),
+    };
+  } catch {
+    return { ok: false };
   }
 }
 
@@ -79,15 +178,15 @@ export async function updateChecklistItem(
   input: { checked?: boolean; checkedByName?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) {
     return {
       ok: false,
-      message: "Faça login com perfil autorizado ou defina EXPO_PUBLIC_ADMIN_API_KEY.",
+      message: "Faça login com perfil autorizado para executar esta ação.",
     };
   }
 
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE}/events/${encodeURIComponent(eventId)}/checklist/items/${encodeURIComponent(itemId)}`,
     {
       method: "PATCH",
@@ -113,16 +212,16 @@ export async function previewSongTxt(
   content: string,
   accessToken?: string | null,
 ): Promise<{ ok: boolean; parsed: SongPreview | null; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) {
     return {
       ok: false,
       parsed: null,
-      message: "Faça login com perfil autorizado ou defina EXPO_PUBLIC_ADMIN_API_KEY.",
+      message: "Faça login com perfil autorizado para executar esta ação.",
     };
   }
 
-  const response = await fetch(`${API_BASE}/songs/import/txt/preview`, {
+  const response = await authFetch(`${API_BASE}/songs/import/txt/preview`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -147,16 +246,16 @@ export async function importSongTxt(
   content: string,
   accessToken?: string | null,
 ): Promise<{ ok: boolean; imported: SongImportResult | null; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) {
     return {
       ok: false,
       imported: null,
-      message: "Faça login com perfil autorizado ou defina EXPO_PUBLIC_ADMIN_API_KEY.",
+      message: "Faça login com perfil autorizado para executar esta ação.",
     };
   }
 
-  const response = await fetch(`${API_BASE}/songs/import/txt`, {
+  const response = await authFetch(`${API_BASE}/songs/import/txt`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -203,11 +302,11 @@ export async function createEvent(
   input: { title: string; dateTime: string; location?: string; description?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) {
     return { ok: false, message: "Token de autenticação ausente." };
   }
-  const response = await fetch(`${API_BASE}/events`, {
+  const response = await authFetch(`${API_BASE}/events`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -230,9 +329,9 @@ export async function updateEvent(
   input: { title?: string; dateTime?: string; location?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
-  const response = await fetch(`${API_BASE}/events/${encodeURIComponent(id)}`, {
+  const response = await authFetch(`${API_BASE}/events/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -254,9 +353,9 @@ export async function deleteEvent(
   id: string,
   accessToken?: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
-  const response = await fetch(`${API_BASE}/events/${encodeURIComponent(id)}`, {
+  const response = await authFetch(`${API_BASE}/events/${encodeURIComponent(id)}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${bearerToken}` },
   });
@@ -275,9 +374,9 @@ export async function addSetlistItem(
   input: { songTitle: string; key?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE}/events/${encodeURIComponent(eventId)}/setlist/items`,
     {
       method: "POST",
@@ -297,9 +396,9 @@ export async function removeSetlistItem(
   itemId: string,
   accessToken?: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE}/events/${encodeURIComponent(eventId)}/setlist/items/${encodeURIComponent(itemId)}`,
     {
       method: "DELETE",
@@ -319,9 +418,9 @@ export async function updateSetlistItem(
   input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE}/events/${encodeURIComponent(eventId)}/setlist/items/${encodeURIComponent(itemId)}`,
     {
       method: "PATCH",
@@ -357,12 +456,12 @@ export async function reorderSetlist(
   items: { id: string; order: number }[],
   accessToken?: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
-  const bearerToken = (accessToken || ADMIN_API_KEY || "").trim();
+  const bearerToken = (accessToken || "").trim();
   if (!bearerToken) {
     return { ok: false, message: "Token de autenticação ausente." };
   }
 
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE}/events/${encodeURIComponent(eventId)}/setlist/reorder`,
     {
       method: "POST",
@@ -405,7 +504,7 @@ export async function updateProfile(
   accessToken: string,
   data: { name: string },
 ): Promise<{ ok: boolean; user?: AuthUser; message?: string }> {
-  const response = await fetch(`${API_BASE}/auth/me`, {
+  const response = await authFetch(`${API_BASE}/auth/me`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

@@ -3,14 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: "SUPER_ADMIN" | "ADMIN" | "LEADER" | "MEMBER";
-  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
-};
+import type { AuthUser } from "@overflow/types";
 
 export function GlobalHeader() {
   const pathname = usePathname();
@@ -90,9 +83,14 @@ export function GlobalHeader() {
           {loading ? <p className="session-text">Sessão...</p> : null}
           {!loading && user ? (
             <>
-              <p className="session-text" title={user.email}>
+              <Link
+                className={pathname.startsWith("/profile") ? "active" : ""}
+                href="/profile"
+                title={user.email}
+                style={{ fontSize: 14 }}
+              >
                 {user.name} ({user.role})
-              </p>
+              </Link>
               <button className="logout-btn" type="button" onClick={() => void logout()}>
                 {loggingOut ? "Saindo..." : "Sair"}
               </button>
