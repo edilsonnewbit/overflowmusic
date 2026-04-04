@@ -7,6 +7,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN mkdir -p public
 # NEXT_PUBLIC_* vars are baked in at build time — pass them via --build-arg
 ARG NEXT_PUBLIC_API_URL=https://music.overflowmvmt.com/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
