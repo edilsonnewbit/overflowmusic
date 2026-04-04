@@ -12,9 +12,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 # Copy sources needed for Next.js build
+# NÃO copiar package.json raiz: Turbopack detectaria /app como workspace root
+# e falharia por não encontrar next/package.json a partir daí
 COPY packages/types ./packages/types
 COPY apps/web ./apps/web
-COPY package.json ./
 WORKDIR /app/apps/web
 RUN mkdir -p public
 # NEXT_PUBLIC_* vars are baked in at build time — pass them via --build-arg
