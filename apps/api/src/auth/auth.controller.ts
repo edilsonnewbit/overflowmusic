@@ -72,6 +72,49 @@ export class AuthController {
     );
   }
 
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @Post("api/auth/register")
+  async emailRegister(@Body() body: { email: string; password: string; name: string }) {
+    return this.authService.emailRegister({
+      email: body.email,
+      password: body.password,
+      name: body.name,
+    });
+  }
+
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
+  @Post("api/auth/login")
+  async emailLogin(@Body() body: { email: string; password: string }) {
+    return this.authService.emailLogin({
+      email: body.email,
+      password: body.password,
+    });
+  }
+
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @Post("api/auth/verify-email")
+  async verifyEmail(@Body() body: { token: string }) {
+    return this.authService.verifyEmail(body.token);
+  }
+
+  @Throttle({ auth: { limit: 3, ttl: 60000 } })
+  @Post("api/auth/resend-verification")
+  async resendVerification(@Body() body: { email: string }) {
+    return this.authService.resendVerificationEmail(body.email);
+  }
+
+  @Throttle({ auth: { limit: 3, ttl: 60000 } })
+  @Post("api/auth/request-password-reset")
+  async requestPasswordReset(@Body() body: { email: string }) {
+    return this.authService.requestPasswordReset(body.email);
+  }
+
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @Post("api/auth/reset-password")
+  async resetPassword(@Body() body: { token: string; password: string }) {
+    return this.authService.resetPassword(body.token, body.password);
+  }
+
   @SkipThrottle()
   @Get("api/auth/me")
   async me(@Headers("authorization") authorization?: string) {
