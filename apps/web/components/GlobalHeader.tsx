@@ -31,15 +31,6 @@ export function GlobalHeader() {
         </div>
 
         <nav className="header-nav">
-          <Link className={pathname === "/" ? "active" : ""} href="/">
-            Hub
-          </Link>
-          <Link className={pathname.startsWith("/checklists") ? "active" : ""} href="/checklists">
-            Checklists
-          </Link>
-          <Link className={pathname.startsWith("/songs/import") ? "active" : ""} href="/songs/import">
-            Songs
-          </Link>
         </nav>
 
         <div className="auth-block">

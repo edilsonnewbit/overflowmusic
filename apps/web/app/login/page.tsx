@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 type LoginResponse = {
   ok: boolean;
-  status?: "PENDING_APPROVAL" | "REJECTED" | "APPROVED";
+  status?: "PENDING_APPROVAL" | "REJECTED" | "APPROVED" | "EMAIL_NOT_VERIFIED";
   message?: string;
 };
 
@@ -40,16 +41,25 @@ declare global {
 export default function LoginPage() {
   const router = useRouter();
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  
+  // Google login estados
   const [idToken, setIdToken] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [googleSub, setGoogleSub] = useState("");
   const [clientId, setClientId] = useState("");
   const [fallbackEnabled, setFallbackEnabled] = useState(false);
-  const [statusText, setStatusText] = useState("Carregando login Google...");
-  const [loginStatus, setLoginStatus] = useState<"idle" | "pending_approval" | "rejected" | "error">("idle");
-  const [loading, setLoading] = useState(false);
   const [gisReady, setGisReady] = useState(false);
+  
+  // Email/password login estados
+  const [emailLogin, setEmailLogin] = useState("");
+  const [passwordLogin, setPasswordLogin] = useState("");
+  const [loginMethod, setLoginMethod] = useState<"google" | "email">("google");
+  
+  // Shared estados
+  const [statusText, setStatusText] = useState("Carregando login Google...");
+  const [loginStatus, setLoginStatus] = useState<"idle" | "pending_approval" | "rejected" | "error" | "email_not_verified">("idle");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -67,7 +77,7 @@ export default function LoginPage() {
           if (mounted) {
             setStatusText(
               body.fallbackEnabled
-                ? "Google não configurado. Use o fallback manual abaixo."
+                ? "Google não configurado. Use o login com email."
                 : (body.message || "Falha ao carregar GOOGLE_CLIENT_ID"),
             );
           }
@@ -76,11 +86,7 @@ export default function LoginPage() {
 
         if (mounted) {
           setClientId(body.clientId);
-          setStatusText(
-            body.fallbackEnabled
-              ? "Use o botão Google para entrar. Fallback manual disponível abaixo."
-              : "Use o botão Google para entrar.",
-          );
+          setStatusText("Escolha uma forma de login.");
         }
       } catch {
         if (mounted) {
@@ -199,6 +205,58 @@ export default function LoginPage() {
     }
   }
 
+  async function handleEmailLogin(e: FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setLoginStatus("idle");
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailLogin, password: passwordLogin }),
+      });
+
+      const body = (await response.json()) as LoginResponse;
+
+      if (!response.ok) {
+        setLoginStatus("error");
+        setStatusText(body.message || "Email ou senha inválidos");
+        return;
+      }
+
+      if (body.status === "EMAIL_NOT_VERIFIED") {
+        setLoginStatus("email_not_verified");
+        setStatusText(body.message || "Email não verificado");
+        return;
+      }
+
+      if (body.status === "APPROVED") {
+        setStatusText("Login aprovado. Redirecionando...");
+        router.replace("/");
+        return;
+      }
+
+      if (body.status === "PENDING_APPROVAL") {
+        setLoginStatus("pending_approval");
+        return;
+      }
+
+      if (body.status === "REJECTED") {
+        setLoginStatus("rejected");
+        return;
+      }
+
+      setLoginStatus("error");
+      setStatusText("Resposta de login inválida.");
+    } catch {
+      setLoginStatus("error");
+      setStatusText("Erro ao conectar com o servidor.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function submitFallback(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -228,8 +286,52 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ margin: 0 }}>Login</h1>
-        <p style={{ margin: 0, color: "#b3c6e0" }}>Entre com Google para acessar áreas operacionais.</p>
+        <p style={{ margin: 0, color: "#b3c6e0" }}>Escolha uma forma de login</p>
 
+        {/* Login method selector */}
+        {loginStatus === "idle" && (
+          <div style={{
+            display: "flex",
+            gap: 8,
+            marginBottom: 8,
+            background: "rgba(9, 25, 40, 0.88)",
+            padding: 4,
+            borderRadius: 12,
+          }}>
+            <button
+              onClick={() => setLoginMethod("google")}
+              style={{
+                flex: 1,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                background: loginMethod === "google" ? "#1ecad3" : "transparent",
+                color: loginMethod === "google" ? "#061420" : "#b3c6e0",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Google
+            </button>
+            <button
+              onClick={() => setLoginMethod("email")}
+              style={{
+                flex: 1,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                background: loginMethod === "email" ? "#1ecad3" : "transparent",
+                color: loginMethod === "email" ? "#061420" : "#b3c6e0",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Email/Senha
+            </button>
+          </div>
+        )}
+
+        {/* Status messages */}
         {loginStatus === "pending_approval" ? (
           <div
             style={{
@@ -245,15 +347,36 @@ export default function LoginPage() {
               ⏳ Aguardando aprovação
             </p>
             <p style={{ margin: 0, color: "#d6c87a", fontSize: 13, lineHeight: 1.5 }}>
-              Sua conta Google foi reconhecida, mas ainda não foi aprovada por um administrador.
+              Sua conta foi reconhecida, mas ainda não foi aprovada por um administrador.
               Assim que for aprovada, você poderá entrar normalmente.
             </p>
             <button
-              onClick={() => { setLoginStatus("idle"); setStatusText("Use o botão Google para entrar."); }}
+              onClick={() => { setLoginStatus("idle"); setStatusText("Escolha uma forma de login."); }}
               style={{ ...buttonStyle, background: "rgba(255,200,0,0.15)", color: "#fbbf24", marginTop: 4 }}
             >
               Tentar novamente
             </button>
+          </div>
+        ) : loginStatus === "email_not_verified" ? (
+          <div
+            style={{
+              background: "rgba(255, 200, 0, 0.10)",
+              border: "1px solid #f59e0b",
+              borderRadius: 12,
+              padding: 16,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <p style={{ margin: 0, fontWeight: 700, color: "#fbbf24", fontSize: 15 }}>
+              ✉️ Email não verificado
+            </p>
+            <p style={{ margin: 0, color: "#d6c87a", fontSize: 13, lineHeight: 1.5 }}>
+              {statusText}
+            </p>
+            <Link href="/resend-verification" style={{ ...buttonStyle, background: "rgba(255,200,0,0.15)", color: "#fbbf24", marginTop: 4, textDecoration: "none", textAlign: "center", display: "block" }}>
+              Reenviar email de verificação
+            </Link>
           </div>
         ) : loginStatus === "rejected" ? (
           <div
@@ -287,7 +410,10 @@ export default function LoginPage() {
             <p style={{ margin: 0, fontWeight: 700, color: "#f87171", fontSize: 15 }}>Erro no login</p>
             <p style={{ margin: 0, color: "#fca5a5", fontSize: 13 }}>{statusText}</p>
           </div>
-        ) : (
+        ) : null}
+
+        {/* Login forms */}
+        {loginStatus === "idle" && loginMethod === "google" && (
           <div
             style={{
               background: "rgba(9, 25, 40, 0.88)",
@@ -302,10 +428,79 @@ export default function LoginPage() {
             <p style={{ margin: 0, color: "#d6e5f8" }}>Google Sign-In</p>
             <div ref={googleButtonRef} />
             {!gisReady ? <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>Carregando botão Google...</p> : null}
+            <div style={{ textAlign: "center", fontSize: 13, width: "100%" }}>
+              <Link href="/register" style={{ color: "#1ecad3", textDecoration: "none" }}>
+                Não tem conta? Cadastre-se
+              </Link>
+            </div>
           </div>
         )}
 
-        {loginStatus === "idle" && fallbackEnabled ? (
+        {loginStatus === "idle" && loginMethod === "email" && (
+          <div
+            style={{
+              background: "rgba(9, 25, 40, 0.88)",
+              border: "1px solid #31557c",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <form onSubmit={(e) => void handleEmailLogin(e)} style={{ display: "grid", gap: 12 }}>
+              <div>
+                <label style={{ display: "block", marginBottom: 6, color: "#d6e5f8", fontSize: 14 }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={emailLogin}
+                  onChange={(e) => setEmailLogin(e.target.value)}
+                  required
+                  style={inputStyle}
+                  placeholder="seu@email.com"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", marginBottom: 6, color: "#d6e5f8", fontSize: 14 }}>
+                  Senha
+                </label>
+                <input
+                  type="password"
+                  value={passwordLogin}
+                  onChange={(e) => setPasswordLogin(e.target.value)}
+                  required
+                  style={inputStyle}
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  ...buttonStyle,
+                  width: "100%",
+                  opacity: loading ? 0.5 : 1,
+                  cursor: loading ? "not-allowed" : "pointer",
+                }}
+              >
+                {loading ? "Entrando..." : "Entrar"}
+              </button>
+
+              <div style={{ textAlign: "center", fontSize: 13 }}>
+                <Link href="/register" style={{ color: "#1ecad3", textDecoration: "none" }}>
+                  Criar nova conta
+                </Link>
+                {" • "}
+                <Link href="/forgot-password" style={{ color: "#1ecad3", textDecoration: "none" }}>
+                  Esqueceu a senha?
+                </Link>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {loginStatus === "idle" && fallbackEnabled && loginMethod === "google" ? (
           <details style={{ background: "rgba(9, 25, 40, 0.88)", border: "1px solid #31557c", borderRadius: 12, padding: 12 }}>
             <summary style={{ cursor: "pointer", color: "#d6e5f8" }}>Fallback manual (debug/bootstrap)</summary>
             <form onSubmit={submitFallback} style={{ display: "grid", gap: 10, marginTop: 10 }}>
@@ -329,7 +524,7 @@ export default function LoginPage() {
           </details>
         ) : null}
 
-        {loginStatus === "idle" ? <p style={{ margin: 0, color: "#1ecad3" }}>{statusText}</p> : null}
+        {loginStatus === "idle" ? <p style={{ margin: 0, color: "#1ecad3", fontSize: 13 }}>{statusText}</p> : null}
       </section>
     </main>
   );
@@ -342,6 +537,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 12,
   padding: "10px 12px",
   outline: "none",
+  width: "100%",
 };
 
 const buttonStyle: React.CSSProperties = {
