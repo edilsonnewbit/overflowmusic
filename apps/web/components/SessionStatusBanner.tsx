@@ -1,59 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { AuthUser } from "@/lib/types";
-
-type SessionPayload = {
-  ok: boolean;
-  user?: AuthUser;
-  statusHint?: "PENDING_APPROVAL" | "REJECTED" | null;
-};
+import { useAuth } from "@/components/AuthProvider";
 
 export function SessionStatusBanner() {
-  const [state, setState] = useState<"loading" | "hidden" | "pending" | "rejected" | "approved">("loading");
-  const [userName, setUserName] = useState("");
+  const { loading, user, statusHint } = useAuth();
 
-  useEffect(() => {
-    let mounted = true;
+  if (loading) return null;
 
-    async function loadSessionStatus() {
-      try {
-        const response = await fetch("/api/auth/me", { method: "GET", cache: "no-store" });
-        const body = (await response.json()) as SessionPayload;
+  const state = user
+    ? "approved"
+    : statusHint === "PENDING_APPROVAL"
+    ? "pending"
+    : statusHint === "REJECTED"
+    ? "rejected"
+    : "hidden";
 
-        if (!mounted) return;
-
-        if (response.ok && body.user) {
-          setUserName(body.user.name || "usuário");
-          setState("approved");
-          return;
-        }
-
-        if (body.statusHint === "PENDING_APPROVAL") {
-          setState("pending");
-          return;
-        }
-
-        if (body.statusHint === "REJECTED") {
-          setState("rejected");
-          return;
-        }
-
-        setState("hidden");
-      } catch {
-        if (mounted) {
-          setState("hidden");
-        }
-      }
-    }
-
-    void loadSessionStatus();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const userName = user?.name ?? "usuário";
 
   if (state === "loading" || state === "hidden") {
     return null;
