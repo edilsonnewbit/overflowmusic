@@ -31,7 +31,12 @@ export function LoginScreen({ onSubmit }: Props) {
   const [googleInfoText, setGoogleInfoText] = useState("");
 
   const discovery = AuthSession.useAutoDiscovery("https://accounts.google.com");
-  const redirectUri = useMemo(() => AuthSession.makeRedirectUri({ scheme: "overflowmusic" }), []);
+  const redirectUri = useMemo(() => {
+    const uri = AuthSession.makeRedirectUri({ scheme: "overflowmusic" });
+    console.log("🔗 Redirect URI gerado:", uri);
+    console.log("🔑 Client ID:", googleClientId);
+    return uri;
+  }, [googleClientId]);
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId: googleClientId,

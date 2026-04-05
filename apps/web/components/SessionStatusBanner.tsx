@@ -18,7 +18,7 @@ export function SessionStatusBanner() {
 
   const userName = user?.name ?? "usuário";
 
-  if (state === "loading" || state === "hidden") {
+  if (state === "hidden") {
     return null;
   }
 
