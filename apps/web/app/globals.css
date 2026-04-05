@@ -133,3 +133,7 @@ a {
   padding: 6px 10px;
   cursor: pointer;
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
