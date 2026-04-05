@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { AuthUser } from "@overflow/types";
+import type { AuthUser } from "@/lib/types";
 
 type SessionPayload = {
   ok: boolean;

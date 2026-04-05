@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
-import type { ChecklistTemplate, ChecklistRunItem, ChecklistRun } from "@overflow/types";
+import type { ChecklistTemplate, ChecklistRunItem, ChecklistRun } from "@/lib/types";
 
 type ApiResult<T> = {
   ok: boolean;

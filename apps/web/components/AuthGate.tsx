@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
-import type { AuthUser } from "@overflow/types";
+import type { AuthUser } from "@/lib/types";
 
 type AuthGateProps = {
   children: ReactNode;
