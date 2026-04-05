@@ -69,7 +69,7 @@ services:
       WEB_LOGIN_FALLBACK_ENABLED: ${WEB_LOGIN_FALLBACK_ENABLED:-false}
       API_INTERNAL_URL: http://api:3001/api
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- --server-response http://localhost:3000/ 2>&1 | grep -qE 'HTTP/[0-9.]+ (200|301|302|307|308)' || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
