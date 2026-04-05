@@ -39,19 +39,51 @@ enum ChordChartSourceType {
 }
 
 model User {
-  id         String     @id @default(uuid())
-  name       String
-  email      String     @unique
-  googleSub  String     @unique
-  role       UserRole   @default(MEMBER)
-  status     UserStatus @default(PENDING_APPROVAL)
-  createdAt  DateTime   @default(now())
-  reviewedAt DateTime?
+  id                String     @id @default(uuid())
+  name              String
+  email             String     @unique
+  googleSub         String?    @unique
+  passwordHash      String?
+  emailVerified     Boolean    @default(false)
+  emailVerifiedAt   DateTime?
+  role              UserRole   @default(MEMBER)
+  status            UserStatus @default(PENDING_APPROVAL)
+  createdAt         DateTime   @default(now())
+  reviewedAt        DateTime?
+  lastLoginAt       DateTime?
 
-  pushTokens   PushToken[]
-  memberships  OrganizationMember[]
+  pushTokens           PushToken[]
+  memberships          OrganizationMember[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens  PasswordResetToken[]
 
   @@index([status])
+  @@index([emailVerified])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  usedAt    DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
 }
 
 model PushToken {
