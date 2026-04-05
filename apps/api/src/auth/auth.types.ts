@@ -5,7 +5,7 @@ export type AuthUser = {
   id: string;
   name: string;
   email: string;
-  googleSub: string;
+  googleSub?: string;
   role: UserRole;
   status: UserStatus;
   createdAt: string;
