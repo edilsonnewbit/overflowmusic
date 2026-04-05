@@ -72,6 +72,7 @@ export class AuthController {
     );
   }
 
+  @SkipThrottle()
   @Get("api/auth/me")
   async me(@Headers("authorization") authorization?: string) {
     const token = (authorization || "").replace(/^Bearer\s+/i, "");
@@ -93,6 +94,7 @@ export class AuthController {
     return this.authService.refreshAccessToken(token);
   }
 
+  @SkipThrottle()
   @Patch("api/auth/me")
   async updateMe(
     @Headers("authorization") authorization: string | undefined,
