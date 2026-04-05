@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { AuthUser } from "@overflow/types";
+import type { AuthUser } from "@/lib/types";
 
 export function GlobalHeader() {
   const pathname = usePathname();

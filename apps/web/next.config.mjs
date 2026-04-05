@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  // Transpilar pacotes do monorepo (TypeScript-only, sem build step próprio)
-  transpilePackages: ["@overflow/types"],
   async headers() {
     return [
       {

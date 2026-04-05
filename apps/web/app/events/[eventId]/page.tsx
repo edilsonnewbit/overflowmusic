@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, FormEvent, useCallback, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
-import type { EventStatus, SetlistItem, EventSetlist } from "@overflow/types";
+import type { EventStatus, SetlistItem, EventSetlist } from "@/lib/types";
 
 type Setlist = NonNullable<EventSetlist>;
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { AuthUser } from "@overflow/types";
+import type { AuthUser } from "@/lib/types";
 
 // ─── Profile Page ─────────────────────────────────────────────────────────────
 

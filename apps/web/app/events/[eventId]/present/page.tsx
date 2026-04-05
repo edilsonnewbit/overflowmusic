@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { SetlistItem, EventSetlist, SongChordChart, SongSectionLine } from "@overflow/types";
+import type { SetlistItem, EventSetlist, SongChordChart, SongSectionLine } from "@/lib/types";
 
 type Setlist = NonNullable<EventSetlist>;
 

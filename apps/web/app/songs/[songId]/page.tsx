@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
-import type { Song, SongSectionLine } from "@overflow/types";
+import type { Song, SongSectionLine } from "@/lib/types";
 
 // ── page ─────────────────────────────────────────────────────────────────────
 
