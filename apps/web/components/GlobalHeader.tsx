@@ -2,57 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { AuthUser } from "@/lib/types";
+import { useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 
 export function GlobalHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { loading, user } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadSession() {
-      try {
-        const response = await fetch("/api/auth/me", { method: "GET", cache: "no-store" });
-        if (!response.ok) {
-          if (mounted) {
-            setUser(null);
-          }
-          return;
-        }
-
-        const body = (await response.json()) as { ok: boolean; user?: AuthUser };
-        if (mounted) {
-          setUser(body.user || null);
-        }
-      } catch {
-        if (mounted) {
-          setUser(null);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadSession();
-
-    return () => {
-      mounted = false;
-    };
-  }, [pathname]);
 
   async function logout() {
     setLoggingOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
-      setUser(null);
       setLoggingOut(false);
       router.replace("/login");
       router.refresh();

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { AuthUser } from "@/lib/types";
+import { useAuth } from "@/components/AuthProvider";
 
 type DashboardStats = {
   pendingUsers: number;
@@ -34,53 +34,35 @@ function formatDate(iso: string) {
 }
 
 export function HomeClient() {
-  const [session, setSession] = useState<SessionState>("loading");
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const { loading: authLoading, user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [nextEvent, setNextEvent] = useState<Event | null>(null);
 
+  const session: SessionState = authLoading ? "loading" : user ? "logged_in" : "guest";
+
   useEffect(() => {
+    if (!user) return;
     let mounted = true;
 
-    async function load() {
-      try {
-        const meRes = await fetch("/api/auth/me", { method: "GET", cache: "no-store" });
-        if (!meRes.ok) {
-          if (mounted) setSession("guest");
-          return;
-        }
-        const meBody = (await meRes.json()) as { ok: boolean; user?: AuthUser };
-        if (!meBody.user) {
-          if (mounted) setSession("guest");
-          return;
-        }
+    async function loadData() {
+      const [statsRes, eventsRes] = await Promise.all([
+        fetch("/api/dashboard/stats", { cache: "no-store" }),
+        fetch("/api/events/next", { cache: "no-store" }),
+      ]);
 
-        if (mounted) {
-          setUser(meBody.user);
-          setSession("logged_in");
-        }
-
-        const [statsRes, eventsRes] = await Promise.all([
-          fetch("/api/dashboard/stats", { cache: "no-store" }),
-          fetch("/api/events/next", { cache: "no-store" }),
-        ]);
-
-        if (statsRes.ok && mounted) {
-          const s = (await statsRes.json()) as { stats?: DashboardStats };
-          setStats(s.stats ?? null);
-        }
-        if (eventsRes.ok && mounted) {
-          const e = (await eventsRes.json()) as { event?: Event };
-          setNextEvent(e.event ?? null);
-        }
-      } catch {
-        if (mounted) setSession("guest");
+      if (statsRes.ok && mounted) {
+        const s = (await statsRes.json()) as { stats?: DashboardStats };
+        setStats(s.stats ?? null);
+      }
+      if (eventsRes.ok && mounted) {
+        const e = (await eventsRes.json()) as { event?: Event };
+        setNextEvent(e.event ?? null);
       }
     }
 
-    void load();
+    void loadData();
     return () => { mounted = false; };
-  }, []);
+  }, [user]);
 
   if (session === "loading") {
     return (
