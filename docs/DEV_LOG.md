@@ -2,6 +2,39 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-06 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Continuação da sessão anterior — validação pós-commit do fluxo de auth
+- Validado:
+  - `apps/api/src/email/email.service.ts`: URLs dos templates de email apontam corretamente para `/verify-email?token=...` e `/reset-password?token=...` (páginas criadas na sessão anterior)
+  - `FRONTEND_URL` definida como `https://music.overflowmvmt.com` no docker-compose.yml de produção ✅
+  - `apps/mobile/src/screens/LoginScreen.tsx`: implementação funcional (Google + email/senha, trata todos os status APPROVED/PENDING/REJECTED/EMAIL_NOT_VERIFIED)
+  - `apps/mobile/app/register.tsx`: tela de cadastro funcional no mobile
+- Arquivos commitados: mobile LoginScreen.tsx, mobile register.tsx, docs/DEV_LOG.md
+- Pendências: merge develop → main para deploy em produção
+- Próximo passo: `git checkout main && git merge develop && git push origin main` para atualizar produção
+
+### [2026-04-05 20:19 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Redesenhar fluxo de auth completo (login, registro, recuperação, verificação) — funcional sem erros
+- Problema raiz identificado: BFF routes de login/register/verify/resend/reset não existiam (todas davam 404); COOP header bloqueava Google Sign-In
+- Feito:
+  - `apps/web/next.config.mjs`: adicionado header `Cross-Origin-Opener-Policy: same-origin-allow-popups` na rota /login — corrige erro de `window.postMessage` do Google Sign-In
+  - `apps/web/app/api/auth/login/route.ts` — criado (proxy + set cookie session)
+  - `apps/web/app/api/auth/register/route.ts` — criado
+  - `apps/web/app/api/auth/verify-email/route.ts` — criado
+  - `apps/web/app/api/auth/resend-verification/route.ts` — criado
+  - `apps/web/app/api/auth/request-password-reset/route.ts` — criado
+  - `apps/web/app/api/auth/reset-password/route.ts` — criado
+  - `apps/web/app/login/page.tsx` — redesenhado: dark theme consistente, Google + email unificados, estados inline sem tabs
+  - `apps/web/app/register/page.tsx` — redesenhado: dark theme, tela de sucesso com instrução de verificar email
+  - `apps/web/app/forgot-password/page.tsx` — redesenhado: dark theme
+  - `apps/web/app/resend-verification/page.tsx` — redesenhado: pré-preenche email via ?email= query string
+  - `apps/web/app/verify-email/page.tsx` — criado: lê token da URL, chama API automaticamente
+  - `apps/web/app/reset-password/page.tsx` — criado: lê token da URL, formulário nova senha
+  - `apps/web/app/globals.css`: adicionado `@keyframes spin`
+- Validação: 0 erros TypeScript em todos os arquivos; push `012dea3..26d06cd` em develop
+- Pendências: mobile LoginScreen.tsx (modificado local, não commitado); package-lock.json; .env.example
+- Próximo passo: Testar fluxo completo em produção após deploy; verificar templates de email com URLs corretas (/verify-email?token=... e /reset-password?token=...)
+
 ### [2026-04-04 22:35 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Redesenhar página inicial como landing page pública com dashboard visível apenas para logados
 - Feito:
