@@ -22,6 +22,11 @@ export async function POST(request: NextRequest) {
     });
 
     const body = await response.json();
+
+    if (!response.ok) {
+      console.error("[auth/google] API error:", response.status, JSON.stringify(body));
+    }
+
     const nextResponse = NextResponse.json(body, { status: response.status });
 
     if (response.ok && body?.status === "APPROVED" && typeof body?.accessToken === "string") {
