@@ -160,16 +160,16 @@ export class AuthService implements OnModuleInit {
         userId: user.id,
         token,
         expiresAt,
-      }Enviar email de verificação
+      },
+    });
+
+    // Send verification email
     try {
       await this.emailService.sendVerificationEmail(email, token);
     } catch (error) {
       console.error('[AuthService] Falha ao enviar email de verificação:', error);
       // Não bloqueia o registro se o email falhar
     }
-    // TODO: Send verification email
-    // For now, we'll just log the token
-    console.log(`[EmailRegister] Verification token for ${email}: ${token}`);
 
     return {
       ok: true,
@@ -239,17 +239,17 @@ export class AuthService implements OnModuleInit {
       data: {
         userId: user.id,
         token,
-       Enviar email de verificação
+        expiresAt,
+      },
+    });
+
+    // Send verification email
     try {
       await this.emailService.sendVerificationEmail(email, token);
     } catch (error) {
       console.error('[AuthService] Falha ao reenviar email de verificação:', error);
       throw new BadRequestException('Failed to send verification email');
     }
-    });
-
-    // TODO: Send verification email
-    console.log(`[ResendVerification] Verification token for ${email}: ${token}`);
 
     return { ok: true, message: "Verification email sent" };
   }
@@ -341,13 +341,8 @@ export class AuthService implements OnModuleInit {
     // Create new token
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
-Enviar email de recuperação de senha
-    try {
-      await this.emailService.sendPasswordResetEmail(email, token);
-    } catch (error) {
-      console.error('[AuthService] Falha ao enviar email de recuperação:', error);
-      // Não revela se o email existe
-    }
+
+    await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
         token,
@@ -355,8 +350,15 @@ Enviar email de recuperação de senha
       },
     });
 
-    // TODO: Send password reset email
-    console.log(`[PasswordReset] Reset token for ${email}: ${token}`);
+    // Send password reset email
+    try {
+      await this.emailService.sendPasswordResetEmail(email, token);
+    } catch (error) {
+      console.error('[AuthService] Falha ao enviar email de recuperação:', error);
+      // Não revela se o email existe
+    }
+
+    return { ok: true, message: "If the email exists, a password reset link has been sent" };
 
     return { ok: true, message: "If the email exists, a password reset link has been sent" };
   }
