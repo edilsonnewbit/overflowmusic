@@ -3,33 +3,6 @@ import Link from "next/link";
 import { SessionStatusBanner } from "@/components/SessionStatusBanner";
 import { HomeClient } from "@/components/HomeClient";
 
-const FEATURES = [
-  {
-    icon: "📅",
-    tag: "Eventos",
-    title: "Agenda & Setlist",
-    desc: "Organize cultos, ensaios e conferências com setlists completos por apresentação.",
-  },
-  {
-    icon: "🎵",
-    tag: "Música",
-    title: "Biblioteca de Cifras",
-    desc: "Acesse e importe cifras com acordes em destaque, busca por título ou artista.",
-  },
-  {
-    icon: "✅",
-    tag: "Operações",
-    title: "Checklists",
-    desc: "Templates reutilizáveis e execução de checklists operacionais por evento.",
-  },
-  {
-    icon: "👥",
-    tag: "Equipe",
-    title: "Gestão de Membros",
-    desc: "Aprovação de novos membros, definição de papéis e visão geral da equipe.",
-  },
-];
-
 export default function HomePage() {
   return (
     <main style={{ minHeight: "100vh", padding: "32px 16px 56px" }}>
@@ -54,30 +27,18 @@ export default function HomePage() {
                 eventos, setlists, cifras e operações em um só lugar.
               </p>
             </div>
-            <Link href="/login" style={ctaButtonStyle}>
-              Entrar com Google →
-            </Link>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+              <Link href="/login" style={ctaButtonStyle}>
+                Entrar →
+              </Link>
+              <Link href="/register" style={ctaSecondaryStyle}>
+                Criar conta
+              </Link>
+            </div>
           </div>
         </section>
 
         <SessionStatusBanner />
-
-        {/* ── Features ── */}
-        <section style={{ marginTop: 40 }}>
-          <p style={sectionTagStyle}>O que você encontra aqui</p>
-          <div style={featuresGridStyle}>
-            {FEATURES.map((f) => (
-              <div key={f.tag} style={featureCardStyle}>
-                <span style={featureIconStyle}>{f.icon}</span>
-                <div>
-                  <p style={featureTagStyle}>{f.tag}</p>
-                  <h3 style={featureTitleStyle}>{f.title}</h3>
-                  <p style={featureDescStyle}>{f.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
 
         {/* ── Dashboard (visível só para logados) ── */}
         <HomeClient />
@@ -134,57 +95,16 @@ const ctaButtonStyle: React.CSSProperties = {
   letterSpacing: 0.3,
 };
 
-const sectionTagStyle: React.CSSProperties = {
-  margin: "0 0 18px",
-  letterSpacing: 2,
-  textTransform: "uppercase",
-  color: "#4a6a8a",
-  fontSize: 11,
-  fontWeight: 600,
-};
-
-const featuresGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 14,
-};
-
-const featureCardStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 14,
-  background: "rgba(14, 32, 54, 0.9)",
-  border: "1px solid #1e3a58",
-  borderRadius: 18,
-  padding: "18px 20px",
-};
-
-const featureIconStyle: React.CSSProperties = {
-  fontSize: 26,
-  lineHeight: 1,
-  marginTop: 3,
-  flexShrink: 0,
-};
-
-const featureTagStyle: React.CSSProperties = {
-  margin: 0,
-  letterSpacing: 2,
-  textTransform: "uppercase",
-  color: "#7cf2a2",
-  fontSize: 10,
-  fontWeight: 600,
-};
-
-const featureTitleStyle: React.CSSProperties = {
-  margin: "4px 0 6px",
+const ctaSecondaryStyle: React.CSSProperties = {
+  display: "inline-block",
+  textDecoration: "none",
+  background: "rgba(30,202,211,0.12)",
+  color: "#1ecad3",
+  border: "1px solid #1ecad3",
+  borderRadius: 999,
+  padding: "12px 28px",
   fontSize: 15,
   fontWeight: 600,
-};
-
-const featureDescStyle: React.CSSProperties = {
-  margin: 0,
-  color: "#7a9dc0",
-  fontSize: 13,
-  lineHeight: 1.5,
+  letterSpacing: 0.3,
 };
 
