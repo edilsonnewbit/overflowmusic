@@ -90,9 +90,6 @@ export default function HomePage() {
 /* ── Styles ── */
 
 const heroStyle: React.CSSProperties = {
-  background: "linear-gradient(160deg, #112236 0%, #0a1c30 50%, #081828 100%)",
-  border: "1px solid #254563",
-  borderRadius: 28,
   padding: "40px 24px",
   textAlign: "center",
 };
