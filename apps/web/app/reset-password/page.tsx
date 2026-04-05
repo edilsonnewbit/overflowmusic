@@ -1,23 +1,31 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-type RegisterResponse = {
+type ApiResponse = {
   ok: boolean;
   message?: string;
 };
 
-export default function RegisterPage() {
+export default function ResetPasswordPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("token") || "";
+    if (!t) {
+      setError("Token de redefinição não encontrado na URL.");
+    }
+    setToken(t);
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -34,17 +42,18 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ token, password }),
       });
-      const data = (await res.json()) as RegisterResponse;
+      const data = (await res.json()) as ApiResponse;
 
       if (res.ok) {
         setSuccess(true);
+        setTimeout(() => { router.push("/login"); }, 3000);
       } else {
-        setError(data.message || "Erro ao criar conta.");
+        setError(data.message || "Link inválido ou expirado.");
       }
     } catch {
       setError("Erro ao conectar com o servidor.");
@@ -53,18 +62,35 @@ export default function RegisterPage() {
     }
   }
 
+  if (!token && !loading) {
+    return (
+      <AuthLayout>
+        <div style={cardStyle}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <span style={{ fontSize: 48 }}>⚠️</span>
+          </div>
+          <h1 style={{ ...titleStyle, color: "#f87171" }}>Link inválido</h1>
+          <p style={{ margin: "12px 0 24px", fontSize: 14, color: "#b3c6e0", textAlign: "center", lineHeight: 1.6 }}>
+            O link de redefinição está incompleto ou foi corrompido.
+          </p>
+          <Link href="/forgot-password" style={{ ...primaryButtonStyle, display: "block", textAlign: "center", textDecoration: "none" }}>
+            Solicitar novo link
+          </Link>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   if (success) {
     return (
       <AuthLayout>
         <div style={cardStyle}>
           <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <span style={{ fontSize: 40 }}>✉️</span>
+            <span style={{ fontSize: 48 }}>✅</span>
           </div>
-          <h1 style={titleStyle}>Verifique seu email</h1>
+          <h1 style={titleStyle}>Senha redefinida!</h1>
           <p style={{ margin: "12px 0 24px", fontSize: 14, color: "#b3c6e0", textAlign: "center", lineHeight: 1.6 }}>
-            Enviamos um link de verificação para{" "}
-            <strong style={{ color: "#f4f8ff" }}>{email}</strong>.{" "}
-            Confirme seu email para ativar a conta.
+            Sua senha foi alterada com sucesso. Redirecionando para o login...
           </p>
           <Link href="/login" style={{ ...primaryButtonStyle, display: "block", textAlign: "center", textDecoration: "none" }}>
             Ir para o login
@@ -77,47 +103,19 @@ export default function RegisterPage() {
   return (
     <AuthLayout>
       <div style={cardStyle}>
-        {/* Brand */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <p style={{ margin: 0, fontSize: 11, letterSpacing: "2px", textTransform: "uppercase", color: "#7cf2a2", marginBottom: 4 }}>
             OVERFLOW MUSIC
           </p>
-          <h1 style={titleStyle}>Criar conta</h1>
+          <h1 style={titleStyle}>Nova senha</h1>
+          <p style={{ margin: "8px 0 0", fontSize: 14, color: "#b3c6e0" }}>
+            Escolha uma senha segura para sua conta.
+          </p>
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} style={{ display: "grid", gap: 14 }}>
           <div>
-            <label style={labelStyle}>Nome completo</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoComplete="name"
-              placeholder="Seu nome"
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              placeholder="seu@email.com"
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Senha</label>
+            <label style={labelStyle}>Nova senha</label>
             <input
               type="password"
               value={password}
@@ -133,7 +131,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label style={labelStyle}>Confirmar senha</label>
+            <label style={labelStyle}>Confirmar nova senha</label>
             <input
               type="password"
               value={confirm}
@@ -154,15 +152,18 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <button type="submit" disabled={loading} style={{ ...primaryButtonStyle, opacity: loading ? 0.6 : 1 }}>
-            {loading ? "Criando conta..." : "Criar conta"}
+          <button
+            type="submit"
+            disabled={loading || !token}
+            style={{ ...primaryButtonStyle, opacity: loading || !token ? 0.6 : 1 }}
+          >
+            {loading ? "Salvando..." : "Redefinir senha"}
           </button>
         </form>
 
         <p style={{ margin: "20px 0 0", textAlign: "center", fontSize: 13, color: "#b3c6e0" }}>
-          Já tem conta?{" "}
           <Link href="/login" style={{ color: "#1ecad3", fontWeight: 600, textDecoration: "none" }}>
-            Entrar
+            ← Voltar ao login
           </Link>
         </p>
       </div>
@@ -227,6 +228,7 @@ const primaryButtonStyle: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 700,
   cursor: "pointer",
+  boxSizing: "border-box",
 };
 
 const errorBannerStyle: React.CSSProperties = {

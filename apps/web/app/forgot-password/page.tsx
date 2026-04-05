@@ -1,20 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 
-type RegisterResponse = {
+type ApiResponse = {
   ok: boolean;
   message?: string;
 };
 
-export default function RegisterPage() {
-  const router = useRouter();
-  const [name, setName] = useState("");
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -22,29 +17,20 @@ export default function RegisterPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-
-    if (password.length < 8) {
-      setError("A senha deve ter pelo menos 8 caracteres.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("As senhas não coincidem.");
-      return;
-    }
-
     setLoading(true);
+
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch("/api/auth/request-password-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ email }),
       });
-      const data = (await res.json()) as RegisterResponse;
+      const data = (await res.json()) as ApiResponse;
 
       if (res.ok) {
         setSuccess(true);
       } else {
-        setError(data.message || "Erro ao criar conta.");
+        setError(data.message || "Erro ao solicitar redefinição.");
       }
     } catch {
       setError("Erro ao conectar com o servidor.");
@@ -60,14 +46,13 @@ export default function RegisterPage() {
           <div style={{ textAlign: "center", marginBottom: 20 }}>
             <span style={{ fontSize: 40 }}>✉️</span>
           </div>
-          <h1 style={titleStyle}>Verifique seu email</h1>
+          <h1 style={titleStyle}>Email enviado</h1>
           <p style={{ margin: "12px 0 24px", fontSize: 14, color: "#b3c6e0", textAlign: "center", lineHeight: 1.6 }}>
-            Enviamos um link de verificação para{" "}
-            <strong style={{ color: "#f4f8ff" }}>{email}</strong>.{" "}
-            Confirme seu email para ativar a conta.
+            Se esse email estiver cadastrado, você receberá um link para redefinir sua senha.
+            Verifique também a pasta de spam.
           </p>
           <Link href="/login" style={{ ...primaryButtonStyle, display: "block", textAlign: "center", textDecoration: "none" }}>
-            Ir para o login
+            Voltar ao login
           </Link>
         </div>
       </AuthLayout>
@@ -77,30 +62,17 @@ export default function RegisterPage() {
   return (
     <AuthLayout>
       <div style={cardStyle}>
-        {/* Brand */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <p style={{ margin: 0, fontSize: 11, letterSpacing: "2px", textTransform: "uppercase", color: "#7cf2a2", marginBottom: 4 }}>
             OVERFLOW MUSIC
           </p>
-          <h1 style={titleStyle}>Criar conta</h1>
+          <h1 style={titleStyle}>Esqueceu a senha?</h1>
+          <p style={{ margin: "8px 0 0", fontSize: 14, color: "#b3c6e0" }}>
+            Informe seu email e enviaremos um link de redefinição.
+          </p>
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} style={{ display: "grid", gap: 14 }}>
-          <div>
-            <label style={labelStyle}>Nome completo</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoComplete="name"
-              placeholder="Seu nome"
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }}
-            />
-          </div>
-
           <div>
             <label style={labelStyle}>Email</label>
             <input
@@ -116,37 +88,6 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div>
-            <label style={labelStyle}>Senha</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              autoComplete="new-password"
-              placeholder="Mínimo 8 caracteres"
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Confirmar senha</label>
-            <input
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              autoComplete="new-password"
-              placeholder="Repita a senha"
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }}
-            />
-          </div>
-
           {error && (
             <div style={errorBannerStyle}>
               <span style={{ fontSize: 14 }}>⚠</span>
@@ -155,12 +96,12 @@ export default function RegisterPage() {
           )}
 
           <button type="submit" disabled={loading} style={{ ...primaryButtonStyle, opacity: loading ? 0.6 : 1 }}>
-            {loading ? "Criando conta..." : "Criar conta"}
+            {loading ? "Enviando..." : "Enviar link"}
           </button>
         </form>
 
         <p style={{ margin: "20px 0 0", textAlign: "center", fontSize: 13, color: "#b3c6e0" }}>
-          Já tem conta?{" "}
+          Lembrou a senha?{" "}
           <Link href="/login" style={{ color: "#1ecad3", fontWeight: 600, textDecoration: "none" }}>
             Entrar
           </Link>
