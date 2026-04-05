@@ -1,218 +1,193 @@
+import Image from "next/image";
 import Link from "next/link";
 import { SessionStatusBanner } from "@/components/SessionStatusBanner";
-import { serverApiFetch } from "@/lib/server-api";
+import { HomeClient } from "@/components/HomeClient";
 
-type DashboardStats = {
-  pendingUsers: number;
-  totalUsers: number;
-  totalEvents: number;
-  upcomingEvents: number;
-  totalSongs: number;
-  totalChecklists: number;
-};
+const FEATURES = [
+  {
+    icon: "📅",
+    tag: "Eventos",
+    title: "Agenda & Setlist",
+    desc: "Organize cultos, ensaios e conferências com setlists completos por apresentação.",
+  },
+  {
+    icon: "🎵",
+    tag: "Música",
+    title: "Biblioteca de Cifras",
+    desc: "Acesse e importe cifras com acordes em destaque, busca por título ou artista.",
+  },
+  {
+    icon: "✅",
+    tag: "Operações",
+    title: "Checklists",
+    desc: "Templates reutilizáveis e execução de checklists operacionais por evento.",
+  },
+  {
+    icon: "👥",
+    tag: "Equipe",
+    title: "Gestão de Membros",
+    desc: "Aprovação de novos membros, definição de papéis e visão geral da equipe.",
+  },
+];
 
-type Event = {
-  id: string;
-  title: string;
-  dateTime: string;
-  location: string | null;
-  status: string;
-};
-
-async function fetchStats(): Promise<DashboardStats | null> {
-  try {
-    const res = await serverApiFetch("admin/dashboard", { method: "GET" });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { stats?: DashboardStats };
-    return body.stats ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchNextEvent(): Promise<Event | null> {
-  try {
-    const res = await serverApiFetch("events?limit=5", { method: "GET" });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { events?: Event[] };
-    const events = body.events ?? [];
-    const now = new Date();
-    return events.find((e) => new Date(e.dateTime) >= now) ?? events[0] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("pt-BR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export default async function HomePage() {
-  const [stats, nextEvent] = await Promise.all([fetchStats(), fetchNextEvent()]);
-
+export default function HomePage() {
   return (
-    <main style={{ minHeight: "100vh", padding: "24px 16px 36px" }}>
-      <section style={{ maxWidth: 960, margin: "0 auto" }}>
-        {/* Header */}
-        <header style={headerStyle}>
-          <p style={{ margin: 0, letterSpacing: 2.4, textTransform: "uppercase", color: "#7cf2a2", fontSize: 12 }}>
-            Overflow Music Control
-          </p>
-          <h1 style={{ margin: "8px 0 12px", fontSize: 36, lineHeight: 1.1 }}>Dashboard</h1>
-          {stats ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
-              {stats.pendingUsers > 0 && (
-                <Link href="/admin/users" style={badgeStyle("#7a2020", "#ff6b6b")}>
-                  ⚠ {stats.pendingUsers} pendente{stats.pendingUsers !== 1 ? "s" : ""}
-                </Link>
-              )}
-              <span style={badgeStyle("#1a3a5c", "#7cf2a2")}>
-                📅 {stats.upcomingEvents} próximo{stats.upcomingEvents !== 1 ? "s" : ""}
-              </span>
-              <span style={badgeStyle("#1a3a5c", "#b3c6e0")}>
-                🎵 {stats.totalSongs} música{stats.totalSongs !== 1 ? "s" : ""}
-              </span>
-              <span style={badgeStyle("#1a3a5c", "#b3c6e0")}>
-                👥 {stats.totalUsers} membro{stats.totalUsers !== 1 ? "s" : ""}
-              </span>
-              <span style={badgeStyle("#1a3a5c", "#b3c6e0")}>
-                ✅ {stats.totalChecklists} checklist{stats.totalChecklists !== 1 ? "s" : ""}
-              </span>
+    <main style={{ minHeight: "100vh", padding: "32px 16px 56px" }}>
+      <div style={{ maxWidth: 960, margin: "0 auto" }}>
+
+        {/* ── Hero ── */}
+        <section style={heroStyle}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+            <Image
+              src="/logo.png"
+              alt="Overflow Music"
+              width={140}
+              height={140}
+              priority
+              style={{ borderRadius: 24, objectFit: "contain" }}
+            />
+            <div style={{ textAlign: "center" }}>
+              <p style={heroTagStyle}>Overflow Movement</p>
+              <h1 style={heroTitleStyle}>Overflow Music</h1>
+              <p style={heroSubStyle}>
+                Plataforma interna de gestão musical para a equipe Overflow —
+                eventos, setlists, cifras e operações em um só lugar.
+              </p>
             </div>
-          ) : (
-            <p style={{ margin: 0, color: "#4a6278", fontSize: 13 }}>stats indisponíveis</p>
-          )}
-        </header>
+            <Link href="/login" style={ctaButtonStyle}>
+              Entrar com Google →
+            </Link>
+          </div>
+        </section>
 
         <SessionStatusBanner />
 
-        {/* Próximo Evento */}
-        {nextEvent && (
-          <Link href="/events" style={nextEventCardStyle}>
-            <p style={{ margin: 0, letterSpacing: 2, textTransform: "uppercase", color: "#7cf2a2", fontSize: 11 }}>
-              Próximo Evento
-            </p>
-            <h2 style={{ margin: "6px 0 4px", fontSize: 20 }}>{nextEvent.title}</h2>
-            <p style={{ margin: 0, color: "#b3c6e0", fontSize: 14 }}>
-              {formatDate(nextEvent.dateTime)}
-              {nextEvent.location ? ` · ${nextEvent.location}` : ""}
-            </p>
-          </Link>
-        )}
-
-        {/* Navigation cards */}
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-          <Link href="/events" style={cardStyle}>
-            <p style={cardTagStyle}>Events</p>
-            <h2 style={{ margin: "6px 0 8px" }}>Eventos & Setlist</h2>
-            <p style={cardTextStyle}>Liste, crie e gerencie eventos com setlist completo por apresentação.</p>
-          </Link>
-
-          <Link href="/checklists" style={cardStyle}>
-            <p style={cardTagStyle}>Operations</p>
-            <h2 style={{ margin: "6px 0 8px" }}>Checklist Management</h2>
-            <p style={cardTextStyle}>Gerencie templates e checklist por evento com ações operacionais.</p>
-          </Link>
-
-          <Link href="/songs" style={cardStyle}>
-            <p style={cardTagStyle}>Music</p>
-            <h2 style={{ margin: "6px 0 8px" }}>Biblioteca de Músicas</h2>
-            <p style={cardTextStyle}>Browse cifras com busca por título/artista, visualize seções com acordes em destaque e importe novas versões.</p>
-          </Link>
-
-          <Link href="/login" style={cardStyle}>
-            <p style={cardTagStyle}>Auth</p>
-            <h2 style={{ margin: "6px 0 8px" }}>Login</h2>
-            <p style={cardTextStyle}>Entre com Google ID Token para liberar áreas operacionais protegidas.</p>
-          </Link>
-
-          <Link href="/admin/users" style={cardStyle}>
-            <p style={cardTagStyle}>Admin</p>
-            <h2 style={{ margin: "6px 0 8px" }}>Aprovação de Usuários</h2>
-            <p style={cardTextStyle}>Aprove ou rejeite novos acessos pendentes com definição de perfil.</p>
-            {stats && stats.pendingUsers > 0 && (
-              <p style={{ margin: "6px 0 0", color: "#ff6b6b", fontSize: 13, fontWeight: 600 }}>
-                {stats.pendingUsers} aguardando aprovação
-              </p>
-            )}
-          </Link>
-
-          <Link href="/admin/team" style={cardStyle}>
-            <p style={cardTagStyle}>Admin</p>
-            <h2 style={{ margin: "6px 0 8px" }}>Equipe</h2>
-            <p style={cardTextStyle}>Visualize todos os membros aprovados agrupados por função.</p>
-            {stats && (
-              <p style={{ margin: "6px 0 0", color: "#7cf2a2", fontSize: 13 }}>
-                {stats.totalUsers} membro{stats.totalUsers !== 1 ? "s" : ""} ativo{stats.totalUsers !== 1 ? "s" : ""}
-              </p>
-            )}
-          </Link>
+        {/* ── Features ── */}
+        <section style={{ marginTop: 40 }}>
+          <p style={sectionTagStyle}>O que você encontra aqui</p>
+          <div style={featuresGridStyle}>
+            {FEATURES.map((f) => (
+              <div key={f.tag} style={featureCardStyle}>
+                <span style={featureIconStyle}>{f.icon}</span>
+                <div>
+                  <p style={featureTagStyle}>{f.tag}</p>
+                  <h3 style={featureTitleStyle}>{f.title}</h3>
+                  <p style={featureDescStyle}>{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
-      </section>
+
+        {/* ── Dashboard (visível só para logados) ── */}
+        <HomeClient />
+
+      </div>
     </main>
   );
 }
 
-const headerStyle: React.CSSProperties = {
-  background: "linear-gradient(135deg, #1b3756 0%, #122840 55%, #0f2137 100%)",
-  border: "1px solid #31557c",
-  borderRadius: 24,
-  padding: 24,
-  marginBottom: 20,
+/* ── Styles ── */
+
+const heroStyle: React.CSSProperties = {
+  background: "linear-gradient(160deg, #112236 0%, #0a1c30 50%, #081828 100%)",
+  border: "1px solid #254563",
+  borderRadius: 28,
+  padding: "40px 24px",
+  textAlign: "center",
 };
 
-const nextEventCardStyle: React.CSSProperties = {
-  display: "block",
+const heroTagStyle: React.CSSProperties = {
+  margin: 0,
+  letterSpacing: 3,
+  textTransform: "uppercase",
+  color: "#7cf2a2",
+  fontSize: 11,
+  fontWeight: 600,
+};
+
+const heroTitleStyle: React.CSSProperties = {
+  margin: "10px 0 16px",
+  fontSize: "clamp(32px, 6vw, 52px)",
+  lineHeight: 1.1,
+  fontWeight: 700,
+  background: "linear-gradient(135deg, #fff 40%, #9dd4ff 100%)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+};
+
+const heroSubStyle: React.CSSProperties = {
+  margin: "0 auto",
+  maxWidth: 520,
+  color: "#7a9dc0",
+  fontSize: 15,
+  lineHeight: 1.6,
+};
+
+const ctaButtonStyle: React.CSSProperties = {
+  marginTop: 8,
+  display: "inline-block",
   textDecoration: "none",
-  color: "inherit",
-  background: "linear-gradient(135deg, #0e2c1e 0%, #0b2015 100%)",
-  border: "1px solid #2a6644",
-  borderRadius: 18,
-  padding: "18px 22px",
-  marginBottom: 20,
-  transition: "border-color 0.15s",
+  background: "linear-gradient(135deg, #1a6fd4 0%, #1258aa 100%)",
+  color: "#fff",
+  borderRadius: 999,
+  padding: "12px 28px",
+  fontSize: 15,
+  fontWeight: 600,
+  letterSpacing: 0.3,
 };
 
-const cardStyle: React.CSSProperties = {
-  display: "block",
-  textDecoration: "none",
-  background: "rgba(18, 40, 64, 0.85)",
-  border: "1px solid #2d4b6d",
-  borderRadius: 18,
-  padding: 18,
-  color: "inherit",
+const sectionTagStyle: React.CSSProperties = {
+  margin: "0 0 18px",
+  letterSpacing: 2,
+  textTransform: "uppercase",
+  color: "#4a6a8a",
+  fontSize: 11,
+  fontWeight: 600,
 };
 
-const cardTagStyle: React.CSSProperties = {
+const featuresGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+};
+
+const featureCardStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 14,
+  background: "rgba(14, 32, 54, 0.9)",
+  border: "1px solid #1e3a58",
+  borderRadius: 18,
+  padding: "18px 20px",
+};
+
+const featureIconStyle: React.CSSProperties = {
+  fontSize: 26,
+  lineHeight: 1,
+  marginTop: 3,
+  flexShrink: 0,
+};
+
+const featureTagStyle: React.CSSProperties = {
   margin: 0,
   letterSpacing: 2,
   textTransform: "uppercase",
   color: "#7cf2a2",
-  fontSize: 11,
+  fontSize: 10,
+  fontWeight: 600,
 };
 
-const cardTextStyle: React.CSSProperties = {
+const featureTitleStyle: React.CSSProperties = {
+  margin: "4px 0 6px",
+  fontSize: 15,
+  fontWeight: 600,
+};
+
+const featureDescStyle: React.CSSProperties = {
   margin: 0,
-  color: "#b3c6e0",
-  lineHeight: 1.45,
+  color: "#7a9dc0",
+  fontSize: 13,
+  lineHeight: 1.5,
 };
-
-function badgeStyle(bg: string, color: string): React.CSSProperties {
-  return {
-    display: "inline-block",
-    background: bg,
-    color,
-    borderRadius: 20,
-    padding: "3px 12px",
-    fontSize: 13,
-    fontWeight: 600,
-    textDecoration: "none",
-  };
-}
 
