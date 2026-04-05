@@ -1,23 +1,23 @@
-import { SafeAreaView, ScrollView, Text, View } from "react-native";
+import { ImageBackground, SafeAreaView, Text, View, Pressable } from "react-native";
 import { LoginScreen } from "../src/screens/LoginScreen";
 import { useSession } from "../src/context/SessionContext";
-import { styles } from "../src/styles";
+import { styles,colors } from "../src/styles";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function LoginRoute() {
   const { login, statusText } = useSession();
 
   return (
-    <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.headerCard}>
-          <Text style={styles.kicker}>Overflow Music</Text>
-          <Text style={styles.title}>Acesse sua conta</Text>
+    <SafeAreaView style={styles.loginContainer}>
+      <View style={styles.loginHero}>
+        <View style={styles.loginHeroGradient}>
+          <Text style={styles.welcomeText}>Welcome!</Text>
           {Boolean(statusText) && (
-            <Text style={styles.statusText}>{statusText}</Text>
+            <Text style={[styles.helper, { color: colors.primary }]}>{statusText}</Text>
           )}
         </View>
-        <LoginScreen onSubmit={login} />
-      </ScrollView>
+      </View>
+      <LoginScreen onSubmit={login} />
     </SafeAreaView>
   );
 }
