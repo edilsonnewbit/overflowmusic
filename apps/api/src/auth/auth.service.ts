@@ -47,8 +47,10 @@ export class AuthService implements OnModuleInit {
     }
 
     let user = await this.prisma.user.findUnique({ where: { googleSub } });
+    let foundByEmail = false;
     if (!user) {
       user = await this.prisma.user.findUnique({ where: { email } });
+      if (user) foundByEmail = true;
     }
 
     if (!user) {
@@ -67,6 +69,14 @@ export class AuthService implements OnModuleInit {
         status: "PENDING_APPROVAL",
         user: this.toAuthUser(user),
       };
+    }
+
+    // Migrate seeded googleSub (e.g. "seed:email") to the real one from Google
+    if (foundByEmail && user.googleSub !== googleSub) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { googleSub },
+      });
     }
 
     if (user.status === "REJECTED") {
