@@ -9,6 +9,7 @@ import { ChecklistRunsController } from "./checklist/checklist-runs.controller";
 import { ChecklistRunsService } from "./checklist/checklist-runs.service";
 import { ChecklistTemplatesController } from "./checklist/checklist-templates.controller";
 import { ChecklistTemplatesService } from "./checklist/checklist-templates.service";
+import { EmailService } from "./email/email.service";
 import { EventsController } from "./events/events.controller";
 import { EventsService } from "./events/events.service";
 import { NotificationsController } from "./notifications/notifications.controller";
@@ -45,6 +46,7 @@ import { SongsService } from "./songs/songs.service";
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     AuditService,
     AuthService,
+    EmailService,
     EventsService,
     NotificationsService,
     QueueService,

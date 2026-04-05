@@ -1,7 +1,11 @@
 import { BadRequestException, Injectable, OnModuleInit, UnauthorizedException } from "@nestjs/common";
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes, scrypt } from "node:crypto";
+import { promisify } from "node:util";
+import { EmailService } from "../email/email.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthUser, AccessTokenPayload, UserRole } from "./auth.types";
+
+const scryptAsync = promisify(scrypt);
 
 type GoogleLoginInput = {
   email: string;
@@ -13,11 +17,15 @@ type DbUserRecord = {
   id: string;
   name: string;
   email: string;
-  googleSub: string;
+  googleSub: string | null;
+  passwordHash: string | null;
+  emailVerified: boolean;
+  emailVerifiedAt: Date | null;
   role: string;
   status: string;
   createdAt: Date;
   reviewedAt: Date | null;
+  lastLoginAt: Date | null;
 };
 
 @Injectable()
@@ -25,7 +33,10 @@ export class AuthService implements OnModuleInit {
   private readonly jwtSecret = process.env.JWT_SECRET || "dev_secret_change_me";
   private readonly tokenTtlSeconds = 60 * 60 * 24 * 7;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     await this.seedAdminUsers();
@@ -96,6 +107,308 @@ export class AuthService implements OnModuleInit {
     });
 
     return { ok: true, status: "APPROVED", user: this.toAuthUser(user), accessToken };
+  }
+
+  /**
+   * Register a new user with email and password.
+   * Sends a verification email and creates the user with emailVerified = false.
+   */
+  async emailRegister(input: {
+    email: string;
+    password: string;
+    name: string;
+  }): Promise<{ ok: true; user: AuthUser; message: string }> {
+    const email = (input.email || "").trim().toLowerCase();
+    const password = (input.password || "").trim();
+    const name = (input.name || "").trim();
+
+    if (!email || !password || !name) {
+      throw new BadRequestException("email, password and name are required");
+    }
+
+    if (password.length < 8) {
+      throw new BadRequestException("password must be at least 8 characters");
+    }
+
+    // Check if user already exists
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      throw new BadRequestException("email already registered");
+    }
+
+    // Hash password
+    const passwordHash = await this.hashPassword(password);
+
+    // Create user
+    const user = await this.prisma.user.create({
+      data: {
+        name,
+        email,
+        passwordHash,
+        emailVerified: false,
+        role: "MEMBER",
+        status: "PENDING_APPROVAL",
+      },
+    });
+
+    // Create verification token
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await this.prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        token,
+        expiresAt,
+      }Enviar email de verificação
+    try {
+      await this.emailService.sendVerificationEmail(email, token);
+    } catch (error) {
+      console.error('[AuthService] Falha ao enviar email de verificação:', error);
+      // Não bloqueia o registro se o email falhar
+    }
+    // TODO: Send verification email
+    // For now, we'll just log the token
+    console.log(`[EmailRegister] Verification token for ${email}: ${token}`);
+
+    return {
+      ok: true,
+      user: this.toAuthUser(user),
+      message: "Registration successful. Please check your email to verify your account.",
+    };
+  }
+
+  /**
+   * Verify email with token sent to user's email.
+   */
+  async verifyEmail(token: string): Promise<{ ok: true; message: string }> {
+    const verificationToken = await this.prisma.emailVerificationToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!verificationToken) {
+      throw new BadRequestException("Invalid or expired verification token");
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      throw new BadRequestException("Verification token has expired");
+    }
+
+    // Update user
+    await this.prisma.user.update({
+      where: { id: verificationToken.userId },
+      data: {
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+      },
+    });
+
+    // Delete used token
+    await this.prisma.emailVerificationToken.delete({
+      where: { id: verificationToken.id },
+    });
+
+    return { ok: true, message: "Email verified successfully" };
+  }
+
+  /**
+   * Resend verification email.
+   */
+  async resendVerificationEmail(email: string): Promise<{ ok: true; message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+
+    if (!user) {
+      throw new BadRequestException("User not found");
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException("Email already verified");
+    }
+
+    // Delete old tokens
+    await this.prisma.emailVerificationToken.deleteMany({
+      where: { userId: user.id },
+    });
+
+    // Create new token
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await this.prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        token,
+       Enviar email de verificação
+    try {
+      await this.emailService.sendVerificationEmail(email, token);
+    } catch (error) {
+      console.error('[AuthService] Falha ao reenviar email de verificação:', error);
+      throw new BadRequestException('Failed to send verification email');
+    }
+    });
+
+    // TODO: Send verification email
+    console.log(`[ResendVerification] Verification token for ${email}: ${token}`);
+
+    return { ok: true, message: "Verification email sent" };
+  }
+
+  /**
+   * Login with email and password.
+   */
+  async emailLogin(input: {
+    email: string;
+    password: string;
+  }): Promise<
+    | { ok: true; status: "EMAIL_NOT_VERIFIED"; user: AuthUser; message: string }
+    | { ok: true; status: "PENDING_APPROVAL"; user: AuthUser }
+    | { ok: true; status: "REJECTED"; user: AuthUser }
+    | { ok: true; status: "APPROVED"; user: AuthUser; accessToken: string }
+  > {
+    const email = (input.email || "").trim().toLowerCase();
+    const password = (input.password || "").trim();
+
+    if (!email || !password) {
+      throw new BadRequestException("email and password are required");
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    // Verify password
+    const isPasswordValid = await this.verifyPassword(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    // Check email verification
+    if (!user.emailVerified) {
+      return {
+        ok: true,
+        status: "EMAIL_NOT_VERIFIED",
+        user: this.toAuthUser(user),
+        message: "Please verify your email before logging in",
+      };
+    }
+
+    // Check approval status
+    if (user.status === "REJECTED") {
+      return { ok: true, status: "REJECTED", user: this.toAuthUser(user) };
+    }
+
+    if (user.status === "PENDING_APPROVAL") {
+      return { ok: true, status: "PENDING_APPROVAL", user: this.toAuthUser(user) };
+    }
+
+    // Update last login
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Generate access token
+    const accessToken = this.signToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role as UserRole,
+      iat: this.nowSeconds(),
+      exp: this.nowSeconds() + this.tokenTtlSeconds,
+    });
+
+    return { ok: true, status: "APPROVED", user: this.toAuthUser(user), accessToken };
+  }
+
+  /**
+   * Request password reset.
+   */
+  async requestPasswordReset(email: string): Promise<{ ok: true; message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+
+    // Don't reveal if user exists
+    if (!user) {
+      return { ok: true, message: "If the email exists, a password reset link has been sent" };
+    }
+
+    // Delete old tokens
+    await this.prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id },
+    });
+
+    // Create new token
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+Enviar email de recuperação de senha
+    try {
+      await this.emailService.sendPasswordResetEmail(email, token);
+    } catch (error) {
+      console.error('[AuthService] Falha ao enviar email de recuperação:', error);
+      // Não revela se o email existe
+    }
+      data: {
+        userId: user.id,
+        token,
+        expiresAt,
+      },
+    });
+
+    // TODO: Send password reset email
+    console.log(`[PasswordReset] Reset token for ${email}: ${token}`);
+
+    return { ok: true, message: "If the email exists, a password reset link has been sent" };
+  }
+
+  /**
+   * Reset password with token.
+   */
+  async resetPassword(token: string, newPassword: string): Promise<{ ok: true; message: string }> {
+    if (newPassword.length < 8) {
+      throw new BadRequestException("password must be at least 8 characters");
+    }
+
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token },
+    });
+
+    if (!resetToken || resetToken.usedAt) {
+      throw new BadRequestException("Invalid or expired reset token");
+    }
+
+    if (resetToken.expiresAt < new Date()) {
+      throw new BadRequestException("Reset token has expired");
+    }
+
+    // Hash new password
+    const passwordHash = await this.hashPassword(newPassword);
+
+    // Update user password
+    await this.prisma.user.update({
+      where: { id: resetToken.userId },
+      data: { passwordHash },
+    });
+
+    // Mark token as used
+    await this.prisma.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { usedAt: new Date() },
+    });
+
+    return { ok: true, message: "Password reset successfully" };
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    const salt = randomBytes(16).toString("hex");
+    const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+    return `${salt}:${derivedKey.toString("hex")}`;
+  }
+
+  private async verifyPassword(password: string, hash: string): Promise<boolean> {
+    const [salt, key] = hash.split(":");
+    const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+    return key === derivedKey.toString("hex");
   }
 
   async getMe(accessToken: string): Promise<{ ok: true; user: AuthUser }> {
@@ -294,7 +607,7 @@ export class AuthService implements OnModuleInit {
       id: user.id,
       name: user.name,
       email: user.email,
-      googleSub: user.googleSub,
+      googleSub: user.googleSub || undefined,
       role: user.role as UserRole,
       status: user.status as AuthUser["status"],
       createdAt: user.createdAt.toISOString(),
