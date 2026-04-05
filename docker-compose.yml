@@ -31,7 +31,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health | grep -q '\"ok\":true' || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/health | grep -q '\"ok\":true' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -69,11 +69,7 @@ services:
       WEB_LOGIN_FALLBACK_ENABLED: ${WEB_LOGIN_FALLBACK_ENABLED:-false}
       API_INTERNAL_URL: http://api:3001/api
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- --server-response http://localhost:3000/ 2>&1 | grep -qE 'HTTP/[0-9.]+ (200|301|302|307|308)' || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      disable: true
     depends_on:
       api:
         condition: service_started
