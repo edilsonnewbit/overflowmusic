@@ -2,6 +2,31 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-04 22:35 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Redesenhar página inicial como landing page pública com dashboard visível apenas para logados
+- Feito:
+  - `apps/web/app/page.tsx` reescrito: hero estático com logo, título gradiente, 4 feature cards, CTA "Entrar com Google"
+  - `apps/web/components/HomeClient.tsx` criado: client component que detecta sessão via `/api/auth/me` e renderiza welcome box + próximo evento + nav cards somente para logados; guests recebem `null`
+  - `apps/web/app/api/dashboard/stats/route.ts` criado: GET /api/dashboard/stats → verifica cookie → proxy para `admin/dashboard` com admin key
+  - `apps/web/app/api/events/next/route.ts` criado: GET /api/events/next → verifica cookie → proxy para `events?limit=10`, retorna próximo evento futuro
+- Arquivos: apps/web/app/page.tsx, apps/web/components/HomeClient.tsx, apps/web/app/api/dashboard/stats/route.ts, apps/web/app/api/events/next/route.ts
+- Validação: sem erros TypeScript; push `0646bf2..8e35865` em develop
+- Pendências: copiar logo para `apps/web/public/logo.png`; merge develop→main; CI/CD build; `docker compose pull web && docker compose up -d web` no VPS
+- Próximo passo: Copiar logo.png para public/ e fazer merge para main + deploy
+
+### [2025-07-14 21:11 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Eliminar dependência de `@overflow/types` no Docker web — solução definitiva para 404 runtime
+- Feito:
+  - Criado `apps/web/lib/types.ts` com todos os tipos copiados de `packages/types/index.ts`
+  - Atualizados 9 arquivos (imports `@overflow/types` → `@/lib/types`)
+  - Dockerfile simplificado para `context: ./apps/web` (3 stages limpos, WORKDIR /app)
+  - Removidos: `transpilePackages` (next.config.mjs), `@overflow/types` (package.json), path alias (tsconfig.json)
+  - CI/CD: `context: .` → `context: ./apps/web`
+  - Commits `f3de1ba` (develop) e `5702422` (main)
+- Arquivos: apps/web/lib/types.ts, apps/web/Dockerfile, apps/web/next.config.mjs, apps/web/package.json, apps/web/tsconfig.json, .github/workflows/deploy-hostinger.yml, 9 arquivos de tela/componentes
+- Pendências: aguardar CI/CD build + validar https://music.overflowmvmt.com
+- Próximo passo: Rebuild APK mobile (EAS) + cadastrar SHA-1 Android no Google OAuth (Q-005)
+
 ## Template de entrada
 ```md
 ### [YYYY-MM-DD HH:mm TZ] - <LLM/Agente>
