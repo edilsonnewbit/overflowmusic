@@ -2,6 +2,24 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-07 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Instrumentos no perfil, líder vocal por dropdown, gerenciamento de equipe com edição
+- Feito:
+  - `apps/api/prisma/schema.prisma`: campo `instruments String[] @default([])` no model User
+  - `apps/api/src/auth/auth.types.ts`: `instruments: string[]` em AuthUser
+  - `apps/api/src/auth/auth.service.ts`: `updateMe` aceita `instruments`, novo método `adminUpdateUser`
+  - `apps/api/src/auth/auth.controller.ts`: PATCH `api/auth/me` passa instruments; novo endpoint PATCH `api/admin/users/:userId`
+  - `apps/web/app/api/auth/me/route.ts`: BFF repassa `instruments` no PATCH
+  - `apps/web/app/api/admin/users/[userId]/route.ts`: novo BFF PATCH criado
+  - `apps/web/lib/types.ts`: `instruments: string[]` adicionado ao AuthUser
+  - `apps/web/app/profile/page.tsx`: multi-select de 14 instrumentos/vocal; salva junto com nome
+  - `apps/web/app/events/[eventId]/page.tsx`: "Líder vocal" substituído por `<select>` com membros do time (via `/api/admin/users`)
+  - `apps/web/app/admin/team/page.tsx`: MemberCard com edição inline de role + instrumentos via PATCH
+  - Sessão anterior: banner de sessão removido, login/logout com `window.location.href`, setlist com busca de músicas cadastradas
+- Commit: `10df02d` na branch develop
+- Status: 0 erros TypeScript; 12 arquivos alterados
+- Próximo passo: `git push origin develop && deploy` (prisma db push aplicará instruments no boot do container)
+
 ### [2026-04-06 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Continuação da sessão anterior — validação pós-commit do fluxo de auth
 - Validado:

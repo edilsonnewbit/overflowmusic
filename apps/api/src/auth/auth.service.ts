@@ -482,7 +482,7 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException("user not found");
     }
 
-    const updateData: { role?: string; instruments?: string[] } = {};
+    const updateData: { role?: UserRole; instruments?: string[] } = {};
     if (data.role) updateData.role = data.role;
     if (Array.isArray(data.instruments)) updateData.instruments = data.instruments;
 
