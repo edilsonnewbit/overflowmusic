@@ -1,9 +1,15 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Share, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { EventSetlist, MusicEvent, SetlistItem } from "../types";
 import { styles } from "../styles";
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Rascunho", ACTIVE: "Ativo", PUBLISHED: "Publicado", FINISHED: "Encerrado", ARCHIVED: "Arquivado",
+};
+const STATUS_COLOR: Record<string, string> = {
+  DRAFT: "#8fa9c8", ACTIVE: "#60a5fa", PUBLISHED: "#7cf2a2", FINISHED: "#94a3b8", ARCHIVED: "#4b5563",
+};
 type Props = {
   events: MusicEvent[];
   loading: boolean;
@@ -16,9 +22,9 @@ type Props = {
   onRemoveItem: (itemId: string) => Promise<void>;
   onUpdateSetlistItem: (itemId: string, input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string }) => Promise<void>;
   statusText: string;
-  onCreateEvent: (input: { title: string; dateTime: string; location?: string }) => Promise<void>;
+  onCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string }) => Promise<void>;
   creatingEvent: boolean;
-  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string }) => Promise<void>;
+  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string }) => Promise<void>;
   onDeleteEvent: (id: string) => Promise<void>;
 };
 
@@ -48,11 +54,13 @@ export function EventsScreen({
   const [formTitle, setFormTitle] = useState("");
   const [formDate, setFormDate] = useState("");
   const [formLocation, setFormLocation] = useState("");
+  const [formAddress, setFormAddress] = useState("");
   const [formError, setFormError] = useState("");
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [editAddress, setEditAddress] = useState("");
   const [editError, setEditError] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -61,6 +69,7 @@ export function EventsScreen({
     setEditTitle(ev.title);
     setEditDate(ev.dateTime.slice(0, 16));
     setEditLocation(ev.location ?? "");
+    setEditAddress(ev.address ?? "");
     setEditError("");
   }
 
@@ -79,7 +88,7 @@ export function EventsScreen({
     }
     setSavingEdit(true);
     setEditError("");
-    await onUpdateEvent(editingEventId!, { title, dateTime, location: editLocation.trim() || undefined });
+    await onUpdateEvent(editingEventId!, { title, dateTime, location: editLocation.trim() || undefined, address: editAddress.trim() || undefined });
     setSavingEdit(false);
     setEditingEventId(null);
   }
@@ -105,10 +114,11 @@ export function EventsScreen({
       return;
     }
     setFormError("");
-    await onCreateEvent({ title, dateTime, location: formLocation.trim() || undefined });
+    await onCreateEvent({ title, dateTime, location: formLocation.trim() || undefined, address: formAddress.trim() || undefined });
     setFormTitle("");
     setFormDate("");
     setFormLocation("");
+    setFormAddress("");
     setShowForm(false);
   }
 
@@ -187,6 +197,14 @@ export function EventsScreen({
             onChangeText={setFormLocation}
             editable={!creatingEvent}
           />
+          <TextInput
+            style={formInputStyle}
+            placeholder="Endereço completo (opcional)"
+            placeholderTextColor="#6a8a9a"
+            value={formAddress}
+            onChangeText={setFormAddress}
+            editable={!creatingEvent}
+          />
           {formError ? <Text style={{ color: "#f28c8c", fontSize: 12 }}>{formError}</Text> : null}
           <Pressable
             style={[styles.primaryButton, { backgroundColor: creatingEvent ? "#2a3a2a" : "#1e7a3e" }]}
@@ -227,13 +245,41 @@ export function EventsScreen({
                   onPress={() => void onSelectEvent(ev.id)}
                   disabled={loadingSetlist}
                 >
-                  <Text style={[styles.primaryButtonText, { textAlign: "left" }]}>
-                    {ev.title}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={[styles.primaryButtonText, { textAlign: "left", flex: 1 }]}>
+                      {ev.title}
+                    </Text>
+                    <Text style={{
+                      fontSize: 10, fontWeight: "700", letterSpacing: 0.8,
+                      color: STATUS_COLOR[ev.computedStatus ?? ev.status] ?? "#8fa9c8",
+                      borderWidth: 1,
+                      borderColor: STATUS_COLOR[ev.computedStatus ?? ev.status] ?? "#8fa9c8",
+                      borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1,
+                    }}>
+                      {STATUS_LABEL[ev.computedStatus ?? ev.status] ?? ev.status}
+                    </Text>
+                  </View>
                   <Text style={[styles.helper, { marginTop: 2 }]}>
                     {formatDate(ev.dateTime)}
                     {ev.location ? `  —  ${ev.location}` : ""}
                   </Text>
+                  {ev.address ? (
+                    <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
+                      <Text style={[styles.helper, { flex: 1 }]} numberOfLines={1}>📍 {ev.address}</Text>
+                      <Pressable
+                        onPress={() => void Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(ev.address!)}`)}
+                        style={{ borderWidth: 1, borderColor: "#60a5fa", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}
+                      >
+                        <Text style={{ color: "#60a5fa", fontSize: 10 }}>Maps</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => void Linking.openURL(`https://waze.com/ul?q=${encodeURIComponent(ev.address!)}`)}
+                        style={{ borderWidth: 1, borderColor: "#3dd8ba", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}
+                      >
+                        <Text style={{ color: "#3dd8ba", fontSize: 10 }}>Waze</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
                 </Pressable>
                 <Pressable
                   onPress={() => (isEditing ? cancelEdit() : startEdit(ev))}
@@ -277,6 +323,14 @@ export function EventsScreen({
                     placeholderTextColor="#6a8a9a"
                     value={editLocation}
                     onChangeText={setEditLocation}
+                    editable={!savingEdit}
+                  />
+                  <TextInput
+                    style={formInputStyle}
+                    placeholder="Endereço completo (opcional)"
+                    placeholderTextColor="#6a8a9a"
+                    value={editAddress}
+                    onChangeText={setEditAddress}
                     editable={!savingEdit}
                   />
                   {editError ? <Text style={{ color: "#f28c8c", fontSize: 12 }}>{editError}</Text> : null}

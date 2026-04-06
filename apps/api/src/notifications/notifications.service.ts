@@ -70,4 +70,90 @@ export class NotificationsService {
   async sendNewEventNotification(eventTitle: string): Promise<void> {
     await this.sendToAll("Novo evento publicado", eventTitle, { type: "new_event" });
   }
+
+  /** Send confirmation invite to a specific musician for an event slot. */
+  async sendMusicianConfirmationRequest(
+    userId: string,
+    eventTitle: string,
+    instrumentRole: string,
+    slotId: string,
+  ): Promise<void> {
+    const tokens = await this.prisma.pushToken.findMany({
+      where: { userId },
+      select: { token: true },
+    });
+    if (tokens.length === 0) return;
+
+    const tokenList = tokens.map((t: { token: string }) => t.token);
+    const title = `Convite para evento: ${instrumentRole}`;
+    const body = `Você foi convidado para tocar ${instrumentRole} em "${eventTitle}". Confirme sua participação.`;
+
+    const enqueued = await this.queue.enqueuePush({
+      title,
+      body,
+      tokens: tokenList,
+      data: { type: "musician_invite", slotId },
+    });
+    if (enqueued) return;
+
+    const messages = tokenList.map((to: string) => ({
+      to,
+      title,
+      body,
+      data: { type: "musician_invite", slotId },
+    }));
+
+    try {
+      await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "Accept-Encoding": "gzip, deflate" },
+        body: JSON.stringify(messages),
+      });
+    } catch (err) {
+      this.logger.error("Failed to send musician confirmation push", err);
+    }
+  }
+
+  /** Send a daily reminder to a pending musician. */
+  async sendMusicianReminder(
+    userId: string,
+    eventTitle: string,
+    instrumentRole: string,
+    slotId: string,
+  ): Promise<void> {
+    const tokens = await this.prisma.pushToken.findMany({
+      where: { userId },
+      select: { token: true },
+    });
+    if (tokens.length === 0) return;
+
+    const tokenList = tokens.map((t: { token: string }) => t.token);
+    const title = `Lembrete: confirme sua participação`;
+    const body = `Você ainda não confirmou ${instrumentRole} em "${eventTitle}". Responda para reservar sua vaga.`;
+
+    const enqueued = await this.queue.enqueuePush({
+      title,
+      body,
+      tokens: tokenList,
+      data: { type: "musician_reminder", slotId },
+    });
+    if (enqueued) return;
+
+    const messages = tokenList.map((to: string) => ({
+      to,
+      title,
+      body,
+      data: { type: "musician_reminder", slotId },
+    }));
+
+    try {
+      await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "Accept-Encoding": "gzip, deflate" },
+        body: JSON.stringify(messages),
+      });
+    } catch (err) {
+      this.logger.error("Failed to send musician reminder push", err);
+    }
+  }
 }

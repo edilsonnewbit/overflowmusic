@@ -17,12 +17,21 @@ type CreateEventBody = {
   title: string;
   dateTime: string;
   location?: string;
+  address?: string;
   description?: string;
   eventType?: "CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO";
-  status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  status?: "DRAFT" | "ACTIVE" | "PUBLISHED" | "FINISHED" | "ARCHIVED";
+  confirmationDeadlineDays?: number;
+  responseWindowHours?: number;
 };
 
 type UpdateEventBody = Partial<CreateEventBody>;
+
+type MusicianBody = {
+  instrumentRole: string;
+  userId: string;
+  priority: number;
+};
 
 @Controller("api/events")
 export class EventsController {
@@ -74,5 +83,43 @@ export class EventsController {
     const result = await this.eventsService.remove(id);
     void this.auditService.log({ action: "event.deleted", resourceType: "Event", resourceId: id });
     return result;
+  }
+
+  // ── Musician Slots ────────────────────────────────────────────────────────
+
+  @Get(":id/musicians")
+  async listMusicians(@Param("id") id: string) {
+    return this.eventsService.listMusicians(id);
+  }
+
+  @Post(":id/musicians")
+  async upsertMusician(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Body() body: MusicianBody,
+  ) {
+    await this.authService.assertAdminKeyOrContentManager(authorization);
+    return this.eventsService.upsertMusicianSlot(id, body);
+  }
+
+  @Delete(":id/musicians/:musicianId")
+  async removeMusician(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Param("musicianId") musicianId: string,
+  ) {
+    await this.authService.assertAdminKeyOrContentManager(authorization);
+    return this.eventsService.removeMusicianSlot(id, musicianId);
+  }
+
+  @Post(":id/musicians/:musicianId/respond")
+  async respondMusician(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("musicianId") musicianId: string,
+    @Body() body: { accept: boolean },
+  ) {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const { user } = await this.authService.getMe(token);
+    return this.eventsService.respondMusician(musicianId, user.id, body.accept);
   }
 }

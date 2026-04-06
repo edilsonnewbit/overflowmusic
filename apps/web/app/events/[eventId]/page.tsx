@@ -7,13 +7,27 @@ import type { EventStatus, SetlistItem, EventSetlist } from "@/lib/types";
 
 type Setlist = NonNullable<EventSetlist>;
 
+type EventMusician = {
+  id: string;
+  instrumentRole: string;
+  userId: string;
+  priority: number;
+  status: "PENDING" | "CONFIRMED" | "DECLINED" | "EXPIRED";
+  user?: { id: string; name: string; email: string; instruments: string[] };
+};
+
 type Event = {
   id: string;
   title: string;
   dateTime: string;
   location: string | null;
+  address?: string | null;
   description: string | null;
-  status: EventStatus;
+  status: EventStatus | "ACTIVE" | "FINISHED";
+  computedStatus?: string;
+  confirmationDeadlineDays?: number;
+  responseWindowHours?: number;
+  musicians?: EventMusician[];
   setlist: Setlist | null;
 };
 
@@ -47,11 +61,32 @@ type PageProps = {
   params: Promise<{ eventId: string }>;
 };
 
+// Status display helpers
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Rascunho", ACTIVE: "Ativo", PUBLISHED: "Publicado", FINISHED: "Encerrado", ARCHIVED: "Arquivado",
+};
+const STATUS_COLOR: Record<string, string> = {
+  DRAFT: "#8fa9c8", ACTIVE: "#60a5fa", PUBLISHED: "#7cf2a2", FINISHED: "#94a3b8", ARCHIVED: "#4b5563",
+};
+const MUSICIAN_STATUS_COLOR: Record<string, string> = {
+  PENDING: "#fbbf24", CONFIRMED: "#7cf2a2", DECLINED: "#f87171", EXPIRED: "#8fa9c8",
+};
+const INSTRUMENT_ROLES = ["Bateria", "Baixo", "Guitarra", "Teclado", "Violão", "Vocal", "Trompete", "Saxofone", "Outro"];
+
 export default function EventDetailPage({ params }: PageProps) {
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("Carregando...");
+
+  // edit event
+  const [showEdit, setShowEdit] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDateTime, setEditDateTime] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // songs catalog
   const [songs, setSongs] = useState<SongOption[]>([]);
@@ -61,6 +96,13 @@ export default function EventDetailPage({ params }: PageProps) {
 
   // team members for leader selector
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+
+  // musician team
+  const [musicRole, setMusicRole] = useState(INSTRUMENT_ROLES[0]);
+  const [musicUserId, setMusicUserId] = useState("");
+  const [musicPriority, setMusicPriority] = useState(1);
+  const [addingMusician, setAddingMusician] = useState(false);
+  const [removingMusicianId, setRemovingMusicianId] = useState<string | null>(null);
 
   // setlist form
   const [addSongTitle, setAddSongTitle] = useState("");
@@ -120,6 +162,93 @@ export default function EventDetailPage({ params }: PageProps) {
       setLoading(false);
     }
   }, []);
+
+  async function saveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!eventId) return;
+    setSaving(true);
+    setStatus("Salvando...");
+    try {
+      const response = await fetch(`/api/events/${eventId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle.trim() || undefined,
+          dateTime: editDateTime ? new Date(editDateTime).toISOString() : undefined,
+          location: editLocation.trim() || null,
+          address: editAddress.trim() || null,
+          description: editDescription.trim() || null,
+        }),
+      });
+      await parseJson<unknown>(response);
+      setShowEdit(false);
+      setStatus("Salvo.");
+      await loadEvent(eventId);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changeStatus(newStatus: string) {
+    if (!eventId) return;
+    setSaving(true);
+    setStatus(`Alterando status para ${newStatus}...`);
+    try {
+      const response = await fetch(`/api/events/${eventId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      await parseJson<unknown>(response);
+      setStatus("Status atualizado.");
+      await loadEvent(eventId);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao alterar status.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addMusician(e: FormEvent) {
+    e.preventDefault();
+    if (!eventId || !musicUserId) return;
+    setAddingMusician(true);
+    setStatus("Adicionando músico...");
+    try {
+      const response = await fetch(`/api/events/${eventId}/musicians`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instrumentRole: musicRole, userId: musicUserId, priority: musicPriority }),
+      });
+      await parseJson<unknown>(response);
+      setMusicUserId("");
+      setMusicPriority(1);
+      setStatus("Músico adicionado.");
+      await loadEvent(eventId);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao adicionar.");
+    } finally {
+      setAddingMusician(false);
+    }
+  }
+
+  async function removeMusician(musicianId: string) {
+    if (!eventId) return;
+    setRemovingMusicianId(musicianId);
+    setStatus("Removendo...");
+    try {
+      const response = await fetch(`/api/events/${eventId}/musicians/${musicianId}`, { method: "DELETE" });
+      await parseJson<unknown>(response);
+      setStatus("Removido.");
+      await loadEvent(eventId);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao remover.");
+    } finally {
+      setRemovingMusicianId(null);
+    }
+  }
 
   useEffect(() => {
     if (eventId) {
@@ -246,6 +375,8 @@ export default function EventDetailPage({ params }: PageProps) {
   const sortedItems = [...(event?.setlist?.items || [])].sort((a, b) => a.order - b.order);
   const isBusy = Boolean(deletingItemId || reorderingId || addingItem);
 
+  const displayStatus = event?.computedStatus ?? event?.status ?? "";
+
   return (
     <AuthGate>
       <main style={{ minHeight: "100vh", padding: "24px 16px 48px" }}>
@@ -259,22 +390,156 @@ export default function EventDetailPage({ params }: PageProps) {
               <h1 style={{ margin: "10px 0 4px", fontSize: 26 }}>Carregando...</h1>
             ) : event ? (
               <>
-                <h1 style={{ margin: "10px 0 4px", fontSize: 26 }}>{event.title}</h1>
-                <p style={{ margin: "0 0 4px", color: "#b3c6e0", fontSize: 14 }}>
-                  {formatDate(event.dateTime)}
-                  {event.location ? ` — ${event.location}` : ""}
-                </p>
-                {event.description && (
-                  <p style={{ margin: 0, color: "#8fa9c8", fontSize: 13 }}>{event.description}</p>
-                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1 }}>
+                    <h1 style={{ margin: "10px 0 4px", fontSize: 26 }}>{event.title}</h1>
+                    <p style={{ margin: "0 0 4px", color: "#b3c6e0", fontSize: 14 }}>
+                      {formatDate(event.dateTime)}
+                      {event.location ? ` — ${event.location}` : ""}
+                    </p>
+                    {event.address && (
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
+                        <span style={{ color: "#8fa9c8", fontSize: 13 }}>📍 {event.address}</span>
+                        <a
+                          href={`https://maps.google.com/?q=${encodeURIComponent(event.address)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 11, color: "#60a5fa", textDecoration: "none", border: "1px solid #60a5fa", borderRadius: 6, padding: "1px 8px" }}
+                        >
+                          Google Maps
+                        </a>
+                        <a
+                          href={`https://waze.com/ul?q=${encodeURIComponent(event.address)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 11, color: "#3dd8ba", textDecoration: "none", border: "1px solid #3dd8ba", borderRadius: 6, padding: "1px 8px" }}
+                        >
+                          Waze
+                        </a>
+                      </div>
+                    )}
+                    {event.description && (
+                      <p style={{ margin: "4px 0 0", color: "#8fa9c8", fontSize: 13 }}>{event.description}</p>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
+                      color: STATUS_COLOR[displayStatus] ?? "#8fa9c8",
+                      border: `1px solid ${STATUS_COLOR[displayStatus] ?? "#8fa9c8"}`,
+                      borderRadius: 6, padding: "2px 10px",
+                    }}>
+                      {STATUS_LABEL[displayStatus] ?? displayStatus}
+                    </span>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      {event.status === "DRAFT" && (
+                        <button style={smallBtn("#60a5fa")} disabled={saving} onClick={() => void changeStatus("ACTIVE")}>Ativar</button>
+                      )}
+                      {(event.status === "DRAFT" || event.status === "ACTIVE") && (
+                        <button style={smallBtn("#7cf2a2")} disabled={saving} onClick={() => void changeStatus("PUBLISHED")}>Publicar</button>
+                      )}
+                      {(event.status === "ACTIVE" || event.status === "PUBLISHED") && (
+                        <button style={smallBtn("#94a3b8")} disabled={saving} onClick={() => void changeStatus("ARCHIVED")}>Arquivar</button>
+                      )}
+                      <button
+                        style={smallBtn("#fbbf24")}
+                        onClick={() => {
+                          setEditTitle(event.title);
+                          setEditDateTime(event.dateTime.slice(0, 16));
+                          setEditLocation(event.location ?? "");
+                          setEditAddress(event.address ?? "");
+                          setEditDescription(event.description ?? "");
+                          setShowEdit((v) => !v);
+                        }}
+                      >
+                        Editar
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </>
             ) : (
               <h1 style={{ margin: "10px 0 4px", fontSize: 26, color: "#f87171" }}>{status}</h1>
             )}
           </header>
 
+          {/* Edit Form */}
+          {showEdit && event && (
+            <form onSubmit={(e) => void saveEdit(e)} style={{ ...sectionStyle, marginBottom: 16 }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 15, color: "#fbbf24" }}>Editar Evento</h3>
+              <label style={labelStyle}>Título</label>
+              <input style={inputStyle} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} disabled={saving} />
+              <label style={labelStyle}>Data e Hora</label>
+              <input style={inputStyle} type="datetime-local" value={editDateTime} onChange={(e) => setEditDateTime(e.target.value)} disabled={saving} />
+              <label style={labelStyle}>Local</label>
+              <input style={inputStyle} value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="Ex: Igreja Central" disabled={saving} />
+              <label style={labelStyle}>Endereço completo</label>
+              <input style={inputStyle} value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="Rua das Flores, 123, São Paulo" disabled={saving} />
+              <label style={labelStyle}>Descrição</label>
+              <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} disabled={saving} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="submit" style={primaryBtn} disabled={saving}>{saving ? "Salvando..." : "Salvar"}</button>
+                <button type="button" style={{ ...primaryBtn, background: "transparent", color: "#8fa9c8", border: "1px solid #2d4b6d" }} onClick={() => setShowEdit(false)}>Cancelar</button>
+              </div>
+            </form>
+          )}
+
           {!loading && event && (
             <>
+              {/* Musician Team Section */}
+              <section style={{ ...sectionStyle, marginBottom: 16 }}>
+                <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>Equipe de Músicos</h2>
+
+                {/* Grouped by instrument role */}
+                {INSTRUMENT_ROLES.filter((role) => (event.musicians ?? []).some((m) => m.instrumentRole === role)).map((role) => {
+                  const roleMusicians = (event.musicians ?? []).filter((m) => m.instrumentRole === role).sort((a, b) => a.priority - b.priority);
+                  return (
+                    <div key={role} style={{ marginBottom: 12 }}>
+                      <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#b3c6e0", fontSize: 14 }}>{role}</p>
+                      {roleMusicians.map((m) => (
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(15,33,55,0.7)", borderRadius: 8, border: "1px solid #2d4b6d", marginBottom: 4 }}>
+                          <span style={{ color: "#8fa9c8", fontSize: 12, minWidth: 16 }}>#{m.priority}</span>
+                          <span style={{ flex: 1, fontSize: 13 }}>{m.user?.name ?? m.userId}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: MUSICIAN_STATUS_COLOR[m.status] ?? "#8fa9c8", border: `1px solid ${MUSICIAN_STATUS_COLOR[m.status] ?? "#8fa9c8"}`, borderRadius: 5, padding: "1px 7px" }}>
+                            {m.status}
+                          </span>
+                          <button
+                            style={deleteBtn}
+                            disabled={removingMusicianId === m.id}
+                            onClick={() => void removeMusician(m.id)}
+                            title="Remover"
+                          >
+                            {removingMusicianId === m.id ? "..." : "✕"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+
+                {(event.musicians ?? []).length === 0 && (
+                  <p style={{ color: "#8fa9c8", fontSize: 13 }}>Nenhum músico definido ainda.</p>
+                )}
+
+                {/* Add musician form */}
+                <form onSubmit={(e) => void addMusician(e)} style={{ ...addFormStyle, marginTop: 12 }}>
+                  <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#7cf2a2" }}>+ Adicionar músico</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8 }}>
+                    <select style={{ ...inputStyle, appearance: "none" as const }} value={musicRole} onChange={(e) => setMusicRole(e.target.value)} disabled={addingMusician}>
+                      {INSTRUMENT_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <select style={{ ...inputStyle, appearance: "none" as const }} value={musicUserId} onChange={(e) => setMusicUserId(e.target.value)} disabled={addingMusician}>
+                      <option value="">Selecionar usuário</option>
+                      {teamUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                    <select style={{ ...inputStyle, appearance: "none" as const }} value={musicPriority} onChange={(e) => setMusicPriority(Number(e.target.value))} disabled={addingMusician}>
+                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>#{n}</option>)}
+                    </select>
+                  </div>
+                  <button type="submit" style={primaryBtn} disabled={addingMusician || !musicUserId}>
+                    {addingMusician ? "Adicionando..." : "Adicionar"}
+                  </button>
+                </form>
+              </section>
+
               {/* Setlist */}
               <section style={sectionStyle}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -619,3 +884,24 @@ const dropdownItemStyle: CSSProperties = {
   color: "#e8f2ff",
   borderBottom: "1px solid rgba(45,75,109,0.4)",
 };
+
+const labelStyle: CSSProperties = {
+  color: "#7cf2a2",
+  fontSize: 12,
+  letterSpacing: 1,
+  textTransform: "uppercase",
+  marginBottom: 2,
+};
+
+function smallBtn(color: string): CSSProperties {
+  return {
+    background: "transparent",
+    border: `1px solid ${color}`,
+    color,
+    borderRadius: 8,
+    padding: "3px 12px",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+}
