@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CSSProperties, FormEvent, useEffect, useState } from "react";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthRequired } from "@/components/AuthRequired";
 
 type Event = {
   id: string;
@@ -101,7 +101,7 @@ export default function EventsPage() {
   }
 
   return (
-    <AuthGate>
+    <AuthRequired>
       <main style={{ minHeight: "100vh", padding: "24px 16px 48px" }}>
         <section style={{ maxWidth: 840, margin: "0 auto" }}>
           <header style={headerStyle}>
@@ -193,7 +193,7 @@ export default function EventsPage() {
           )}
         </section>
       </main>
-    </AuthGate>
+    </AuthRequired>
   );
 }
 

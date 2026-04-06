@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthRequired } from "@/components/AuthRequired";
 import type { ChecklistTemplate, ChecklistRunItem, ChecklistRun } from "@/lib/types";
 
 type ApiResult<T> = {
@@ -203,7 +203,7 @@ export default function ChecklistsPage() {
   return (
     <main style={{ minHeight: "100vh", padding: "24px 16px 36px" }}>
       <section style={{ maxWidth: 1120, margin: "0 auto" }}>
-        <AuthGate>
+        <AuthRequired>
           <header style={headerStyle}>
             <p style={tagStyle}>Operations</p>
             <h1 style={{ margin: "8px 0 12px", fontSize: 36, lineHeight: 1.1 }}>Checklist Management</h1>
@@ -314,7 +314,7 @@ export default function ChecklistsPage() {
               </div>
             </article>
           </section>
-        </AuthGate>
+        </AuthRequired>
       </section>
     </main>
   );
