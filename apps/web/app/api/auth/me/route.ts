@@ -42,7 +42,9 @@ export async function GET(request: NextRequest) {
     const statusHint = readStatusHint(request);
     const token = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value || "";
     if (!token) {
-      return NextResponse.json({ ok: false, message: "not authenticated", statusHint }, { status: 401 });
+      // Retorna 200 (não 401) para que o browser não logue erro no console —
+      // o AuthProvider checa body.user, não o status HTTP.
+      return NextResponse.json({ ok: false, message: "not authenticated", statusHint }, { status: 200 });
     }
 
     const response = await serverApiFetch("auth/me", {
