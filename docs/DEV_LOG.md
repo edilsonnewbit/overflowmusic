@@ -2,6 +2,19 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-06 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Cron jobs para expiração de músicos e lembretes; propagar `address` pelo mobile
+- Feito:
+  - `apps/api/package.json`: adicionada dependência `@nestjs/schedule@^4.1.0`
+  - `apps/api/src/events/events.cron.ts` (novo): `EventsCronService` com `@Cron` para `processExpiredMusicians` (a cada hora) e `sendPendingReminders` (8h, 13h, 20h BRT = 11h, 16h, 23h UTC)
+  - `apps/api/src/app.module.ts`: importa `ScheduleModule.forRoot()`, registra `EventsCronService` como provider
+  - `apps/mobile/src/lib/api.ts`: `createEvent` e `updateEvent` aceitam `address?` no input
+  - `apps/mobile/src/context/SessionContext.tsx`: assinaturas de `handleCreateEvent` e `handleUpdateEvent` incluem `address?`
+  - `apps/mobile/App.tsx`: assinaturas de `handleCreateEvent` e `handleUpdateEvent` incluem `address?`
+- Commit: na branch develop
+- Status: 0 erros TypeScript no mobile/web; erro @nestjs/schedule esperado localmente (resolve no docker build com npm install)
+- Próximo passo: `git push origin develop` para deploy; reconstruir containers para aplicar alterações
+
 ### [2026-04-08 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Endereço com Maps/Waze, edição e controle de status (ACTIVE/FINISHED automático), equipe de músicos por instrumento com prioridade e notificações
 - Feito:
