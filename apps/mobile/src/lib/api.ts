@@ -299,7 +299,7 @@ export async function fetchEvents(): Promise<{ ok: boolean; events: MusicEvent[]
 }
 
 export async function createEvent(
-  input: { title: string; dateTime: string; location?: string; description?: string },
+  input: { title: string; dateTime: string; location?: string; description?: string; address?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
   const bearerToken = (accessToken || "").trim();
@@ -326,7 +326,7 @@ export async function createEvent(
 
 export async function updateEvent(
   id: string,
-  input: { title?: string; dateTime?: string; location?: string },
+  input: { title?: string; dateTime?: string; location?: string; address?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
   const bearerToken = (accessToken || "").trim();

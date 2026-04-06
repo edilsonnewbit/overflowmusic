@@ -70,10 +70,10 @@ export interface SessionContextValue {
     itemId: string,
     input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string },
   ) => Promise<void>;
-  handleCreateEvent: (input: { title: string; dateTime: string; location?: string }) => Promise<void>;
+  handleCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string }) => Promise<void>;
   handleUpdateEvent: (
     id: string,
-    input: { title?: string; dateTime?: string; location?: string },
+    input: { title?: string; dateTime?: string; location?: string; address?: string },
   ) => Promise<void>;
   handleDeleteEvent: (id: string) => Promise<void>;
 
@@ -423,7 +423,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function handleCreateEvent(input: { title: string; dateTime: string; location?: string }) {
+  async function handleCreateEvent(input: { title: string; dateTime: string; location?: string; address?: string }) {
     setCreatingEvent(true);
     setEventsStatus("Criando evento...");
     try {
@@ -443,7 +443,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   async function handleUpdateEvent(
     id: string,
-    input: { title?: string; dateTime?: string; location?: string },
+    input: { title?: string; dateTime?: string; location?: string; address?: string },
   ) {
     setEventsStatus("Salvando alterações...");
     try {

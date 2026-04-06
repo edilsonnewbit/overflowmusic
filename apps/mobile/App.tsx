@@ -330,7 +330,7 @@ export default function App() {
     }
   }
 
-  async function handleCreateEvent(input: { title: string; dateTime: string; location?: string }) {
+  async function handleCreateEvent(input: { title: string; dateTime: string; location?: string; address?: string }) {
     setCreatingEvent(true);
     setEventsStatus("Criando evento...");
     try {
@@ -350,7 +350,7 @@ export default function App() {
 
   async function handleUpdateEvent(
     id: string,
-    input: { title?: string; dateTime?: string; location?: string },
+    input: { title?: string; dateTime?: string; location?: string; address?: string },
   ) {
     setEventsStatus("Salvando alterações...");
     try {
