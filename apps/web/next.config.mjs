@@ -4,8 +4,8 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // Google Sign-In usa window.postMessage; COOP precisa ser same-origin-allow-popups
-        source: "/login",
+        // Google GIS persiste em memória entre navegações; COOP precisa cobrir todas as rotas
+        source: "/:path*",
         headers: [
           { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
         ],
