@@ -2,6 +2,23 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-09 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: `eventType` nos formulários de evento (web + mobile) + fluxo completo de resposta a convite de músico no mobile
+- Feito:
+  - `packages/types/index.ts`: `EventType` = CULTO|CONFERENCIA|ENSAIO|OUTRO, campo `eventType?` em `MusicEvent`
+  - `apps/web/app/events/page.tsx`: `<select>` de tipo no form de criação de evento
+  - `apps/mobile/src/screens/EventsScreen.tsx`: seletores visuais de tipo (botões) nos forms de criação e edição
+  - `apps/api/src/events/events.service.ts`: `respondMusicianBySlotId` (wrapper leve para `respondMusician`)
+  - `apps/api/src/events/events.controller.ts`: `POST /events/slots/:slotId/respond` (endpoint sem eventId para uso direto do mobile)
+  - `apps/api/src/notifications/notifications.service.ts`: dados de notificação incluem `eventTitle` e `instrumentRole`
+  - `apps/mobile/src/lib/api.ts`: função `respondMusicianSlot(slotId, accept, token)`
+  - `apps/mobile/src/context/SessionContext.tsx`: estado `pendingInvite`, `setPendingInvite`, `handleRespondInvite`; assinaturas de create/update incluem `eventType?`
+  - `apps/mobile/app/_layout.tsx`: listener de notificação extrai `slotId/eventTitle/instrumentRole` e chama `setPendingInvite`
+  - `apps/mobile/src/screens/HomeScreen.tsx`: modal overlay de confirmação/recusa de convite quando `pendingInvite !== null`
+- Commit: `d10f158` na branch develop
+- Status: 0 erros TS nos arquivos modificados; erros pré-existentes de PrismaService em events.service.ts não alterados
+- Próximo passo: `git push origin develop` para deploy
+
 ### [2026-04-06 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Cron jobs para expiração de músicos e lembretes; propagar `address` pelo mobile
 - Feito:
