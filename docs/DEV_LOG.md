@@ -2,6 +2,23 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-08 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Endereço com Maps/Waze, edição e controle de status (ACTIVE/FINISHED automático), equipe de músicos por instrumento com prioridade e notificações
+- Feito:
+  - `apps/api/prisma/schema.prisma`: enum `EventStatus` (+ ACTIVE, FINISHED), novo enum `MusicianSlotStatus`, campos `address`, `confirmationDeadlineDays`, `responseWindowHours` em Event, novo model `EventMusician` com unique+index
+  - `apps/api/src/events/events.service.ts`: reescrita completa — CreateEventInput com novos campos, `computedStatus` (ACTIVE + data passada = FINISHED), `getById` inclui musicians, endpoints CRUD de músicos, `respondMusician`, `triggerMusicianNotifications`, `escalateMusician`, `processExpiredMusicians` (cron), `sendPendingReminders` (3x/dia)
+  - `apps/api/src/events/events.controller.ts`: novos endpoints `GET/POST :id/musicians`, `DELETE :id/musicians/:musicianId`, `POST :id/musicians/:musicianId/respond`
+  - `apps/api/src/notifications/notifications.service.ts`: novos métodos `sendMusicianConfirmationRequest` e `sendMusicianReminder`
+  - `packages/types/index.ts`: `EventStatus` com novos valores, novo tipo `MusicianSlotStatus`, novo tipo `EventMusician`, `MusicEvent` com address/computedStatus/musicians
+  - `apps/web/app/api/events/[eventId]/musicians/route.ts` (novo): BFF GET/POST músicos
+  - `apps/web/app/api/events/[eventId]/musicians/[musicianId]/route.ts` (novo): BFF DELETE músico
+  - `apps/web/app/events/page.tsx`: campo `address` no form, novos status (ACTIVE/FINISHED/ARCHIVED) com cores, label em português
+  - `apps/web/app/events/[eventId]/page.tsx`: endereço com botões Google Maps / Waze, form edição inline, botões de status (Ativar/Publicar/Arquivar), seção equipe músicos por instrumento com prioridade/status
+  - `apps/mobile/src/screens/EventsScreen.tsx`: campo address no form criação/edição, badge de status colorido, botões Maps/Waze com `Linking.openURL`
+- Commit: `17f3bb9` na branch develop
+- Status: TypeScript OK no web/mobile; erros @prisma/client no editor são esperados (Prisma generate roda no `docker build`)
+- Próximo passo: `git push origin develop` para deploy; worker deve ser configurado para chamar `processExpiredMusicians()` e `sendPendingReminders()` via cron
+
 ### [2026-04-07 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Instrumentos no perfil, líder vocal por dropdown, gerenciamento de equipe com edição
 - Feito:
