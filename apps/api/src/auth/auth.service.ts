@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, OnModuleInit, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable, InternalServerErrorException, OnModuleInit, UnauthorizedException } from "@nestjs/common";
 import { createHmac, randomBytes, scrypt } from "node:crypto";
 import { promisify } from "node:util";
 import { EmailService } from "../email/email.service";
@@ -248,7 +248,7 @@ export class AuthService implements OnModuleInit {
       await this.emailService.sendVerificationEmail(email, token);
     } catch (error) {
       console.error('[AuthService] Falha ao reenviar email de verificação:', error);
-      throw new BadRequestException('Failed to send verification email');
+      throw new InternalServerErrorException('Failed to send verification email. Please try again later.');
     }
 
     return { ok: true, message: "Verification email sent" };
