@@ -6,6 +6,8 @@ export type UserStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
 
 export type EventStatus = "DRAFT" | "ACTIVE" | "PUBLISHED" | "FINISHED" | "ARCHIVED";
 
+export type EventType = "CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO";
+
 export type ChordChartSourceType = "TXT_IMPORT" | "MANUAL";
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -119,6 +121,7 @@ export type MusicEvent = {
   address?: string | null;
   description: string | null;
   status: EventStatus;
+  eventType?: EventType;
   computedStatus?: string;
   confirmationDeadlineDays?: number;
   responseWindowHours?: number;

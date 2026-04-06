@@ -92,7 +92,7 @@ export class NotificationsService {
       title,
       body,
       tokens: tokenList,
-      data: { type: "musician_invite", slotId },
+      data: { type: "musician_invite", slotId, eventTitle, instrumentRole },
     });
     if (enqueued) return;
 
@@ -100,7 +100,7 @@ export class NotificationsService {
       to,
       title,
       body,
-      data: { type: "musician_invite", slotId },
+      data: { type: "musician_invite", slotId, eventTitle, instrumentRole },
     }));
 
     try {
@@ -135,7 +135,7 @@ export class NotificationsService {
       title,
       body,
       tokens: tokenList,
-      data: { type: "musician_reminder", slotId },
+      data: { type: "musician_reminder", slotId, eventTitle, instrumentRole },
     });
     if (enqueued) return;
 
@@ -143,7 +143,7 @@ export class NotificationsService {
       to,
       title,
       body,
-      data: { type: "musician_reminder", slotId },
+      data: { type: "musician_reminder", slotId, eventTitle, instrumentRole },
     }));
 
     try {

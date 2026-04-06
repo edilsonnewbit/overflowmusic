@@ -238,6 +238,10 @@ export class EventsService {
     return { ok: true };
   }
 
+  async respondMusicianBySlotId(slotId: string, userId: string, accept: boolean) {
+    return this.respondMusician(slotId, userId, accept);
+  }
+
   private async triggerMusicianNotifications(eventId: string) {
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
     if (!event) return;

@@ -22,9 +22,9 @@ type Props = {
   onRemoveItem: (itemId: string) => Promise<void>;
   onUpdateSetlistItem: (itemId: string, input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string }) => Promise<void>;
   statusText: string;
-  onCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string }) => Promise<void>;
+  onCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
   creatingEvent: boolean;
-  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string }) => Promise<void>;
+  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
   onDeleteEvent: (id: string) => Promise<void>;
 };
 
@@ -55,12 +55,14 @@ export function EventsScreen({
   const [formDate, setFormDate] = useState("");
   const [formLocation, setFormLocation] = useState("");
   const [formAddress, setFormAddress] = useState("");
+  const [formEventType, setFormEventType] = useState<"CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO">("CULTO");
   const [formError, setFormError] = useState("");
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editAddress, setEditAddress] = useState("");
+  const [editEventType, setEditEventType] = useState<"CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO">("CULTO");
   const [editError, setEditError] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -70,6 +72,7 @@ export function EventsScreen({
     setEditDate(ev.dateTime.slice(0, 16));
     setEditLocation(ev.location ?? "");
     setEditAddress(ev.address ?? "");
+    setEditEventType((ev.eventType as typeof editEventType) ?? "CULTO");
     setEditError("");
   }
 
@@ -88,7 +91,7 @@ export function EventsScreen({
     }
     setSavingEdit(true);
     setEditError("");
-    await onUpdateEvent(editingEventId!, { title, dateTime, location: editLocation.trim() || undefined, address: editAddress.trim() || undefined });
+    await onUpdateEvent(editingEventId!, { title, dateTime, location: editLocation.trim() || undefined, address: editAddress.trim() || undefined, eventType: editEventType });
     setSavingEdit(false);
     setEditingEventId(null);
   }
@@ -114,11 +117,12 @@ export function EventsScreen({
       return;
     }
     setFormError("");
-    await onCreateEvent({ title, dateTime, location: formLocation.trim() || undefined, address: formAddress.trim() || undefined });
+    await onCreateEvent({ title, dateTime, location: formLocation.trim() || undefined, address: formAddress.trim() || undefined, eventType: formEventType });
     setFormTitle("");
     setFormDate("");
     setFormLocation("");
     setFormAddress("");
+    setFormEventType("CULTO");
     setShowForm(false);
   }
 
@@ -205,6 +209,25 @@ export function EventsScreen({
             onChangeText={setFormAddress}
             editable={!creatingEvent}
           />
+          <Text style={{ color: "#b3c6e0", fontSize: 12, marginBottom: 2 }}>Tipo</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {(["CULTO", "CONFERENCIA", "ENSAIO", "OUTRO"] as const).map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => !creatingEvent && setFormEventType(t)}
+                style={{
+                  paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: formEventType === t ? "#1ecad3" : "#2a4a6a",
+                  backgroundColor: formEventType === t ? "#0d2a3a" : "transparent",
+                }}
+              >
+                <Text style={{ color: formEventType === t ? "#1ecad3" : "#8fa9c8", fontSize: 12 }}>
+                  {t === "CULTO" ? "Culto" : t === "CONFERENCIA" ? "Conferência" : t === "ENSAIO" ? "Ensaio" : "Outro"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
           {formError ? <Text style={{ color: "#f28c8c", fontSize: 12 }}>{formError}</Text> : null}
           <Pressable
             style={[styles.primaryButton, { backgroundColor: creatingEvent ? "#2a3a2a" : "#1e7a3e" }]}
@@ -333,6 +356,25 @@ export function EventsScreen({
                     onChangeText={setEditAddress}
                     editable={!savingEdit}
                   />
+                  <Text style={{ color: "#b3c6e0", fontSize: 12, marginBottom: 2 }}>Tipo</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                    {(["CULTO", "CONFERENCIA", "ENSAIO", "OUTRO"] as const).map((t) => (
+                      <Pressable
+                        key={t}
+                        onPress={() => !savingEdit && setEditEventType(t)}
+                        style={{
+                          paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+                          borderWidth: 1,
+                          borderColor: editEventType === t ? "#1ecad3" : "#2a4a6a",
+                          backgroundColor: editEventType === t ? "#0d2a3a" : "transparent",
+                        }}
+                      >
+                        <Text style={{ color: editEventType === t ? "#1ecad3" : "#8fa9c8", fontSize: 12 }}>
+                          {t === "CULTO" ? "Culto" : t === "CONFERENCIA" ? "Conferência" : t === "ENSAIO" ? "Ensaio" : "Outro"}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
                   {editError ? <Text style={{ color: "#f28c8c", fontSize: 12 }}>{editError}</Text> : null}
                   <Pressable
                     style={[styles.primaryButton, { backgroundColor: savingEdit ? "#2a3a2a" : "#1e5a7a" }]}

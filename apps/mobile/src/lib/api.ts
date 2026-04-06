@@ -369,6 +369,25 @@ export async function deleteEvent(
   return { ok: true };
 }
 
+export async function respondMusicianSlot(
+  slotId: string,
+  accept: boolean,
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(`${API_BASE}/events/slots/${encodeURIComponent(slotId)}/respond`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+    body: JSON.stringify({ accept }),
+  });
+  const body = await parseJson(response);
+  if (!response.ok) {
+    return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao responder convite." };
+  }
+  return { ok: true };
+}
+
 export async function addSetlistItem(
   eventId: string,
   input: { songTitle: string; key?: string },

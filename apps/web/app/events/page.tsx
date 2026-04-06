@@ -11,6 +11,7 @@ type Event = {
   location: string | null;
   address?: string | null;
   description: string | null;
+  eventType?: "CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO";
   status: "DRAFT" | "ACTIVE" | "PUBLISHED" | "FINISHED" | "ARCHIVED";
   computedStatus?: string;
   createdAt: string;
@@ -40,6 +41,7 @@ export default function EventsPage() {
   const [formLocation, setFormLocation] = useState("");
   const [formAddress, setFormAddress] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formEventType, setFormEventType] = useState<"CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO">("CULTO");
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -80,6 +82,7 @@ export default function EventsPage() {
           location: formLocation.trim() || undefined,
           address: formAddress.trim() || undefined,
           description: formDescription.trim() || undefined,
+          eventType: formEventType,
         }),
       });
       await parseJson<{ event: Event }>(response);
@@ -88,6 +91,7 @@ export default function EventsPage() {
       setFormLocation("");
       setFormAddress("");
       setFormDescription("");
+      setFormEventType("CULTO");
       setShowForm(false);
       setStatus("Evento criado.");
       await loadEvents();
@@ -162,6 +166,19 @@ export default function EventsPage() {
                 placeholder="Ex: Rua das Flores, 123, São Paulo"
                 disabled={creating}
               />
+
+              <label style={labelStyle}>Tipo de Evento</label>
+              <select
+                style={inputStyle}
+                value={formEventType}
+                onChange={(e) => setFormEventType(e.target.value as typeof formEventType)}
+                disabled={creating}
+              >
+                <option value="CULTO">Culto</option>
+                <option value="CONFERENCIA">Conferência</option>
+                <option value="ENSAIO">Ensaio</option>
+                <option value="OUTRO">Outro</option>
+              </select>
 
               <label style={labelStyle}>Descrição</label>
               <textarea

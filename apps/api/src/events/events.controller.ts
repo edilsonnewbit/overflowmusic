@@ -122,4 +122,15 @@ export class EventsController {
     const { user } = await this.authService.getMe(token);
     return this.eventsService.respondMusician(musicianId, user.id, body.accept);
   }
+
+  @Post("slots/:slotId/respond")
+  async respondMusicianSlot(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("slotId") slotId: string,
+    @Body() body: { accept: boolean },
+  ) {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const { user } = await this.authService.getMe(token);
+    return this.eventsService.respondMusicianBySlotId(slotId, user.id, body.accept);
+  }
 }

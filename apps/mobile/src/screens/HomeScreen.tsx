@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useSession } from "../context/SessionContext";
 import { styles } from "../styles";
 import type { MusicEvent } from "../types";
@@ -45,11 +45,12 @@ function daysUntil(iso: string): number {
 
 export function HomeScreen() {
   const router = useRouter();
-  const { user, events, loadingEvents, loadEventsList, eventSetlist, activeEventId, selectEvent } = useSession();
+  const { user, events, loadingEvents, loadEventsList, eventSetlist, activeEventId, selectEvent, pendingInvite, handleRespondInvite } = useSession();
   const nextEvent = getNextEvent(events);
   const setlistCount = eventSetlist?.items?.length ?? 0;
 
   return (
+    <>
     <ScrollView
       style={{ flex: 1, backgroundColor: "#07101d" }}
       contentContainerStyle={[styles.container, { gap: 16 }]}
@@ -213,6 +214,60 @@ export function HomeScreen() {
         </>
       )}
     </ScrollView>
+
+    {/* Musician invite modal */}
+    {pendingInvite && (
+      <View
+        style={{
+          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.7)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 24,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: "#0d1e2f",
+            borderRadius: 16,
+            padding: 24,
+            width: "100%",
+            borderWidth: 1,
+            borderColor: "#1ecad3",
+            gap: 12,
+          }}
+        >
+          <Text style={{ color: "#7cf2a2", fontSize: 16, fontWeight: "700" }}>Convite de Evento</Text>
+          {pendingInvite.role ? (
+            <Text style={{ color: "#b3c6e0", fontSize: 14 }}>
+              Você foi convidado como <Text style={{ color: "#f4f8ff", fontWeight: "600" }}>{pendingInvite.role}</Text>
+              {pendingInvite.eventTitle ? (
+                <> em <Text style={{ color: "#f4f8ff", fontWeight: "600" }}>{pendingInvite.eventTitle}</Text></>
+              ) : null}.
+            </Text>
+          ) : (
+            <Text style={{ color: "#b3c6e0", fontSize: 14 }}>Você recebeu um convite para participar de um evento.</Text>
+          )}
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
+            <Pressable
+              onPress={() => void handleRespondInvite(true)}
+              style={{ flex: 1, backgroundColor: "#1e3a2a", borderRadius: 10, padding: 12,
+                alignItems: "center", borderWidth: 1, borderColor: "#7cf2a2" }}
+            >
+              <Text style={{ color: "#7cf2a2", fontWeight: "700" }}>✓ Confirmar</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void handleRespondInvite(false)}
+              style={{ flex: 1, backgroundColor: "#2a1a1a", borderRadius: 10, padding: 12,
+                alignItems: "center", borderWidth: 1, borderColor: "#f28c8c" }}
+            >
+              <Text style={{ color: "#f28c8c", fontWeight: "700" }}>✗ Recusar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    )}
+    </>
   );
 }
 
