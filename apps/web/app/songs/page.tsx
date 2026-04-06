@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthRequired } from "@/components/AuthRequired";
 import type { Song } from "@/lib/types";
 
 export default function SongsPage() {
   return (
-    <AuthGate>
+    <AuthRequired>
       <SongsContent />
-    </AuthGate>
+    </AuthRequired>
   );
 }
 

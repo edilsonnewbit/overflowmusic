@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
@@ -73,7 +74,39 @@ export function HomeClient() {
   }
 
   if (session === "guest") {
-    return null;
+    return (
+      <section style={{ padding: "48px 0 24px", textAlign: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+          <Image
+            src="/logo.png"
+            alt="Overflow Music"
+            width={120}
+            height={120}
+            priority
+            style={{ borderRadius: 24, objectFit: "contain" }}
+          />
+          <div>
+            <p style={{ margin: 0, letterSpacing: 3, textTransform: "uppercase", color: "#7cf2a2", fontSize: 11, fontWeight: 600 }}>
+              Overflow Movement
+            </p>
+            <h1 style={{ margin: "10px 0 16px", fontSize: "clamp(28px, 6vw, 48px)", lineHeight: 1.1, fontWeight: 700, background: "linear-gradient(135deg, #fff 40%, #9dd4ff 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Overflow Music
+            </h1>
+            <p style={{ margin: "0 auto", maxWidth: 480, color: "#7a9dc0", fontSize: 15, lineHeight: 1.6 }}>
+              Plataforma interna de gestão musical — eventos, setlists, cifras e operações em um só lugar.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
+            <Link href="/login" style={{ display: "inline-block", textDecoration: "none", background: "linear-gradient(135deg, #1a6fd4 0%, #1258aa 100%)", color: "#fff", borderRadius: 999, padding: "12px 28px", fontSize: 15, fontWeight: 600 }}>
+              Entrar →
+            </Link>
+            <Link href="/register" style={{ display: "inline-block", textDecoration: "none", background: "rgba(30,202,211,0.12)", color: "#1ecad3", border: "1px solid #1ecad3", borderRadius: 999, padding: "12px 28px", fontSize: 15, fontWeight: 600 }}>
+              Criar conta
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -123,8 +156,8 @@ export function HomeClient() {
       )}
 
       {/* Dashboard nav cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
-        <Link href="/events" style={dashCardStyle}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
+        <Link href="/events" className="dash-card">
           <span style={dashIconStyle}>📅</span>
           <div>
             <p style={dashTagStyle}>Events</p>
@@ -133,7 +166,7 @@ export function HomeClient() {
           </div>
         </Link>
 
-        <Link href="/songs" style={dashCardStyle}>
+        <Link href="/songs" className="dash-card">
           <span style={dashIconStyle}>🎵</span>
           <div>
             <p style={dashTagStyle}>Music</p>
@@ -142,7 +175,7 @@ export function HomeClient() {
           </div>
         </Link>
 
-        <Link href="/checklists" style={dashCardStyle}>
+        <Link href="/checklists" className="dash-card">
           <span style={dashIconStyle}>✅</span>
           <div>
             <p style={dashTagStyle}>Operations</p>
@@ -151,19 +184,32 @@ export function HomeClient() {
           </div>
         </Link>
 
-        <Link href="/admin/users" style={dashCardStyle}>
-          <span style={dashIconStyle}>👥</span>
-          <div>
-            <p style={dashTagStyle}>Admin</p>
-            <h3 style={dashTitleStyle}>Equipe & Aprovações</h3>
-            <p style={dashDescStyle}>Aprove membros e gerencie papéis da equipe.</p>
-            {stats && stats.pendingUsers > 0 && (
-              <p style={{ margin: "6px 0 0", color: "#ff6b6b", fontSize: 12, fontWeight: 600 }}>
-                {stats.pendingUsers} aguardando aprovação
-              </p>
-            )}
-          </div>
-        </Link>
+        {(user?.role === "SUPER_ADMIN" || user?.role === "ADMIN") && (
+          <>
+            <Link href="/admin/team" className="dash-card">
+              <span style={dashIconStyle}>👥</span>
+              <div>
+                <p style={dashTagStyle}>Admin</p>
+                <h3 style={dashTitleStyle}>Equipe</h3>
+                <p style={dashDescStyle}>Gerencie membros, papéis e instrumentos.</p>
+              </div>
+            </Link>
+
+            <Link href="/admin/users" className="dash-card">
+              <span style={dashIconStyle}>🔑</span>
+              <div>
+                <p style={dashTagStyle}>Admin</p>
+                <h3 style={dashTitleStyle}>Aprovações</h3>
+                <p style={dashDescStyle}>Aprove ou rejeite novos membros.</p>
+                {stats && stats.pendingUsers > 0 && (
+                  <p style={{ margin: "6px 0 0", color: "#ff6b6b", fontSize: 12, fontWeight: 600 }}>
+                    ⚠ {stats.pendingUsers} aguardando aprovação
+                  </p>
+                )}
+              </div>
+            </Link>
+          </>
+        )}
       </div>
     </section>
   );
@@ -186,18 +232,6 @@ const nextEventStyle: React.CSSProperties = {
   borderRadius: 16,
   padding: "16px 20px",
   marginBottom: 16,
-};
-
-const dashCardStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 16,
-  textDecoration: "none",
-  color: "inherit",
-  background: "rgba(18, 40, 64, 0.85)",
-  border: "1px solid #2d4b6d",
-  borderRadius: 16,
-  padding: "18px 20px",
 };
 
 const dashIconStyle: React.CSSProperties = {
