@@ -23,11 +23,7 @@ export function SessionStatusBanner() {
   }
 
   if (state === "approved") {
-    return (
-      <section style={approvedStyle}>
-        <p style={{ margin: 0, color: "#d7fce8" }}>Sessão ativa. Bem-vindo, {userName}.</p>
-      </section>
-    );
+    return null;
   }
 
   if (state === "pending") {

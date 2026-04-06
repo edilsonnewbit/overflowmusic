@@ -17,6 +17,19 @@ type Event = {
   setlist: Setlist | null;
 };
 
+type SongOption = {
+  id: string;
+  title: string;
+  artist: string | null;
+  defaultKey: string | null;
+};
+
+type TeamUser = {
+  id: string;
+  name: string;
+  role: string;
+};
+
 type ApiResult<T> = {
   ok: boolean;
   message?: string;
@@ -40,6 +53,15 @@ export default function EventDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("Carregando...");
 
+  // songs catalog
+  const [songs, setSongs] = useState<SongOption[]>([]);
+  const [songSearch, setSongSearch] = useState("");
+  const [showSongDropdown, setShowSongDropdown] = useState(false);
+  const [selectedSong, setSelectedSong] = useState<SongOption | null>(null);
+
+  // team members for leader selector
+  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+
   // setlist form
   const [addSongTitle, setAddSongTitle] = useState("");
   const [addSongKey, setAddSongKey] = useState("");
@@ -57,6 +79,32 @@ export default function EventDetailPage({ params }: PageProps) {
       setEventId(id);
     });
   }, [params]);
+
+  useEffect(() => {
+    async function loadSongs() {
+      try {
+        const res = await fetch("/api/songs?limit=500", { cache: "no-store" });
+        if (!res.ok) return;
+        const body = (await res.json()) as { songs?: SongOption[] };
+        setSongs(body.songs ?? []);
+      } catch {
+        // silently ignore
+      }
+    }
+    void loadSongs();
+
+    async function loadTeamUsers() {
+      try {
+        const res = await fetch("/api/admin/users", { cache: "no-store" });
+        if (!res.ok) return;
+        const body = (await res.json()) as { users?: TeamUser[] };
+        setTeamUsers(body.users ?? []);
+      } catch {
+        // silently ignore
+      }
+    }
+    void loadTeamUsers();
+  }, []);
 
   const loadEvent = useCallback(async (id: string) => {
     setLoading(true);
@@ -341,16 +389,72 @@ export default function EventDetailPage({ params }: PageProps) {
                   <h3 style={{ margin: "0 0 10px", fontSize: 14, color: "#7cf2a2" }}>
                     + Adicionar música
                   </h3>
+
+                  {/* Song search */}
+                  <div style={{ position: "relative" }}>
+                    <input
+                      style={inputStyle}
+                      placeholder="Buscar música cadastrada *"
+                      value={selectedSong ? selectedSong.title : songSearch}
+                      onChange={(e) => {
+                        setSelectedSong(null);
+                        setAddSongTitle("");
+                        setAddSongKey("");
+                        setSongSearch(e.target.value);
+                        setShowSongDropdown(true);
+                      }}
+                      onFocus={() => setShowSongDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowSongDropdown(false), 150)}
+                      disabled={addingItem}
+                      autoComplete="off"
+                    />
+                    {showSongDropdown && songSearch.length > 0 && !selectedSong && (
+                      <ul style={dropdownStyle}>
+                        {songs
+                          .filter((s) =>
+                            s.title.toLowerCase().includes(songSearch.toLowerCase()) ||
+                            (s.artist ?? "").toLowerCase().includes(songSearch.toLowerCase())
+                          )
+                          .slice(0, 10)
+                          .map((s) => (
+                            <li
+                              key={s.id}
+                              style={dropdownItemStyle}
+                              onMouseDown={() => {
+                                setSelectedSong(s);
+                                setAddSongTitle(s.title);
+                                setAddSongKey(s.defaultKey ?? "");
+                                setSongSearch("");
+                                setShowSongDropdown(false);
+                              }}
+                            >
+                              <span style={{ fontWeight: 600 }}>{s.title}</span>
+                              {s.artist && <span style={{ color: "#8fa9c8", marginLeft: 8, fontSize: 12 }}>{s.artist}</span>}
+                              {s.defaultKey && <span style={{ color: "#7cf2a2", marginLeft: 8, fontSize: 12 }}>Tom: {s.defaultKey}</span>}
+                            </li>
+                          ))}
+                        {songs.filter((s) =>
+                          s.title.toLowerCase().includes(songSearch.toLowerCase()) ||
+                          (s.artist ?? "").toLowerCase().includes(songSearch.toLowerCase())
+                        ).length === 0 && (
+                          <li style={{ ...dropdownItemStyle, color: "#8fa9c8", cursor: "default" }}>
+                            Nenhuma música encontrada
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                    {selectedSong && (
+                      <button
+                        type="button"
+                        style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#8fa9c8", cursor: "pointer", fontSize: 14 }}
+                        onClick={() => { setSelectedSong(null); setAddSongTitle(""); setAddSongKey(""); setSongSearch(""); }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <input
-                        style={inputStyle}
-                        placeholder="Título da música *"
-                        value={addSongTitle}
-                        onChange={(e) => setAddSongTitle(e.target.value)}
-                        disabled={addingItem}
-                      />
-                    </div>
                     <input
                       style={inputStyle}
                       placeholder="Tom (ex: G)"
@@ -358,13 +462,17 @@ export default function EventDetailPage({ params }: PageProps) {
                       onChange={(e) => setAddSongKey(e.target.value)}
                       disabled={addingItem}
                     />
-                    <input
-                      style={inputStyle}
-                      placeholder="Líder vocal"
+                    <select
+                      style={{ ...inputStyle, appearance: "none" as const }}
                       value={addSongLeader}
                       onChange={(e) => setAddSongLeader(e.target.value)}
                       disabled={addingItem}
-                    />
+                    >
+                      <option value="">Líder vocal (opcional)</option>
+                      {teamUsers.map((u) => (
+                        <option key={u.id} value={u.name}>{u.name}</option>
+                      ))}
+                    </select>
                     <input
                       style={inputStyle}
                       placeholder="Zona (Z1..Z5)"
@@ -486,4 +594,28 @@ const secondaryLinkStyle: CSSProperties = {
   color: "#b3c6e0",
   fontSize: 13,
   textDecoration: "none",
+};
+
+const dropdownStyle: CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  left: 0,
+  right: 0,
+  zIndex: 100,
+  background: "#0f2137",
+  border: "1px solid #2d4b6d",
+  borderRadius: 8,
+  marginTop: 2,
+  listStyle: "none",
+  padding: "4px 0",
+  maxHeight: 240,
+  overflowY: "auto",
+};
+
+const dropdownItemStyle: CSSProperties = {
+  padding: "8px 12px",
+  cursor: "pointer",
+  fontSize: 13,
+  color: "#e8f2ff",
+  borderBottom: "1px solid rgba(45,75,109,0.4)",
 };

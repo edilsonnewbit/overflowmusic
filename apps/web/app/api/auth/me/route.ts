@@ -9,16 +9,24 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ok: false, message: "not authenticated" }, { status: 401 });
     }
 
-    const body = (await request.json()) as { name?: string };
-    if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
-      return NextResponse.json({ ok: false, message: "name is required" }, { status: 400 });
+    const body = (await request.json()) as { name?: string; instruments?: string[] };
+    if (!body.name && !body.instruments) {
+      return NextResponse.json({ ok: false, message: "name or instruments required" }, { status: 400 });
+    }
+
+    const payload: { name?: string; instruments?: string[] } = {};
+    if (body.name && typeof body.name === "string" && body.name.trim()) {
+      payload.name = body.name.trim();
+    }
+    if (Array.isArray(body.instruments)) {
+      payload.instruments = body.instruments;
     }
 
     const response = await serverApiFetch("auth/me", {
       method: "PATCH",
       authMode: "user",
       userToken: token,
-      body: JSON.stringify({ name: body.name.trim() }),
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();

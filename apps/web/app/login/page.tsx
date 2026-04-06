@@ -163,7 +163,7 @@ export default function LoginPage() {
       return;
     }
     if (body.status === "APPROVED") {
-      router.replace("/");
+      window.location.href = "/";
       return;
     }
     if (body.status === "PENDING_APPROVAL") {

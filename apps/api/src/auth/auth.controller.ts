@@ -141,14 +141,14 @@ export class AuthController {
   @Patch("api/auth/me")
   async updateMe(
     @Headers("authorization") authorization: string | undefined,
-    @Body() body: { name?: string },
+    @Body() body: { name?: string; instruments?: string[] },
   ) {
     const token = (authorization || "").replace(/^Bearer\s+/i, "");
     if (!token) {
       throw new UnauthorizedException("missing bearer token");
     }
 
-    return this.authService.updateMe(token, { name: body.name });
+    return this.authService.updateMe(token, { name: body.name, instruments: body.instruments });
   }
 
   @Get("api/admin/users")
@@ -189,6 +189,21 @@ export class AuthController {
     this.assertAdminKey(authorization);
     const result = await this.authService.rejectUser(userId);
     void this.auditService.log({ action: "user.rejected", resourceType: "User", resourceId: userId });
+    return result;
+  }
+
+  @Patch("api/admin/users/:userId")
+  async adminUpdateUser(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("userId") userId: string,
+    @Body() body: { role?: string; instruments?: string[] },
+  ) {
+    this.assertAdminKey(authorization);
+    const result = await this.authService.adminUpdateUser(userId, {
+      role: body.role as import("./auth.types").UserRole | undefined,
+      instruments: body.instruments,
+    });
+    void this.auditService.log({ action: "user.updated", resourceType: "User", resourceId: userId, metadata: { role: body.role } });
     return result;
   }
 

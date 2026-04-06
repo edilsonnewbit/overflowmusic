@@ -12,6 +12,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [instruments, setInstruments] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -34,6 +35,7 @@ export default function ProfilePage() {
         }
         setUser(body.user);
         setName(body.user.name ?? "");
+        setInstruments(body.user.instruments ?? []);
       } catch {
         router.replace("/login");
       } finally {
@@ -43,16 +45,12 @@ export default function ProfilePage() {
     void load();
   }, [router]);
 
-  // ── Handle name update ─────────────────────────────────────────────────
+  // ── Handle name + instruments update ───────────────────────────────────
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
       setErrorMsg("O nome não pode estar vazio.");
-      return;
-    }
-    if (trimmed === user?.name) {
-      setErrorMsg("Nenhuma alteração detectada.");
       return;
     }
     setErrorMsg("");
@@ -61,7 +59,7 @@ export default function ProfilePage() {
       const res = await fetch("/api/auth/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ name: trimmed, instruments }),
       });
       const body = (await res.json()) as { ok?: boolean; user?: AuthUser; message?: string };
       if (!res.ok) {
@@ -71,8 +69,9 @@ export default function ProfilePage() {
       if (body.user) {
         setUser(body.user);
         setName(body.user.name ?? trimmed);
+        setInstruments(body.user.instruments ?? []);
       }
-      setSuccessMsg("Nome atualizado com sucesso!");
+      setSuccessMsg("Perfil atualizado com sucesso!");
       if (successTimer.current) clearTimeout(successTimer.current);
       successTimer.current = setTimeout(() => setSuccessMsg(""), 4000);
     } catch {
@@ -137,7 +136,30 @@ export default function ProfilePage() {
 
           {errorMsg && <p style={errorStyle}>{errorMsg}</p>}
           {successMsg && <p style={successStyle}>{successMsg}</p>}
-
+          {/* ── Instruments multi-select ────────────────────────── */}
+          <div style={{ marginTop: 4 }}>
+            <p style={{ ...labelStyle, marginBottom: 8 }}>Instrumentos / Vocal</p>
+            <div style={instrumentGridStyle}>
+              {INSTRUMENT_OPTIONS.map((inst) => {
+                const selected = instruments.includes(inst);
+                return (
+                  <button
+                    key={inst}
+                    type="button"
+                    disabled={saving}
+                    onClick={() =>
+                      setInstruments((prev) =>
+                        selected ? prev.filter((i) => i !== inst) : [...prev, inst]
+                      )
+                    }
+                    style={selected ? chipSelectedStyle : chipStyle}
+                  >
+                    {inst}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <button type="submit" disabled={saving} style={saving ? btnDisabledStyle : btnStyle}>
             {saving ? "Salvando..." : "Salvar alterações"}
           </button>
@@ -269,4 +291,34 @@ const mutedStyle: React.CSSProperties = {
   color: "var(--muted)",
   textAlign: "center",
   marginTop: 60,
+};
+
+const INSTRUMENT_OPTIONS = [
+  "Vocal", "Viol\u00e3o", "Guitarra", "Baixo", "Bateria",
+  "Teclado", "Piano", "Trompete", "Saxofone",
+  "Violino", "Flauta", "Percuss\u00e3o", "Gaita", "Contrabaixo",
+];
+
+const instrumentGridStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+};
+
+const chipStyle: React.CSSProperties = {
+  padding: "5px 12px",
+  borderRadius: 20,
+  border: "1px solid #2d4b6d",
+  background: "#0d1f2e",
+  color: "#8fa9c8",
+  fontSize: 13,
+  cursor: "pointer",
+};
+
+const chipSelectedStyle: React.CSSProperties = {
+  ...chipStyle,
+  background: "#0f3020",
+  border: "1px solid #7cf2a2",
+  color: "#7cf2a2",
+  fontWeight: 600,
 };
