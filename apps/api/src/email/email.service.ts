@@ -7,14 +7,15 @@ export class EmailService {
   private transporter: Transporter;
 
   constructor() {
-    // Configuração do transporter SMTP do Gmail
+    // Configuração do transporter SMTP
+    // Variáveis de ambiente usadas: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
     this.transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false, // true para 465, false para outras portas
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: (process.env.SMTP_PORT || '587') === '465',
       auth: {
-        user: process.env.SMTP_USER, // Seu email do Gmail
-        pass: process.env.SMTP_PASSWORD, // Senha de app do Gmail
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS, // docker-compose e CI/CD usam SMTP_PASS
       },
     });
   }
