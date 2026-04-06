@@ -12,6 +12,7 @@ type TeamMember = {
   email: string;
   role: UserRole;
   status: string;
+  instruments: string[];
 };
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -156,7 +157,7 @@ function TeamContent() {
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {group.map((member) => (
-                      <MemberCard key={member.id} member={member} />
+                      <MemberCard key={member.id} member={member} onUpdated={() => void load()} />
                     ))}
                   </div>
                 </section>
@@ -169,40 +170,148 @@ function TeamContent() {
   );
 }
 
-function MemberCard({ member }: { member: TeamMember }) {
+function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () => void }) {
   const initials = getInitials(member.name);
   const roleColor = ROLE_COLOR[member.role];
+  const [editing, setEditing] = useState(false);
+  const [editRole, setEditRole] = useState<UserRole>(member.role);
+  const [editInstruments, setEditInstruments] = useState<string[]>(member.instruments ?? []);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const INSTRUMENT_OPTIONS = [
+    "Vocal", "Viol\u00e3o", "Guitarra", "Baixo", "Bateria",
+    "Teclado", "Piano", "Trompete", "Saxofone",
+    "Violino", "Flauta", "Percuss\u00e3o", "Gaita", "Contrabaixo",
+  ];
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError("");
+    try {
+      const res = await fetch(`/api/admin/users/${member.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: editRole, instruments: editInstruments }),
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as { message?: string };
+        setSaveError(body.message ?? "Erro ao salvar.");
+        return;
+      }
+      setEditing(false);
+      onUpdated();
+    } catch {
+      setSaveError("Falha de rede.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <div style={cardStyle}>
-      {/* Avatar */}
-      <div
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: "50%",
-          backgroundColor: "#0f2137",
-          border: `1.5px solid ${roleColor}55`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          fontSize: 14,
-          fontWeight: 700,
-          color: roleColor,
-        }}
-      >
-        {initials}
+    <div style={{ ...cardStyle, flexDirection: "column", alignItems: "stretch" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {/* Avatar */}
+        <div
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: "50%",
+            backgroundColor: "#0f2137",
+            border: `1.5px solid ${roleColor}55`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            fontSize: 14,
+            fontWeight: 700,
+            color: roleColor,
+          }}
+        >
+          {initials}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontWeight: 600, color: "#e8f2ff", fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {member.name}
+          </p>
+          <p style={{ margin: 0, color: "#5a7a9a", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {member.email}
+          </p>
+          {!editing && member.instruments && member.instruments.length > 0 && (
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: roleColor }}>
+              {member.instruments.join(" · ")}
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={() => { setEditing((v) => !v); setSaveError(""); setEditRole(member.role); setEditInstruments(member.instruments ?? []); }}
+          style={{ background: "none", border: "1px solid #2d4b6d", borderRadius: 8, color: "#7cf2a2", fontSize: 12, padding: "4px 10px", cursor: "pointer" }}
+        >
+          {editing ? "Cancelar" : "Editar"}
+        </button>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontWeight: 600, color: "#e8f2ff", fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {member.name}
-        </p>
-        <p style={{ margin: 0, color: "#5a7a9a", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {member.email}
-        </p>
-      </div>
+      {editing && (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Role selector */}
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>Fun\u00e7\u00e3o</p>
+            <select
+              value={editRole}
+              onChange={(e) => setEditRole(e.target.value as UserRole)}
+              style={{ background: "#0b1d31", border: "1px solid #2d4b6d", borderRadius: 8, color: "#e8f2ff", padding: "6px 10px", fontSize: 13, width: "100%", appearance: "none" as const }}
+            >
+              {Object.entries(ROLE_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Instruments multi-select */}
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>Instrumentos / Vocal</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {INSTRUMENT_OPTIONS.map((inst) => {
+                const selected = editInstruments.includes(inst);
+                return (
+                  <button
+                    key={inst}
+                    type="button"
+                    onClick={() =>
+                      setEditInstruments((prev) =>
+                        selected ? prev.filter((i) => i !== inst) : [...prev, inst]
+                      )
+                    }
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 16,
+                      border: selected ? "1px solid #7cf2a2" : "1px solid #2d4b6d",
+                      background: selected ? "#0f3020" : "#0b1d31",
+                      color: selected ? "#7cf2a2" : "#8fa9c8",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {inst}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {saveError && <p style={{ margin: 0, color: "#f87171", fontSize: 12 }}>{saveError}</p>}
+
+          <button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            style={{ alignSelf: "flex-start", padding: "7px 16px", borderRadius: 8, border: "none", background: "#7cf2a2", color: "#07101d", fontWeight: 700, fontSize: 13, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}
+          >
+            {saving ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

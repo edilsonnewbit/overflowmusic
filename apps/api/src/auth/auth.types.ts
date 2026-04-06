@@ -8,6 +8,7 @@ export type AuthUser = {
   googleSub?: string;
   role: UserRole;
   status: UserStatus;
+  instruments: string[];
   createdAt: string;
   reviewedAt: string | null;
 };

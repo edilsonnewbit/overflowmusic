@@ -17,6 +17,7 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   status: UserStatus;
+  instruments: string[];
 };
 
 export type LoginPayload = {

@@ -23,6 +23,7 @@ type DbUserRecord = {
   emailVerifiedAt: Date | null;
   role: string;
   status: string;
+  instruments: string[];
   createdAt: Date;
   reviewedAt: Date | null;
   lastLoginAt: Date | null;
@@ -447,7 +448,7 @@ export class AuthService implements OnModuleInit {
     return { ok: true, accessToken, user: this.toAuthUser(user) };
   }
 
-  async updateMe(accessToken: string, data: { name?: string }): Promise<{ ok: true; user: AuthUser }> {
+  async updateMe(accessToken: string, data: { name?: string; instruments?: string[] }): Promise<{ ok: true; user: AuthUser }> {
     const payload = this.verifyToken(accessToken);
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || user.status !== "APPROVED") {
@@ -459,9 +460,35 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException("name is required");
     }
 
+    const updateData: { name: string; instruments?: string[] } = { name };
+    if (Array.isArray(data.instruments)) {
+      updateData.instruments = data.instruments;
+    }
+
     const updated = await this.prisma.user.update({
       where: { id: user.id },
-      data: { name },
+      data: updateData,
+    });
+
+    return { ok: true, user: this.toAuthUser(updated) };
+  }
+
+  async adminUpdateUser(
+    userId: string,
+    data: { role?: UserRole; instruments?: string[] },
+  ): Promise<{ ok: true; user: AuthUser }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException("user not found");
+    }
+
+    const updateData: { role?: string; instruments?: string[] } = {};
+    if (data.role) updateData.role = data.role;
+    if (Array.isArray(data.instruments)) updateData.instruments = data.instruments;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
     });
 
     return { ok: true, user: this.toAuthUser(updated) };
@@ -612,6 +639,7 @@ export class AuthService implements OnModuleInit {
       googleSub: user.googleSub || undefined,
       role: user.role as UserRole,
       status: user.status as AuthUser["status"],
+      instruments: user.instruments ?? [],
       createdAt: user.createdAt.toISOString(),
       reviewedAt: user.reviewedAt ? user.reviewedAt.toISOString() : null,
     };

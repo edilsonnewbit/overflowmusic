@@ -48,6 +48,7 @@ model User {
   emailVerifiedAt   DateTime?
   role              UserRole   @default(MEMBER)
   status            UserStatus @default(PENDING_APPROVAL)
+  instruments       String[]   @default([])
   createdAt         DateTime   @default(now())
   reviewedAt        DateTime?
   lastLoginAt       DateTime?

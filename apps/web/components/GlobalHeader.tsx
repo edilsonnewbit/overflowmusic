@@ -17,8 +17,7 @@ export function GlobalHeader() {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       setLoggingOut(false);
-      router.replace("/login");
-      router.refresh();
+      window.location.href = "/login";
     }
   }
 
