@@ -274,6 +274,9 @@ export default function PresentPage({ params }: PageProps) {
       if (e.key === "f" || e.key === "F") {
         setCifraFullscreen((v) => !v);
       }
+      if (e.key === "m" || e.key === "M") {
+        setMetroOn((v) => !v);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -331,7 +334,7 @@ export default function PresentPage({ params }: PageProps) {
           {event.title}{event.setlist?.title ? ` — ${event.setlist.title}` : ""}
         </span>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <span style={{ color: "#5a7a9a", fontSize: 11 }}>H=nav • C=cifra • G=acordes • S=scroll • F=fullscreen • ←→=navegar</span>
+          <span style={{ color: "#5a7a9a", fontSize: 11 }}>H=nav • C=cifra • G=acordes • S=scroll • F=fullscreen • M=metrônomo • ←→=navegar</span>
           <button
             onClick={(e) => { e.stopPropagation(); setShowSettings((v) => !v); }}
             style={{ background: showSettings ? "#1e3a5a" : "transparent", border: "1px solid #2d4b6d", color: "#b3c6e0", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}
@@ -465,20 +468,37 @@ export default function PresentPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Metronome floating pill */}
-      {metroOn && (
-        <div
-          style={{ position: "fixed", top: autoScroll ? 90 : 60, left: "50%", transform: "translateX(-50%)", zIndex: 15, background: "rgba(165,200,255,0.12)", border: "1px solid #a5c8ff44", borderRadius: 20, padding: "4px 16px", fontSize: 12, color: "#a5c8ff", cursor: "pointer", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", gap: 10, userSelect: "none" }}
-          onClick={(e) => { e.stopPropagation(); setMetroOn(false); }}
-        >
-          <div style={{ display: "flex", gap: 4 }}>
+      {/* Metronome floating button — always visible, bottom-right */}
+      <div
+        style={{ position: "fixed", bottom: 24, right: 20, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Beat dots — only when active */}
+        {metroOn && (
+          <div style={{ display: "flex", gap: 5, background: "rgba(8,16,30,0.8)", borderRadius: 12, padding: "5px 10px", border: "1px solid #a5c8ff33" }}>
             {[0, 1, 2, 3].map((b) => (
-              <div key={b} style={{ width: 8, height: 8, borderRadius: "50%", background: metroBeat === b ? (b === 0 ? "#7cf2a2" : "#a5c8ff") : "#1e3650", transition: "background 0.05s" }} />
+              <div key={b} style={{ width: 10, height: 10, borderRadius: "50%", background: metroBeat === b ? (b === 0 ? "#7cf2a2" : "#a5c8ff") : "#1e3650", transition: "background 0.05s" }} />
             ))}
           </div>
-          🥁 {metroBpm} BPM — clique para parar
-        </div>
-      )}
+        )}
+        {/* Toggle button */}
+        <button
+          onClick={() => setMetroOn((v) => !v)}
+          style={{ background: metroOn ? "rgba(15,48,32,0.95)" : "rgba(8,16,30,0.85)", border: `1px solid ${metroOn ? "#7cf2a266" : "#2d4b6d"}`, color: metroOn ? "#7cf2a2" : "#8fa9c8", borderRadius: 24, padding: "8px 16px", fontSize: 13, cursor: "pointer", fontWeight: 700, backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 8, userSelect: "none", boxShadow: metroOn ? "0 0 12px #7cf2a222" : "none" }}
+        >
+          🥁 {metroBpm} BPM
+          <span style={{ fontSize: 10, opacity: 0.7 }}>{metroOn ? "⏹" : "▶"}</span>
+        </button>
+        {/* BPM quick controls — only when active */}
+        {metroOn && (
+          <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={() => setMetroBpm((v) => Math.max(20, v - 5))} style={{ background: "rgba(8,16,30,0.85)", border: "1px solid #2d4b6d", color: "#8fa9c8", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>−5</button>
+            <button onClick={() => setMetroBpm((v) => Math.max(20, v - 1))} style={{ background: "rgba(8,16,30,0.85)", border: "1px solid #2d4b6d", color: "#8fa9c8", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>−1</button>
+            <button onClick={() => setMetroBpm((v) => Math.min(300, v + 1))} style={{ background: "rgba(8,16,30,0.85)", border: "1px solid #2d4b6d", color: "#8fa9c8", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>+1</button>
+            <button onClick={() => setMetroBpm((v) => Math.min(300, v + 5))} style={{ background: "rgba(8,16,30,0.85)", border: "1px solid #2d4b6d", color: "#8fa9c8", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>+5</button>
+          </div>
+        )}
+      </div>
 
       {/* Auto-scroll pill */}
       {autoScroll && (
