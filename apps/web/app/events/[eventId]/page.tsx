@@ -1031,7 +1031,7 @@ export default function EventDetailPage({ params }: PageProps) {
               </section>
 
               {/* Ensaios */}
-              <RehearsalsSection eventId={eventId} />
+              {eventId && <RehearsalsSection eventId={eventId} />}
             </>
           )}
         </section>
