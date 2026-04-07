@@ -4,6 +4,57 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 
+const VOLUNTEER_TERMS_VERSION = "1.0-2026";
+
+const VOLUNTEER_TERMS_TEXT = `TERMO DE ADESÃO AO SERVIÇO VOLUNTÁRIO
+Banda Overflow Music – Overflow Movement
+
+Este Termo de Adesão ao Serviço Voluntário ("Termo") é celebrado em conformidade com a Lei nº 9.608, de 18 de fevereiro de 1998, que dispõe sobre o serviço voluntário, e com o Código Civil Brasileiro (Lei nº 10.406/2002), entre:
+
+RECEBEDOR DO SERVIÇO: Equipe ministerial da Banda Overflow Music, pertencente ao Overflow Movement, com sede no Brasil ("Organização").
+
+VOLUNTÁRIO(A): o(a) cadastrante identificado(a) nos dados do presente aplicativo ("Voluntário(a)").
+
+──────────────────────────────────────────
+
+CLÁUSULA 1ª – DO OBJETO
+
+O(A) Voluntário(a) se dispõe a prestar serviços não remunerados como músico(a), vocalista, técnico(a) de som ou em outras funções compatíveis com sua capacidade, junto à Banda Overflow Music.
+
+CLÁUSULA 2ª – DA NATUREZA VOLUNTÁRIA
+
+O serviço prestado tem caráter essencialmente civil e não gera vínculo empregatício, nem obrigação de natureza trabalhista, previdenciária ou congênere, conforme a Lei nº 9.608/1998.
+
+CLÁUSULA 3ª – DAS OBRIGAÇÕES DO VOLUNTÁRIO
+
+O(A) Voluntário(a) compromete-se a participar com assiduidade, zelar pelo bom nome da Organização, observar as diretrizes da liderança e manter sigilo de informações confidenciais.
+
+CLÁUSULA 4ª – DAS OBRIGAÇÕES DA ORGANIZAÇÃO
+
+A Organização compromete-se a fornecer condições necessárias para o desempenho das atividades e tratar o(a) Voluntário(a) com dignidade e respeito.
+
+CLÁUSULA 5ª – DA DURAÇÃO E RESCISÃO
+
+Este Termo é firmado por prazo indeterminado, podendo ser rescindido a qualquer momento por qualquer das partes, sem ônus.
+
+CLÁUSULA 6ª – DO USO DE IMAGEM E VOZ
+
+O(A) Voluntário(a) autoriza, a título gratuito, o uso de imagem e voz captadas durante as atividades para divulgação ministerial, incluindo redes sociais, vedado o uso comercial sem consentimento expresso.
+
+CLÁUSULA 7ª – DA PROTEÇÃO DE DADOS
+
+Os dados pessoais serão tratados em conformidade com a LGPD (Lei nº 13.709/2018), utilizados exclusivamente para coordenação das atividades voluntárias.
+
+CLÁUSULA 8ª – DO FORO
+
+As partes elegem o foro da comarca onde a Organização está sediada para dirimir quaisquer controvérsias.
+
+══════════════════════════════════════════
+
+Ao marcar a opção abaixo, o(a) Voluntário(a) declara ter lido integralmente, compreendido e concordado com todas as cláusulas deste Termo. Sua manifestação digital tem validade jurídica equivalente à assinatura manuscrita, nos termos da MP nº 2.200-2/2001 e da Lei nº 14.063/2020.
+
+Versão do Termo: ${VOLUNTEER_TERMS_VERSION}`;
+
 type RegisterResponse = {
   ok: boolean;
   message?: string;
@@ -15,6 +66,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -32,12 +84,17 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!termsAccepted) {
+      setError("É necessário aceitar o Termo de Adesão ao Serviço Voluntário para se cadastrar.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, volunteerTermsAccepted: true }),
       });
       const data = (await res.json()) as RegisterResponse;
 
@@ -154,7 +211,48 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <button type="submit" disabled={loading} style={{ ...primaryButtonStyle, opacity: loading ? 0.6 : 1 }}>
+          {/* Termo de Adesão */}
+          <div>
+            <label style={labelStyle}>Termo de Adesão ao Serviço Voluntário</label>
+            <div
+              style={{
+                maxHeight: 160,
+                overflowY: "auto",
+                background: "rgba(6, 20, 35, 0.7)",
+                border: "1px solid #2d4b6d",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 11,
+                color: "#b3c6e0",
+                lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
+                fontFamily: "monospace",
+              }}
+            >
+              {VOLUNTEER_TERMS_TEXT}
+            </div>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                marginTop: 10,
+                cursor: "pointer",
+                fontSize: 13,
+                color: "#b3c6e0",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                style={{ marginTop: 2, accentColor: "#1ecad3", flexShrink: 0 }}
+              />
+              Li e aceito o Termo de Adesão ao Serviço Voluntário da Banda Overflow Music.
+            </label>
+          </div>
+
+          <button type="submit" disabled={loading || !termsAccepted} style={{ ...primaryButtonStyle, opacity: (loading || !termsAccepted) ? 0.6 : 1 }}>
             {loading ? "Criando conta..." : "Criar conta"}
           </button>
         </form>
