@@ -7,10 +7,13 @@ import { AuthUser, AccessTokenPayload, UserRole } from "./auth.types";
 
 const scryptAsync = promisify(scrypt);
 
+const VOLUNTEER_TERMS_VERSION = "1.0-2026";
+
 type GoogleLoginInput = {
   email: string;
   name: string;
   googleSub: string;
+  volunteerTermsAccepted?: boolean;
 };
 
 type DbUserRecord = {
@@ -72,6 +75,10 @@ export class AuthService implements OnModuleInit {
     }
 
     if (!user) {
+      const termsData =
+        input.volunteerTermsAccepted === true
+          ? { volunteerTermsVersion: VOLUNTEER_TERMS_VERSION, volunteerTermsAcceptedAt: new Date() }
+          : {};
       user = await this.prisma.user.create({
         data: {
           name,
@@ -79,6 +86,7 @@ export class AuthService implements OnModuleInit {
           googleSub,
           role: "MEMBER",
           status: "PENDING_APPROVAL",
+          ...termsData,
         },
       });
 

@@ -20,6 +20,7 @@ type GoogleLoginBody = {
   email?: string;
   name?: string;
   googleSub?: string;
+  volunteerTermsAccepted?: boolean;
 };
 
 type ApproveBody = {
@@ -56,7 +57,7 @@ export class AuthController {
   @Post("api/auth/google")
   async googleLogin(@Body() body: GoogleLoginBody) {
     if (body.idToken) {
-      return this.googleLoginWithIdToken(body.idToken);
+      return this.googleLoginWithIdToken(body.idToken, body.volunteerTermsAccepted);
     }
 
     if (this.authBootstrapMode && body.email && body.name && body.googleSub) {
@@ -64,6 +65,7 @@ export class AuthController {
         email: body.email,
         name: body.name,
         googleSub: body.googleSub,
+        volunteerTermsAccepted: body.volunteerTermsAccepted,
       });
     }
 
@@ -242,7 +244,7 @@ export class AuthController {
     }
   }
 
-  private async googleLoginWithIdToken(idToken: string) {
+  private async googleLoginWithIdToken(idToken: string, volunteerTermsAccepted?: boolean) {
     if (this.googleClientIds.length === 0) {
       throw new UnauthorizedException("GOOGLE_CLIENT_ID or GOOGLE_CLIENT_IDS is not configured");
     }
@@ -281,7 +283,7 @@ export class AuthController {
       }
     }
 
-    return this.authService.googleLogin({ email, name, googleSub });
+    return this.authService.googleLogin({ email, name, googleSub, volunteerTermsAccepted });
   }
 
   private resolveGoogleClientIds(): string[] {
