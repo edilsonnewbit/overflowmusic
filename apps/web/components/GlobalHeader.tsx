@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/events", label: "Eventos", icon: "📅" },
   { href: "/songs", label: "Músicas", icon: "🎵" },
   { href: "/checklists", label: "Checklists", icon: "✅" },
+  { href: "/rehearsals", label: "Ensaios", icon: "🎸" },
 ];
 
 const ADMIN_LINKS = [
