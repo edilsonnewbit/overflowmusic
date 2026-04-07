@@ -12,6 +12,7 @@
   "dependencies": {
     "@overflow/types": "*",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-google-signin/google-signin": "^16.1.2",
     "expo": "~55.0.8",
     "expo-auth-session": "^55.0.12",
     "expo-build-properties": "^55.0.11",

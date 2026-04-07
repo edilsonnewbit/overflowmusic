@@ -550,7 +550,16 @@ export async function fetchSongById(id: string): Promise<{ ok: boolean; song?: S
 
 export async function updateProfile(
   accessToken: string,
-  data: { name: string },
+  data: {
+    name: string;
+    instruments?: string[];
+    instagramProfile?: string | null;
+    birthDate?: string | null;
+    church?: string | null;
+    pastorName?: string | null;
+    whatsapp?: string | null;
+    address?: string | null;
+  },
 ): Promise<{ ok: boolean; user?: AuthUser; message?: string }> {
   const response = await authFetch(`${API_BASE}/auth/me`, {
     method: "PATCH",

@@ -1,15 +1,33 @@
-import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { useState } from "react";
+import {
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { router } from "expo-router";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import type { LoginPayload } from "../types";
-import { styles, colors } from "../styles";
+import { colors } from "../styles";
 
 WebBrowser.maybeCompleteAuthSession();
 
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+  offlineAccess: false,
+});
+
 type Props = {
   onSubmit: (payload: LoginPayload) => Promise<void>;
+  statusText?: string;
 };
 
 type EmailLoginResponse = {
@@ -19,77 +37,49 @@ type EmailLoginResponse = {
   accessToken?: string;
 };
 
-export function LoginScreen({ onSubmit }: Props) {
-  const [loginMethod, setLoginMethod] = useState<"google" | "email">("google");
+export function LoginScreen({ onSubmit, statusText }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [infoText, setInfoText] = useState("");
+  const [showEmailForm, setShowEmailForm] = useState(false);
 
-  const googleClientId = useMemo(() => {
-    const fallbackClientId = (process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || "").trim();
-    const platformClientId = Platform.select({
-      web: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-      ios: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      android: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-      default: "",
-    });
-    return (platformClientId || fallbackClientId || "").trim();
-  }, []);
-
-  const [googleInfoText, setGoogleInfoText] = useState("");
-
-  const discovery = AuthSession.useAutoDiscovery("https://accounts.google.com");
-  const redirectUri = useMemo(() => {
-    const uri = AuthSession.makeRedirectUri({ scheme: "overflowmusic" });
-    console.log("🔗 Redirect URI gerado:", uri);
-    console.log("🔑 Client ID:", googleClientId);
-    return uri;
-  }, [googleClientId]);
-  
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: googleClientId,
-      redirectUri,
-      responseType: AuthSession.ResponseType.IdToken,
-      scopes: ["openid", "profile", "email"],
-      usePKCE: false,
-      extraParams: {
-        nonce: "overflow-music-login",
-      },
-    },
-    discovery,
-  );
-
-  useEffect(() => {
-    async function onGoogleResponse() {
-      if (response?.type !== "success") {
-        if (response?.type === "error") {
-          setGoogleInfoText("Falha ao autenticar com Google.");
-        }
-        return;
-      }
-
-      const idToken = response.params?.id_token;
+  async function handleGoogleSignIn() {
+    setLoading(true);
+    setInfoText("Abrindo conta Google...");
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
       if (!idToken) {
-        setGoogleInfoText("Google não retornou idToken.");
+        setInfoText("Google não retornou idToken.");
         return;
       }
-
-      setGoogleInfoText("Token Google recebido. Validando sessão...");
+      setInfoText("Token Google recebido. Validando sessão...");
       await onSubmit({ idToken });
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code: string }).code === statusCodes.SIGN_IN_CANCELLED
+      ) {
+        setInfoText("Login cancelado.");
+      } else {
+        console.error("Google Sign-In error:", error);
+        setInfoText("Falha ao autenticar com Google.");
+      }
+    } finally {
+      setLoading(false);
     }
-
-    void onGoogleResponse();
-  }, [onSubmit, response]);
+  }
 
   async function handleEmailLogin() {
     if (!email.trim() || !password.trim()) {
       Alert.alert("Erro", "Preencha email e senha");
       return;
     }
-
     setLoading(true);
-
     try {
       const apiUrl = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
       const res = await fetch(`${apiUrl}/api/auth/login`, {
@@ -97,185 +87,262 @@ export function LoginScreen({ onSubmit }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-
       const data = (await res.json()) as EmailLoginResponse;
-
       if (!res.ok) {
         Alert.alert("Erro", data.message || "Email ou senha inválidos");
         return;
       }
-
       if (data.status === "EMAIL_NOT_VERIFIED") {
-        Alert.alert("Email não verificado", data.message || "Por favor, verifique seu email antes de fazer login");
+        Alert.alert("Email não verificado", data.message || "Verifique seu email antes de fazer login");
         return;
       }
-
       if (data.status === "PENDING_APPROVAL") {
         Alert.alert("Aguardando aprovação", "Sua conta está aguardando aprovação de um administrador");
         return;
       }
-
       if (data.status === "REJECTED") {
         Alert.alert("Acesso negado", "Sua solicitação de acesso foi rejeitada");
         return;
       }
-
       if (data.status === "APPROVED" && data.accessToken) {
-        // Store token and redirect
         await onSubmit({ idToken: data.accessToken });
         return;
       }
-
       Alert.alert("Erro", "Resposta de login inválida");
-    } catch (error) {
+    } catch {
       Alert.alert("Erro", "Erro ao conectar com o servidor");
-      console.error(error);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View style={styles.loginForm}>
-      {/* Login method selector */}
-      <View style={{
-        flexDirection: "row",
-        gap: 8,
-        marginBottom: 20,
-        backgroundColor: colors.surface,
-        padding: 4,
-        borderRadius: 12,
-      }}>
-        <Pressable
-          onPress={() => setLoginMethod("google")}
-          style={{
-            flex: 1,
-            padding: 12,
-            borderRadius: 8,
-            backgroundColor: loginMethod === "google" ? colors.primary : "transparent",
-            alignItems: "center",
-          }}
-        >
-          <Text style={{
-            color: loginMethod === "google" ? colors.background : colors.textSecondary,
-            fontWeight: "600",
-          }}>
-            Google
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setLoginMethod("email")}
-          style={{
-            flex: 1,
-            padding: 12,
-            borderRadius: 8,
-            backgroundColor: loginMethod === "email" ? colors.primary : "transparent",
-            alignItems: "center",
-          }}
-        >
-          <Text style={{
-            color: loginMethod === "email" ? colors.background : colors.textSecondary,
-            fontWeight: "600",
-          }}>
-            Email
-          </Text>
-        </Pressable>
-      </View>
+    <View style={{ flex: 1, backgroundColor: "#070d1a" }}>
+      <StatusBar barStyle="light-content" backgroundColor="#070d1a" />
 
-      {loginMethod === "google" ? (
-        <View style={{ gap: 16 }}>
-          <Pressable
-            style={[
-              styles.loginButton,
-              !request || !googleClientId ? styles.buttonDisabled : null
-            ]}
-            onPress={() => {
-              if (!googleClientId) {
-                setGoogleInfoText("Configure EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID");
-                return;
-              }
-              if (!request) {
-                setGoogleInfoText("Google Auth inicializando...");
-                return;
-              }
-              void promptAsync();
-            }}
-          >
-            <Text style={styles.loginButtonText}>Entrar com Google</Text>
-          </Pressable>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between", paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── LOGO SECTION ─────────────────────────────────── */}
+          <View style={{ alignItems: "center", paddingTop: 72, paddingBottom: 44 }}>
+            {/* Logo container — branco arredondado para a logo com fundo branco */}
+            <View style={{
+              width: 140,
+              height: 140,
+              borderRadius: 32,
+              backgroundColor: "#ffffff",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 24,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.4,
+              shadowRadius: 20,
+              elevation: 16,
+            }}>
+              <Image
+                source={require("../../assets/logo.png")}
+                style={{ width: 120, height: 120 }}
+                resizeMode="contain"
+              />
+            </View>
 
-          {googleInfoText ? (
-            <Text style={[styles.helper, { textAlign: "center" }]}>
-              {googleInfoText}
+            {/* Tagline */}
+            <Text style={{
+              marginTop: 4,
+              fontSize: 13,
+              color: "#4a6a8a",
+              letterSpacing: 0.5,
+            }}>
+              Sua música, sua missão.
             </Text>
-          ) : null}
-        </View>
-      ) : (
-        <View style={{ gap: 20 }}>
-          <View>
-            <Text style={labelStyle}>Email</Text>
-            <TextInput
-              style={inputStyle}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="seu@email.com"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+
+            {/* Status text */}
+            {Boolean(statusText) && (
+              <Text style={{ marginTop: 12, fontSize: 13, color: "#1ecad3", textAlign: "center" }}>
+                {statusText}
+              </Text>
+            )}
           </View>
 
-          <View>
-            <Text style={labelStyle}>Senha</Text>
-            <TextInput
-              style={inputStyle}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry
-            />
+          {/* ── ACTIONS SECTION ──────────────────────────────── */}
+          <View style={{ paddingHorizontal: 28, gap: 14 }}>
+
+            {/* Google Button — pill style (Spotify-like) */}
+            <Pressable
+              onPress={() => void handleGoogleSignIn()}
+              disabled={loading}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: pressed ? "#e8eaed" : "#ffffff",
+                opacity: loading ? 0.6 : 1,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.15,
+                shadowRadius: 6,
+                elevation: 4,
+              })}
+            >
+              {/* Google G */}
+              <View style={{
+                width: 22, height: 22, borderRadius: 11,
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "#4285F4" }}>G</Text>
+              </View>
+              <Text style={{
+                fontSize: 15,
+                fontWeight: "600",
+                color: "#1a1a2e",
+                letterSpacing: 0.2,
+              }}>
+                {loading && !showEmailForm ? "Aguarde..." : "Continuar com Google"}
+              </Text>
+            </Pressable>
+
+            {/* Divider */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 2 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: "#1e2d40" }} />
+              <Text style={{ color: "#3a5570", fontSize: 12, letterSpacing: 1 }}>OU</Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: "#1e2d40" }} />
+            </View>
+
+            {/* Email form (collapsible) */}
+            {!showEmailForm ? (
+              <Pressable
+                onPress={() => setShowEmailForm(true)}
+                style={({ pressed }) => ({
+                  height: 56,
+                  borderRadius: 28,
+                  borderWidth: 1.5,
+                  borderColor: pressed ? "#2a4a6a" : "#1e3a54",
+                  backgroundColor: pressed ? "#0d1d2e" : "transparent",
+                  alignItems: "center",
+                  justifyContent: "center",
+                })}
+              >
+                <Text style={{ color: "#94a3b8", fontSize: 15, fontWeight: "500" }}>
+                  Entrar com email
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={{ gap: 12 }}>
+                {/* Email input */}
+                <View style={{
+                  backgroundColor: "#0d1d2e",
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: "#1e3a54",
+                  height: 56,
+                  paddingHorizontal: 20,
+                  justifyContent: "center",
+                }}>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Email"
+                    placeholderTextColor="#3a5570"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    style={{ color: "#f0f7ff", fontSize: 15 }}
+                  />
+                </View>
+
+                {/* Password input */}
+                <View style={{
+                  backgroundColor: "#0d1d2e",
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: "#1e3a54",
+                  height: 56,
+                  paddingHorizontal: 20,
+                  justifyContent: "center",
+                }}>
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Senha"
+                    placeholderTextColor="#3a5570"
+                    secureTextEntry
+                    autoComplete="password"
+                    style={{ color: "#f0f7ff", fontSize: 15 }}
+                  />
+                </View>
+
+                {/* Forgot password */}
+                <Pressable style={{ alignSelf: "flex-end" }}>
+                  <Text style={{ color: "#1ecad3", fontSize: 13 }}>Esqueceu a senha?</Text>
+                </Pressable>
+
+                {/* Submit */}
+                <Pressable
+                  onPress={() => void handleEmailLogin()}
+                  disabled={loading}
+                  style={({ pressed }) => ({
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: pressed || loading ? "#149aa2" : "#1ecad3",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    shadowColor: "#1ecad3",
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 10,
+                    elevation: 6,
+                  })}
+                >
+                  <Text style={{
+                    color: "#070d1a",
+                    fontSize: 16,
+                    fontWeight: "700",
+                    letterSpacing: 0.5,
+                  }}>
+                    {loading ? "Entrando..." : "Entrar"}
+                  </Text>
+                </Pressable>
+
+                {/* Back to options */}
+                <Pressable onPress={() => setShowEmailForm(false)} style={{ alignItems: "center" }}>
+                  <Text style={{ color: "#3a5570", fontSize: 13 }}>← Outras opções</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* Info text */}
+            {Boolean(infoText) && (
+              <Text style={{ color: "#1ecad3", fontSize: 13, textAlign: "center" }}>{infoText}</Text>
+            )}
           </View>
 
-          <Pressable
-            style={[styles.loginButton, loading ? styles.buttonDisabled : null]}
-            onPress={() => void handleEmailLogin()}
-            disabled={loading}
-          >
-            <Text style={styles.loginButtonText}>
-              {loading ? "Entrando..." : "Entrar"}
-            </Text>
-          </Pressable>
-
-          <View style={{ alignItems: "center", gap: 12 }}>
-            <Pressable>
-              <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+          {/* ── FOOTER ───────────────────────────────────────── */}
+          <View style={{ alignItems: "center", paddingTop: 36, gap: 6 }}>
+            <Text style={{ color: "#3a5570", fontSize: 13 }}>Não tem uma conta?</Text>
+            <Pressable onPress={() => router.push("/register")}>
+              <Text style={{
+                color: "#f0f7ff",
+                fontSize: 14,
+                fontWeight: "600",
+                textDecorationLine: "underline",
+                textDecorationColor: "#1ecad3",
+              }}>
+                Criar conta gratuita
+              </Text>
             </Pressable>
           </View>
-        </View>
-      )}
-
-      <View style={styles.signupRow}>
-        <Text style={styles.signupText}>Não tem uma conta?</Text>
-        <Pressable onPress={() => router.push("/register")}>
-          <Text style={styles.signupLink}>Cadastrar</Text>
-        </Pressable>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
-
-const labelStyle = {
-  color: colors.text,
-  fontSize: 14,
-  fontWeight: "600" as const,
-  marginBottom: 8,
-};
-
-const inputStyle = {
-  ...styles.inputWrapper,
-  paddingHorizontal: 16,
-  height: 56,
-  color: colors.text,
-  fontSize: 16,
-};

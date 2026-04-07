@@ -163,16 +163,36 @@ export function EventsScreen({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Eventos</Text>
-      <Text style={styles.helper}>{statusText}</Text>
+      {/* ── Header row */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <Text style={styles.cardTitle}>Eventos</Text>
+        <Pressable
+          style={({ pressed }) => ([
+            {
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: showForm ? "#f28c8c" : "#2a6644",
+              backgroundColor: showForm ? "#2a1010" : "#0e2c1e",
+              opacity: pressed ? 0.75 : 1,
+            },
+          ])}
+          onPress={() => { setShowForm((v) => !v); setFormError(""); }}
+        >
+          <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 16, lineHeight: 20 }}>
+            {showForm ? "✕" : "+"}
+          </Text>
+          <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 13, fontWeight: "700" }}>
+            {showForm ? "Cancelar" : "Novo Evento"}
+          </Text>
+        </Pressable>
+      </View>
 
-      {/* ── Criar novo evento ─────────────────────────── */}
-      <Pressable
-        style={[styles.primaryButton, { marginBottom: 8, backgroundColor: "#2a5a2a" }]}
-        onPress={() => { setShowForm((v) => !v); setFormError(""); }}
-      >
-        <Text style={styles.primaryButtonText}>{showForm ? "✕ Cancelar" : "＋ Novo Evento"}</Text>
-      </Pressable>
+      <Text style={[styles.helper, { marginBottom: 8 }]}>{statusText}</Text>
 
       {showForm && (
         <View style={{ marginBottom: 12, gap: 6 }}>
@@ -245,79 +265,94 @@ export function EventsScreen({
       {loading ? (
         <ActivityIndicator color="#7cf2a2" style={{ marginTop: 12 }} />
       ) : events.length === 0 ? (
-        <Text style={styles.listItem}>Nenhum evento encontrado.</Text>
+        <Text style={[styles.listItem, { textAlign: "center", color: "#4a6278", marginTop: 8 }]}>Nenhum evento encontrado.</Text>
       ) : (
         events.map((ev) => {
           const isActive = ev.id === activeEventId;
           const isEditing = editingEventId === ev.id;
+          const statusColor = STATUS_COLOR[ev.computedStatus ?? ev.status] ?? "#8fa9c8";
           return (
-            <View key={ev.id} style={{ marginBottom: 8 }}>
-              {/* Card do evento */}
-              <View
-                style={[
-                  styles.primaryButton,
-                  {
-                    backgroundColor: isActive ? "#3a6a4a" : "#1a3a5a",
-                    flexDirection: "row",
-                    alignItems: "center",
-                  },
-                ]}
-              >
+            <View
+              key={ev.id}
+              style={{
+                marginBottom: 8,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: isActive ? "#2a6644" : "#1e3a54",
+                backgroundColor: isActive ? "#0a1f14" : "#0d1d2e",
+                overflow: "hidden",
+              }}
+            >
+              {/* Status bar accent */}
+              <View style={{ height: 3, backgroundColor: statusColor, opacity: 0.8 }} />
+
+              <View style={{ padding: 12 }}>
+                {/* Evento title row */}
                 <Pressable
-                  style={{ flex: 1 }}
                   onPress={() => void onSelectEvent(ev.id)}
                   disabled={loadingSetlist}
+                  style={{ flex: 1, marginBottom: 6 }}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={[styles.primaryButtonText, { textAlign: "left", flex: 1 }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <Text style={{ color: "#f4f8ff", fontSize: 15, fontWeight: "700", flex: 1 }}>
                       {ev.title}
                     </Text>
-                    <Text style={{
-                      fontSize: 10, fontWeight: "700", letterSpacing: 0.8,
-                      color: STATUS_COLOR[ev.computedStatus ?? ev.status] ?? "#8fa9c8",
-                      borderWidth: 1,
-                      borderColor: STATUS_COLOR[ev.computedStatus ?? ev.status] ?? "#8fa9c8",
-                      borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1,
+                    <View style={{
+                      borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2,
+                      borderWidth: 1, borderColor: statusColor,
+                      backgroundColor: statusColor + "18",
                     }}>
-                      {STATUS_LABEL[ev.computedStatus ?? ev.status] ?? ev.status}
-                    </Text>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: statusColor }}>
+                        {STATUS_LABEL[ev.computedStatus ?? ev.status] ?? ev.status}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={[styles.helper, { marginTop: 2 }]}>
+                  <Text style={[styles.helper, { marginTop: 3 }]}>
                     {formatDate(ev.dateTime)}
                     {ev.location ? `  —  ${ev.location}` : ""}
                   </Text>
                   {ev.address ? (
-                    <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
+                    <View style={{ flexDirection: "row", gap: 6, marginTop: 4, alignItems: "center" }}>
                       <Text style={[styles.helper, { flex: 1 }]} numberOfLines={1}>📍 {ev.address}</Text>
                       <Pressable
                         onPress={() => void Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(ev.address!)}`)}
-                        style={{ borderWidth: 1, borderColor: "#60a5fa", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}
+                        style={{ borderWidth: 1, borderColor: "#60a5fa", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}
                       >
                         <Text style={{ color: "#60a5fa", fontSize: 10 }}>Maps</Text>
                       </Pressable>
                       <Pressable
                         onPress={() => void Linking.openURL(`https://waze.com/ul?q=${encodeURIComponent(ev.address!)}`)}
-                        style={{ borderWidth: 1, borderColor: "#3dd8ba", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}
+                        style={{ borderWidth: 1, borderColor: "#3dd8ba", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}
                       >
                         <Text style={{ color: "#3dd8ba", fontSize: 10 }}>Waze</Text>
                       </Pressable>
                     </View>
                   ) : null}
                 </Pressable>
-                <Pressable
-                  onPress={() => (isEditing ? cancelEdit() : startEdit(ev))}
-                  style={{ paddingHorizontal: 8, paddingVertical: 4 }}
-                  accessibilityLabel="Editar evento"
-                >
-                  <Text style={{ color: "#7cf2a2", fontSize: 16 }}>{isEditing ? "✕" : "✏"}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => confirmDelete(ev)}
-                  style={{ paddingHorizontal: 8, paddingVertical: 4 }}
-                  accessibilityLabel="Excluir evento"
-                >
-                  <Text style={{ color: "#f28c8c", fontSize: 16 }}>🗑</Text>
-                </Pressable>
+
+                {/* Action row: edit + delete */}
+                <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+                  <Pressable
+                    onPress={() => (isEditing ? cancelEdit() : startEdit(ev))}
+                    style={({ pressed }) => ([
+                      actionBtnStyle,
+                      { borderColor: isEditing ? "#f28c8c" : "#2d4b6d" },
+                      pressed && { opacity: 0.7 },
+                    ])}
+                    accessibilityLabel="Editar evento"
+                  >
+                    <Text style={{ color: isEditing ? "#f28c8c" : "#7cf2a2", fontSize: 13 }}>
+                      {isEditing ? "✕ Cancelar" : "✏ Editar"}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => confirmDelete(ev)}
+                    style={({ pressed }) => ([actionBtnStyle, { borderColor: "#5a2a2a" }, pressed && { opacity: 0.7 }])}
+                    accessibilityLabel="Excluir evento"
+                  >
+                    <Text style={{ color: "#f28c8c", fontSize: 13 }}>🗑 Excluir</Text>
+                  </Pressable>
+                </View>
               </View>
 
               {/* Formulário inline de edição */}
@@ -415,15 +450,20 @@ export function EventsScreen({
                     <View
                       key={item.id}
                       style={{
-                        flexDirection: "row",
-                        alignItems: "flex-start",
-                        marginBottom: 10,
-                        gap: 8,
+                        marginBottom: 8,
                         opacity: isMoving ? 0.5 : 1,
+                        backgroundColor: "#0d1d2e",
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: "#1e3a54",
+                        padding: 10,
                       }}
                     >
-                      {/* ▲▼ buttons */}
-                      <View style={{ gap: 3, paddingTop: 2 }}>
+                      {/* Title + controles em linha */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={{ flex: 1, color: "#e8f2ff", fontSize: 14, fontWeight: "600" }}>
+                          {idx + 1}. {item.songTitle}
+                        </Text>
                         <Pressable
                           disabled={isBusy || isFirst}
                           onPress={() => void onMoveItem(item, "up", sortedItems)}
@@ -446,44 +486,38 @@ export function EventsScreen({
                         >
                           <Text style={{ color: "#f28c8c", fontSize: 11, lineHeight: 14 }}>✕</Text>
                         </Pressable>
+                        <Pressable
+                          onPress={() =>
+                            editingItemId === item.id
+                              ? setEditingItemId(null)
+                              : startItemEdit(item)
+                          }
+                          style={[orderBtnStyle, { borderColor: editingItemId === item.id ? "#f28c8c" : "#2d4b6d" }]}
+                          accessibilityLabel="Editar item do setlist"
+                        >
+                          <Text style={{ color: editingItemId === item.id ? "#f28c8c" : "#7cf2a2", fontSize: 11, lineHeight: 14 }}>
+                            {editingItemId === item.id ? "✕" : "✏"}
+                          </Text>
+                        </Pressable>
                       </View>
 
-                      {/* Content */}
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center" }}>
-                          <Text style={[styles.primaryButtonText, { color: "#e8f2ff", flex: 1 }]}>
-                            {idx + 1}. {item.songTitle}
-                          </Text>
-                          <Pressable
-                            onPress={() =>
-                              editingItemId === item.id
-                                ? setEditingItemId(null)
-                                : startItemEdit(item)
-                            }
-                            style={{ paddingHorizontal: 6 }}
-                            accessibilityLabel="Editar item do setlist"
-                          >
-                            <Text style={{ color: "#7cf2a2", fontSize: 14 }}>
-                              {editingItemId === item.id ? "✕" : "✏"}
-                            </Text>
-                          </Pressable>
-                        </View>
-                        <Text style={styles.helper}>
-                          {[
-                            item.key && `Tom: ${item.key}`,
-                            item.leaderName && `Líder: ${item.leaderName}`,
-                            item.zone && `Zona: ${item.zone}`,
-                          ]
-                            .filter(Boolean)
-                            .join("  ·  ")}
+                      {/* Info */}
+                      <Text style={[styles.helper, { marginTop: 3 }]}>
+                        {[
+                          item.key && `Tom: ${item.key}`,
+                          item.leaderName && `Líder: ${item.leaderName}`,
+                          item.zone && `Zona: ${item.zone}`,
+                        ]
+                          .filter(Boolean)
+                          .join("  ·  ")}
+                      </Text>
+                      {item.transitionNotes ? (
+                        <Text style={[styles.helper, { fontStyle: "italic" }]}>
+                          {item.transitionNotes}
                         </Text>
-                        {item.transitionNotes ? (
-                          <Text style={[styles.helper, { fontStyle: "italic" }]}>
-                            {item.transitionNotes}
-                          </Text>
-                        ) : null}
+                      ) : null}
 
-                        {editingItemId === item.id && (
+                      {editingItemId === item.id && (
                           <View style={{ marginTop: 8, gap: 6 }}>
                             <TextInput
                               style={formInputStyle}
@@ -535,34 +569,35 @@ export function EventsScreen({
                             </Pressable>
                           </View>
                         )}
-                      </View>
                     </View>
                   );
                 })}
-                <Pressable
-                  style={[styles.primaryButton, { marginTop: 12, backgroundColor: "#1a3a5a" }]}
-                  onPress={() => {
-                    const activeEvent = events.find((e) => e.id === activeEventId);
-                    const lines = sortedItems.map(
-                      (it, i) =>
-                        `${i + 1}. ${it.songTitle}${
-                          it.key ? ` (${it.key})` : ""
-                        }${it.leaderName ? ` — ${it.leaderName}` : ""}`,
-                    );
-                    void Share.share({
-                      message: `Setlist — ${activeEvent?.title ?? ""}\n\n${lines.join("\n")}`,
-                    });
-                  }}
-                >
-                  <Text style={styles.primaryButtonText}>Compartilhar Setlist</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.primaryButton, { marginTop: 8, backgroundColor: "#1a4a3a" }]}
-                  onPress={() => router.push("/present")}
-                  accessibilityLabel="Iniciar modo apresentação"
-                >
-                  <Text style={styles.primaryButtonText}>▶ Apresentar</Text>
-                </Pressable>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+                  <Pressable
+                    style={[styles.primaryButton, { flex: 1, backgroundColor: "#1a3a5a" }]}
+                    onPress={() => {
+                      const activeEvent = events.find((e) => e.id === activeEventId);
+                      const lines = sortedItems.map(
+                        (it, i) =>
+                          `${i + 1}. ${it.songTitle}${
+                            it.key ? ` (${it.key})` : ""
+                          }${it.leaderName ? ` — ${it.leaderName}` : ""}`,
+                      );
+                      void Share.share({
+                        message: `Setlist — ${activeEvent?.title ?? ""}\n\n${lines.join("\n")}`,
+                      });
+                    }}
+                  >
+                    <Text style={styles.primaryButtonText}>Compartilhar</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.primaryButton, { flex: 1, backgroundColor: "#1a4a3a" }]}
+                    onPress={() => router.push("/present")}
+                    accessibilityLabel="Iniciar modo apresentação"
+                  >
+                    <Text style={styles.primaryButtonText}>▶ Apresentar</Text>
+                  </Pressable>
+                </View>
               </>
             )}
             </>
@@ -593,3 +628,12 @@ const formInputStyle = {
   color: "#e8f2ff",
   fontSize: 14,
 };
+
+const actionBtnStyle = {
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+  borderRadius: 6,
+  borderWidth: 1,
+  borderColor: "#2d4b6d",
+  backgroundColor: "#0d1f2e",
+} as const;
