@@ -1,11 +1,18 @@
+import { useEffect } from "react";
 import { ImageBackground, SafeAreaView, Text, View, Pressable } from "react-native";
 import { LoginScreen } from "../src/screens/LoginScreen";
 import { useSession } from "../src/context/SessionContext";
 import { styles,colors } from "../src/styles";
-import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 
 export default function LoginRoute() {
-  const { login, statusText } = useSession();
+  const { login, statusText, pendingGoogleIdToken } = useSession();
+
+  useEffect(() => {
+    if (pendingGoogleIdToken) {
+      router.replace("/complete-profile");
+    }
+  }, [pendingGoogleIdToken]);
 
   return (
     <SafeAreaView style={styles.loginContainer}>

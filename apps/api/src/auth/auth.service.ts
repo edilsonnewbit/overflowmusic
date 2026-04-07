@@ -14,6 +14,12 @@ type GoogleLoginInput = {
   name: string;
   googleSub: string;
   volunteerTermsAccepted?: boolean;
+  instagramProfile?: string;
+  birthDate?: string;
+  church?: string;
+  pastorName?: string;
+  whatsapp?: string;
+  address?: string;
 };
 
 type DbUserRecord = {
@@ -31,6 +37,8 @@ type DbUserRecord = {
   birthDate: Date | null;
   church: string | null;
   pastorName: string | null;
+  whatsapp: string | null;
+  address: string | null;
   volunteerTermsVersion: string | null;
   volunteerTermsAcceptedAt: Date | null;
   createdAt: Date;
@@ -55,7 +63,7 @@ export class AuthService implements OnModuleInit {
   async googleLogin(
     input: GoogleLoginInput,
   ): Promise<
-    | { ok: true; status: "PENDING_APPROVAL"; user: AuthUser }
+    | { ok: true; status: "PENDING_APPROVAL"; needsProfileCompletion: boolean; user: AuthUser }
     | { ok: true; status: "REJECTED"; user: AuthUser }
     | { ok: true; status: "APPROVED"; user: AuthUser; accessToken: string }
   > {
@@ -79,6 +87,14 @@ export class AuthService implements OnModuleInit {
         input.volunteerTermsAccepted === true
           ? { volunteerTermsVersion: VOLUNTEER_TERMS_VERSION, volunteerTermsAcceptedAt: new Date() }
           : {};
+      const profileData = {
+        instagramProfile: (input.instagramProfile || "").trim() || null,
+        birthDate: input.birthDate ? new Date(input.birthDate) : null,
+        church: (input.church || "").trim() || null,
+        pastorName: (input.pastorName || "").trim() || null,
+        whatsapp: (input.whatsapp || "").trim() || null,
+        address: (input.address || "").trim() || null,
+      };
       user = await this.prisma.user.create({
         data: {
           name,
@@ -87,12 +103,14 @@ export class AuthService implements OnModuleInit {
           role: "MEMBER",
           status: "PENDING_APPROVAL",
           ...termsData,
+          ...profileData,
         },
       });
 
       return {
         ok: true,
         status: "PENDING_APPROVAL",
+        needsProfileCompletion: !user.volunteerTermsVersion,
         user: this.toAuthUser(user),
       };
     }
@@ -105,12 +123,32 @@ export class AuthService implements OnModuleInit {
       });
     }
 
+    // If user hasn't accepted terms yet but is doing so now, save terms + profile data
+    if (user.volunteerTermsVersion === null && input.volunteerTermsAccepted === true) {
+      const updateData: Record<string, unknown> = {
+        volunteerTermsVersion: VOLUNTEER_TERMS_VERSION,
+        volunteerTermsAcceptedAt: new Date(),
+      };
+      if ((input.instagramProfile || "").trim()) updateData.instagramProfile = input.instagramProfile!.trim();
+      if (input.birthDate) updateData.birthDate = new Date(input.birthDate);
+      if ((input.church || "").trim()) updateData.church = input.church!.trim();
+      if ((input.pastorName || "").trim()) updateData.pastorName = input.pastorName!.trim();
+      if ((input.whatsapp || "").trim()) updateData.whatsapp = input.whatsapp!.trim();
+      if ((input.address || "").trim()) updateData.address = input.address!.trim();
+      user = await this.prisma.user.update({ where: { id: user.id }, data: updateData });
+    }
+
     if (user.status === "REJECTED") {
       return { ok: true, status: "REJECTED", user: this.toAuthUser(user) };
     }
 
     if (user.status === "PENDING_APPROVAL") {
-      return { ok: true, status: "PENDING_APPROVAL", user: this.toAuthUser(user) };
+      return {
+        ok: true,
+        status: "PENDING_APPROVAL",
+        needsProfileCompletion: !user.volunteerTermsVersion,
+        user: this.toAuthUser(user),
+      };
     }
 
     const accessToken = this.signToken({
@@ -136,6 +174,8 @@ export class AuthService implements OnModuleInit {
     birthDate?: string;
     church?: string;
     pastorName?: string;
+    whatsapp?: string;
+    address?: string;
     volunteerTermsAccepted?: boolean;
   }): Promise<{ ok: true; user: AuthUser; message: string }> {
     const email = (input.email || "").trim().toLowerCase();
@@ -179,6 +219,8 @@ export class AuthService implements OnModuleInit {
         birthDate: input.birthDate ? new Date(input.birthDate) : null,
         church: (input.church || "").trim() || null,
         pastorName: (input.pastorName || "").trim() || null,
+        whatsapp: (input.whatsapp || "").trim() || null,
+        address: (input.address || "").trim() || null,
         volunteerTermsVersion: VOLUNTEER_TERMS_VERSION,
         volunteerTermsAcceptedAt,
       },
@@ -487,6 +529,8 @@ export class AuthService implements OnModuleInit {
     birthDate?: string | null;
     church?: string | null;
     pastorName?: string | null;
+    whatsapp?: string | null;
+    address?: string | null;
   }): Promise<{ ok: true; user: AuthUser }> {
     const payload = this.verifyToken(accessToken);
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
@@ -506,6 +550,8 @@ export class AuthService implements OnModuleInit {
       birthDate?: Date | null;
       church?: string | null;
       pastorName?: string | null;
+      whatsapp?: string | null;
+      address?: string | null;
     } = { name };
 
     if (Array.isArray(data.instruments)) updateData.instruments = data.instruments;
@@ -513,6 +559,8 @@ export class AuthService implements OnModuleInit {
     if (data.birthDate !== undefined) updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     if (data.church !== undefined) updateData.church = (data.church || "").trim() || null;
     if (data.pastorName !== undefined) updateData.pastorName = (data.pastorName || "").trim() || null;
+    if (data.whatsapp !== undefined) updateData.whatsapp = (data.whatsapp || "").trim() || null;
+    if (data.address !== undefined) updateData.address = (data.address || "").trim() || null;
 
     const updated = await this.prisma.user.update({
       where: { id: user.id },
@@ -693,6 +741,8 @@ export class AuthService implements OnModuleInit {
       birthDate: user.birthDate ? user.birthDate.toISOString().split("T")[0] : null,
       church: user.church ?? null,
       pastorName: user.pastorName ?? null,
+      whatsapp: user.whatsapp ?? null,
+      address: user.address ?? null,
       volunteerTermsVersion: user.volunteerTermsVersion ?? null,
       volunteerTermsAcceptedAt: user.volunteerTermsAcceptedAt ? user.volunteerTermsAcceptedAt.toISOString() : null,
       createdAt: user.createdAt.toISOString(),

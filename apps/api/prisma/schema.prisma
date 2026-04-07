@@ -62,6 +62,8 @@ model User {
   birthDate         DateTime?
   church            String?
   pastorName        String?
+  whatsapp          String?
+  address           String?
   volunteerTermsVersion    String?
   volunteerTermsAcceptedAt DateTime?
   createdAt         DateTime   @default(now())

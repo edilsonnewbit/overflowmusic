@@ -2,6 +2,15 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-07 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Corrigir erro 400 `invalid_request` no login Google do app Android
+- Causa raiz: `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` estava com o Web Client ID — Google rejeita custom URI scheme (`overflowmusic://`) com Web client ID
+- Feito:
+  - `apps/mobile/.env`: atualizado `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` para o client ID tipo Android (`...3k2u1atvl0n3v9p2m39qevgtlafmfqs5`); adicionado `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` (`...ai0u5m2uk87vekr0kf2du068d1e4011e`); Web ID mantido (`...6p997egkf07gmge5dp9afuhh5e5d0u7n`)
+  - Rebuild APK release: `assembleRelease` concluído em 31s → `app-release.apk` (76MB) gerado
+- Status: ✅ APK gerado — pendente: instalar no dispositivo e testar login Google
+- Pendências: `prisma db push` (colunas whatsapp/address) quando Docker disponível
+
 ### [2026-04-15 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: (1) fix texto cifra saindo da tela no mobile web ao aumentar fonte; (2) paridade mobile: transpor + metrônomo
 - Feito:

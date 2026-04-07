@@ -53,6 +53,15 @@ export interface SessionContextValue {
   login: (payload: LoginPayload) => Promise<void>;
   logout: (message?: string) => Promise<void>;
   updateUser: (updated: AuthUser) => void;
+  pendingGoogleIdToken: string | null;
+  completeGoogleProfile: (data: {
+    instagramProfile: string;
+    birthDate: string;
+    church: string;
+    pastorName: string;
+    whatsapp: string;
+    address: string;
+  }) => Promise<void>;
 
   // Events
   events: MusicEvent[];
@@ -123,6 +132,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [statusText, setStatusText] = useState("Inicializando...");
+  const [pendingGoogleIdToken, setPendingGoogleIdToken] = useState<string | null>(null);
 
   // Events
   const [events, setEvents] = useState<MusicEvent[]>([]);
@@ -230,6 +240,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // New Google user who needs to fill mandatory profile fields
+      if (body.status === "PENDING_APPROVAL" && body.needsProfileCompletion && payload.idToken) {
+        setPendingGoogleIdToken(payload.idToken);
+        setStatusText("Complete seu cadastro para continuar.");
+        return;
+      }
+
       if (body.status === "PENDING_APPROVAL") {
         setStatusText("Conta pendente de aprovação do administrador.");
         return;
@@ -262,6 +279,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   function updateUser(updated: AuthUser) {
     setUser(updated);
     setStatusText(`Perfil atualizado: ${updated.name}`);
+  }
+
+  async function completeGoogleProfile(data: {
+    instagramProfile: string;
+    birthDate: string;
+    church: string;
+    pastorName: string;
+    whatsapp: string;
+    address: string;
+  }) {
+    if (!pendingGoogleIdToken) return;
+    setStatusText("Salvando perfil...");
+    try {
+      const { ok, body } = await authGoogle({
+        idToken: pendingGoogleIdToken,
+        volunteerTermsAccepted: true,
+        ...data,
+      });
+      if (!ok) {
+        setStatusText(body.message || "Falha ao salvar perfil.");
+        return;
+      }
+      setPendingGoogleIdToken(null);
+      if (body.status === "PENDING_APPROVAL") {
+        setStatusText("Cadastro completo! Aguardando aprovação do administrador.");
+        return;
+      }
+      if (body.status === "APPROVED" && typeof body.accessToken === "string") {
+        await AsyncStorage.setItem(TOKEN_KEY, body.accessToken);
+        const me = await fetchMe(body.accessToken);
+        setAccessToken(body.accessToken);
+        setUser(me);
+        setStatusText(`Bem-vindo, ${me.name}!`);
+        void registerForPushNotificationsAsync(body.accessToken);
+        await loadTemplates();
+        await loadEventsList();
+        await loadMyInvites();
+      }
+    } catch {
+      setStatusText("Erro ao salvar perfil. Tente novamente.");
+    }
   }
 
   async function logout(statusMessage = "Sessão encerrada.") {
@@ -654,6 +712,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     updateUser,
+    pendingGoogleIdToken,
+    completeGoogleProfile,
     events,
     loadingEvents,
     activeEventId,

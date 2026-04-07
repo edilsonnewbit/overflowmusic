@@ -23,6 +23,8 @@ export type AuthUser = {
   birthDate?: string | null;
   church?: string | null;
   pastorName?: string | null;
+  whatsapp?: string | null;
+  address?: string | null;
   volunteerTermsVersion?: string | null;
   volunteerTermsAcceptedAt?: string | null;
 };
@@ -32,12 +34,21 @@ export type LoginPayload = {
   email?: string;
   name?: string;
   googleSub?: string;
+  volunteerTermsAccepted?: boolean;
+  instagramProfile?: string;
+  birthDate?: string;
+  church?: string;
+  pastorName?: string;
+  whatsapp?: string;
+  address?: string;
 };
 
 export type LoginResponse = {
   status: UserStatus;
   accessToken?: string;
   message?: string;
+  needsProfileCompletion?: boolean;
+  user?: AuthUser;
 };
 
 // ── Songs ─────────────────────────────────────────────────────────────────────
