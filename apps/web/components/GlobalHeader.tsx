@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const isAdmin = (role?: string) => role === "SUPER_ADMIN" || role === "ADMIN";
 
@@ -73,6 +74,7 @@ export function GlobalHeader() {
 
           {!loading && user ? (
             <>
+              <NotificationBell />
               <Link
                 href="/profile"
                 className={`user-chip${isActive("/profile") ? " active" : ""}`}

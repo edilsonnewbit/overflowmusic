@@ -369,6 +369,35 @@ export async function deleteEvent(
   return { ok: true };
 }
 
+export type MusicianInvite = {
+  slotId: string;
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  eventLocation: string | null;
+  eventType: string;
+  instrumentRole: string;
+  notifiedAt: string | null;
+};
+
+export async function fetchMyInvites(
+  accessToken?: string | null,
+): Promise<{ ok: boolean; invites: MusicianInvite[] }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, invites: [] };
+  try {
+    const response = await authFetch(`${API_BASE}/events/my-invites`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${bearerToken}` },
+    });
+    const body = await parseJson(response);
+    if (!response.ok) return { ok: false, invites: [] };
+    return { ok: true, invites: Array.isArray(body.invites) ? (body.invites as MusicianInvite[]) : [] };
+  } catch {
+    return { ok: false, invites: [] };
+  }
+}
+
 export async function respondMusicianSlot(
   slotId: string,
   accept: boolean,

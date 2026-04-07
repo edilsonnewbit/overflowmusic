@@ -253,6 +253,33 @@ export class EventsService {
     return this.respondMusician(slotId, userId, accept);
   }
 
+  async getMyInvites(userId: string) {
+    const slots = await this.prisma.eventMusician.findMany({
+      where: { userId, status: "PENDING" },
+      include: {
+        event: {
+          select: { id: true, title: true, dateTime: true, location: true, eventType: true, status: true },
+        },
+      },
+      orderBy: { event: { dateTime: "asc" } },
+    });
+
+    const invites = slots
+      .filter((s) => new Date(s.event.dateTime) >= new Date())
+      .map((s) => ({
+        slotId: s.id,
+        eventId: s.event.id,
+        eventTitle: s.event.title,
+        eventDate: s.event.dateTime,
+        eventLocation: s.event.location,
+        eventType: s.event.eventType,
+        instrumentRole: s.instrumentRole,
+        notifiedAt: s.notifiedAt,
+      }));
+
+    return { ok: true, invites };
+  }
+
   private async triggerMusicianNotifications(eventId: string) {
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
     if (!event) return;
