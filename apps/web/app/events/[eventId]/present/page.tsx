@@ -42,6 +42,9 @@ export default function PresentPage({ params }: PageProps) {
   const [showChords, setShowChords] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [fontSize, setFontSize] = useState(14);
+  const [cifraFullscreen, setCifraFullscreen] = useState(false);
+  const [showCifraControls, setShowCifraControls] = useState(false);
+  const cifraControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void params.then(({ eventId: id }) => setEventId(id));
@@ -107,6 +110,12 @@ export default function PresentPage({ params }: PageProps) {
     return () => clearInterval(id);
   }, [autoScroll, showCifra, scrollSpeed]);
 
+  const showControlsTemporarily = useCallback(() => {
+    setShowCifraControls(true);
+    if (cifraControlsTimerRef.current) clearTimeout(cifraControlsTimerRef.current);
+    cifraControlsTimerRef.current = setTimeout(() => setShowCifraControls(false), 3000);
+  }, []);
+
   const goTo = useCallback(
     (idx: number) => {
       if (idx >= 0 && idx < items.length) setCurrent(idx);
@@ -138,6 +147,9 @@ export default function PresentPage({ params }: PageProps) {
       }
       if (e.key === "g" || e.key === "G") {
         setShowChords((v) => !v);
+      }
+      if (e.key === "f" || e.key === "F") {
+        setCifraFullscreen((v) => !v);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -195,7 +207,7 @@ export default function PresentPage({ params }: PageProps) {
           {event.title}{event.setlist?.title ? ` — ${event.setlist.title}` : ""}
         </span>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <span style={{ color: "#5a7a9a", fontSize: 11 }}>H=nav • C=cifra • G=acordes • S=scroll • ←→=navegar</span>
+          <span style={{ color: "#5a7a9a", fontSize: 11 }}>H=nav • C=cifra • G=acordes • S=scroll • F=fullscreen • ←→=navegar</span>
           <button
             onClick={(e) => { e.stopPropagation(); setShowSettings((v) => !v); }}
             style={{ background: showSettings ? "#1e3a5a" : "transparent", border: "1px solid #2d4b6d", color: "#b3c6e0", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}
@@ -316,28 +328,84 @@ export default function PresentPage({ params }: PageProps) {
         )}
 
         {showCifra && parsed && (
-          <div style={cifraContainerStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-              <h2 style={{ margin: 0, fontSize: 18, color: "#e2f0ff" }}>{item.songTitle}</h2>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                {item.key && <span style={chip("#7cf2a2", "#0f3020")}>🎵 {item.key}</span>}
-                <button onClick={(e) => { e.stopPropagation(); setShowChords((v) => !v); }} style={{ ...closeCifraBtn, color: showChords ? "#7cf2a2" : "#8fa9c8" }}>
-                  {showChords ? "♪ Sem acordes" : "♪ Com acordes"}
-                </button>
+          <div
+            style={cifraFullscreen ? cifraFullscreenContainerStyle : cifraContainerStyle}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header normal (não-fullscreen) */}
+            {!cifraFullscreen && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+                <h2 style={{ margin: 0, fontSize: 18, color: "#e2f0ff" }}>{item.songTitle}</h2>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {item.key && <span style={chip("#7cf2a2", "#0f3020")}>🎵 {item.key}</span>}
+                  <button onClick={(e) => { e.stopPropagation(); setShowChords((v) => !v); }} style={{ ...closeCifraBtn, color: showChords ? "#7cf2a2" : "#8fa9c8" }}>
+                    {showChords ? "♪ Sem acordes" : "♪ Com acordes"}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setAutoScroll((v) => !v); }}
+                    style={{ ...closeCifraBtn, color: autoScroll ? "#7cf2a2" : "#8fa9c8", borderColor: autoScroll ? "#7cf2a244" : "#2d4b6d" }}
+                  >
+                    {autoScroll ? "⏸ Pausar" : "▶ Rolar"}
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); setScrollSpeed((v) => Math.max(5, v - 5)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px" }} title="Diminuir velocidade">▼</button>
+                  <button onClick={(e) => { e.stopPropagation(); setScrollSpeed((v) => Math.min(100, v + 5)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px" }} title="Aumentar velocidade">▲</button>
+                  <button onClick={(e) => { e.stopPropagation(); setFontSize((v) => Math.max(10, v - 2)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px", fontWeight: 700 }}>A-</button>
+                  <button onClick={(e) => { e.stopPropagation(); setFontSize((v) => Math.min(32, v + 2)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px", fontWeight: 700 }}>A+</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setCifraFullscreen(true); setAutoScroll(true); showControlsTemporarily(); }}
+                    style={{ ...closeCifraBtn, color: "#a5c8ff" }}
+                    title="Tela cheia (F)"
+                  >
+                    ⛶ Tela cheia
+                  </button>
+                  <button onClick={() => { setShowCifra(false); setCifraFullscreen(false); }} style={closeCifraBtn}>✕ Ocultar</button>
+                </div>
+              </div>
+            )}
+
+            {/* Overlay superior — aparece ao tocar (fullscreen) */}
+            {cifraFullscreen && (
+              <div
+                style={{
+                  position: "absolute", top: 0, left: 0, right: 0, zIndex: 2,
+                  background: "linear-gradient(to bottom, rgba(4,12,21,0.97) 65%, transparent)",
+                  padding: "14px 20px 40px",
+                  opacity: showCifraControls ? 1 : 0,
+                  transition: "opacity 0.3s",
+                  pointerEvents: showCifraControls ? "auto" : "none",
+                  display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+                }}
+              >
                 <button
-                  onClick={(e) => { e.stopPropagation(); setAutoScroll((v) => !v); }}
-                  style={{ ...closeCifraBtn, color: autoScroll ? "#7cf2a2" : "#8fa9c8", borderColor: autoScroll ? "#7cf2a244" : "#2d4b6d" }}
+                  onClick={(e) => { e.stopPropagation(); setAutoScroll((v) => !v); showControlsTemporarily(); }}
+                  style={{ ...fsControlBtn, color: autoScroll ? "#7cf2a2" : "#8fa9c8", borderColor: autoScroll ? "#7cf2a244" : "#2d4b6d", minWidth: 110 }}
                 >
                   {autoScroll ? "⏸ Pausar" : "▶ Rolar"}
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); setScrollSpeed((v) => Math.max(5, v - 5)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px" }} title="Diminuir velocidade">▼</button>
-                <button onClick={(e) => { e.stopPropagation(); setScrollSpeed((v) => Math.min(100, v + 5)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px" }} title="Aumentar velocidade">▲</button>
-                <button onClick={(e) => { e.stopPropagation(); setFontSize((v) => Math.max(10, v - 2)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px", fontWeight: 700 }}>A-</button>
-                <button onClick={(e) => { e.stopPropagation(); setFontSize((v) => Math.min(32, v + 2)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px", fontWeight: 700 }}>A+</button>
-                <button onClick={() => setShowCifra(false)} style={closeCifraBtn}>✕ Ocultar</button>
+                <h2 style={{ margin: 0, fontSize: 16, color: "#e2f0ff", flex: 1, textAlign: "center", fontFamily: "sans-serif" }}>
+                  {item.songTitle}
+                  {item.key && <span style={{ marginLeft: 10, fontSize: 13, color: "#7cf2a2", fontWeight: 400 }}>🎵 {item.key}</span>}
+                </h2>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCifraFullscreen(false); }}
+                  style={{ ...fsControlBtn, color: "#f87171" }}
+                >
+                  ⤩ Sair
+                </button>
               </div>
-            </div>
-            <div ref={cifraScrollRef} style={{ overflowY: "auto", maxHeight: "calc(100dvh - 200px)" }}>
+            )}
+
+            {/* Área scrollable da cifra */}
+            <div
+              ref={cifraScrollRef}
+              style={{
+                overflowY: "auto",
+                ...(cifraFullscreen
+                  ? { flex: 1, padding: "80px 40px 130px", cursor: "pointer" }
+                  : { maxHeight: "calc(100dvh - 200px)" }),
+              }}
+              onClick={cifraFullscreen ? (e) => { e.stopPropagation(); setAutoScroll((v) => !v); showControlsTemporarily(); } : undefined}
+            >
               {parsed.sections.map((section, si) => (
                 <div key={si} style={{ marginBottom: 20 }}>
                   <p style={{ ...sectionNameStyle, fontSize: Math.max(11, fontSize - 2) }}>[{section.name}]</p>
@@ -349,6 +417,42 @@ export default function PresentPage({ params }: PageProps) {
                 </div>
               ))}
             </div>
+
+            {/* Overlay inferior de controles (fullscreen) */}
+            {cifraFullscreen && (
+              <div
+                style={{
+                  position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2,
+                  background: "linear-gradient(to top, rgba(4,12,21,0.97) 65%, transparent)",
+                  padding: "40px 24px 20px",
+                  opacity: showCifraControls ? 1 : 0,
+                  transition: "opacity 0.3s",
+                  pointerEvents: showCifraControls ? "auto" : "none",
+                  display: "flex", justifyContent: "center", alignItems: "center", gap: 16, flexWrap: "wrap",
+                }}
+              >
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ color: "#5a7a9a", fontSize: 12 }}>Velocidade</span>
+                  <button onClick={(e) => { e.stopPropagation(); setScrollSpeed((v) => Math.max(5, v - 5)); showControlsTemporarily(); }} style={fsControlBtn}>▼</button>
+                  <span style={{ color: "#e2f0ff", fontSize: 13, minWidth: 56, textAlign: "center" }}>{scrollSpeed} px/s</span>
+                  <button onClick={(e) => { e.stopPropagation(); setScrollSpeed((v) => Math.min(100, v + 5)); showControlsTemporarily(); }} style={fsControlBtn}>▲</button>
+                </div>
+                <div style={{ width: 1, height: 24, background: "#2d4b6d" }} />
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ color: "#5a7a9a", fontSize: 12 }}>Fonte</span>
+                  <button onClick={(e) => { e.stopPropagation(); setFontSize((v) => Math.max(10, v - 2)); showControlsTemporarily(); }} style={{ ...fsControlBtn, fontWeight: 700 }}>A-</button>
+                  <span style={{ color: "#e2f0ff", fontSize: 13, minWidth: 36, textAlign: "center" }}>{fontSize}px</span>
+                  <button onClick={(e) => { e.stopPropagation(); setFontSize((v) => Math.min(32, v + 2)); showControlsTemporarily(); }} style={{ ...fsControlBtn, fontWeight: 700 }}>A+</button>
+                </div>
+                <div style={{ width: 1, height: 24, background: "#2d4b6d" }} />
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowChords((v) => !v); showControlsTemporarily(); }}
+                  style={{ ...fsControlBtn, color: showChords ? "#7cf2a2" : "#8fa9c8" }}
+                >
+                  {showChords ? "♪ Acordes ON" : "♪ Acordes OFF"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -494,4 +598,19 @@ const stepBtn: React.CSSProperties = {
   background: "transparent", border: "1px solid #2d4b6d",
   color: "#b3c6e0", borderRadius: 6, padding: "2px 8px",
   fontSize: 12, cursor: "pointer", lineHeight: 1.4,
+};
+
+const cifraFullscreenContainerStyle: React.CSSProperties = {
+  position: "fixed", top: 0, right: 0, bottom: 0, left: 0,
+  zIndex: 50,
+  background: "#040c15",
+  fontFamily: "'Courier New', Courier, monospace",
+  display: "flex", flexDirection: "column",
+  overflow: "hidden",
+};
+
+const fsControlBtn: React.CSSProperties = {
+  background: "rgba(255,255,255,0.08)", border: "1px solid #2d4b6d",
+  color: "#b3c6e0", borderRadius: 8, padding: "6px 12px",
+  fontSize: 13, cursor: "pointer", flexShrink: 0,
 };
