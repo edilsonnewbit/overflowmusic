@@ -51,6 +51,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [screen, setScreen] = useState<Screen>({ view: "login" });
   const [errorMsg, setErrorMsg] = useState("");
@@ -127,7 +128,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, volunteerTermsAccepted: termsAccepted }),
       });
       const body = (await res.json()) as LoginResponse;
       processAuthResponse(res.ok, body, "");
@@ -274,16 +275,53 @@ export default function LoginPage() {
         {/* Google Sign-In */}
         {clientId ? (
           <div style={{ marginBottom: 20 }}>
-            <div
-              ref={googleButtonRef}
+            {/* Termo obrigatório para Google */}
+            <label
               style={{
                 display: "flex",
-                justifyContent: "center",
-                minHeight: 44,
-                opacity: loading ? 0.5 : 1,
-                pointerEvents: loading ? "none" : "auto",
+                alignItems: "flex-start",
+                gap: 10,
+                marginBottom: 12,
+                cursor: "pointer",
+                fontSize: 12,
+                color: "#b3c6e0",
+                lineHeight: 1.5,
               }}
-            />
+            >
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                style={{ marginTop: 2, accentColor: "#1ecad3", flexShrink: 0 }}
+              />
+              Li e aceito o{" "}
+              <Link href="/register" style={{ color: "#1ecad3", textDecoration: "underline" }}>
+                Termo de Adesão ao Serviço Voluntário
+              </Link>
+            </label>
+            <div style={{ position: "relative" }}>
+              <div
+                ref={googleButtonRef}
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  minHeight: 44,
+                  opacity: loading || !termsAccepted ? 0.4 : 1,
+                }}
+              />
+              {/* Overlay bloqueando o botão quando termo não aceito */}
+              {!termsAccepted && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    cursor: "not-allowed",
+                    zIndex: 10,
+                  }}
+                  title="Aceite o Termo de Adesão para continuar"
+                />
+              )}
+            </div>
             {!gisReady && (
               <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 13, color: "#b3c6e0" }}>
                 Carregando Google Sign-In...
