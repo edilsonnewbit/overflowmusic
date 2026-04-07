@@ -42,6 +42,7 @@ type TeamUser = {
   id: string;
   name: string;
   role: string;
+  instruments: string[];
 };
 
 type ApiResult<T> = {
@@ -100,6 +101,8 @@ export default function EventDetailPage({ params }: PageProps) {
   // musician team
   const [musicRole, setMusicRole] = useState(INSTRUMENT_ROLES[0]);
   const [musicUserId, setMusicUserId] = useState("");
+
+  const eligibleUsers = teamUsers.filter((u) => u.instruments.includes(musicRole));
   const [musicPriority, setMusicPriority] = useState(1);
   const [addingMusician, setAddingMusician] = useState(false);
   const [removingMusicianId, setRemovingMusicianId] = useState<string | null>(null);
@@ -523,12 +526,12 @@ export default function EventDetailPage({ params }: PageProps) {
                 <form onSubmit={(e) => void addMusician(e)} style={{ ...addFormStyle, marginTop: 12 }}>
                   <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#7cf2a2" }}>+ Adicionar músico</p>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8 }}>
-                    <select style={{ ...inputStyle, appearance: "none" as const }} value={musicRole} onChange={(e) => setMusicRole(e.target.value)} disabled={addingMusician}>
+                    <select style={{ ...inputStyle, appearance: "none" as const }} value={musicRole} onChange={(e) => { setMusicRole(e.target.value); setMusicUserId(""); }} disabled={addingMusician}>
                       {INSTRUMENT_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
-                    <select style={{ ...inputStyle, appearance: "none" as const }} value={musicUserId} onChange={(e) => setMusicUserId(e.target.value)} disabled={addingMusician}>
-                      <option value="">Selecionar usuário</option>
-                      {teamUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    <select style={{ ...inputStyle, appearance: "none" as const }} value={musicUserId} onChange={(e) => setMusicUserId(e.target.value)} disabled={addingMusician || eligibleUsers.length === 0}>
+                      <option value="">{eligibleUsers.length === 0 ? `Nenhum músico com ${musicRole}` : "Selecionar usuário"}</option>
+                      {eligibleUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                     <select style={{ ...inputStyle, appearance: "none" as const }} value={musicPriority} onChange={(e) => setMusicPriority(Number(e.target.value))} disabled={addingMusician}>
                       {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>#{n}</option>)}
