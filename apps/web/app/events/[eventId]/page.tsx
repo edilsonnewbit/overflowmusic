@@ -132,6 +132,14 @@ export default function EventDetailPage({ params }: PageProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  // inline edit setlist item
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItemKey, setEditItemKey] = useState("");
+  const [editItemLeader, setEditItemLeader] = useState("");
+  const [editItemZone, setEditItemZone] = useState("");
+  const [editItemNotes, setEditItemNotes] = useState("");
+  const [savingItemId, setSavingItemId] = useState<string | null>(null);
+
   useEffect(() => {
     void params.then(({ eventId: id }) => {
       setEventId(id);
@@ -333,6 +341,40 @@ export default function EventDetailPage({ params }: PageProps) {
       setStatus(err instanceof Error ? err.message : "Erro ao adicionar.");
     } finally {
       setAddingItem(false);
+    }
+  }
+
+  function openEditItem(item: SetlistItem) {
+    setEditingItemId(item.id);
+    setEditItemKey(item.key ?? "");
+    setEditItemLeader(item.leaderName ?? "");
+    setEditItemZone(item.zone ?? "");
+    setEditItemNotes(item.transitionNotes ?? "");
+  }
+
+  async function saveSetlistItem(itemId: string) {
+    if (!eventId) return;
+    setSavingItemId(itemId);
+    setStatus("Salvando...");
+    try {
+      const response = await fetch(`/api/events/${eventId}/setlist/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: editItemKey.trim() || null,
+          leaderName: editItemLeader.trim() || null,
+          zone: editItemZone.trim() || null,
+          transitionNotes: editItemNotes.trim() || null,
+        }),
+      });
+      await parseJson<unknown>(response);
+      setEditingItemId(null);
+      setStatus("Salvo.");
+      await loadEvent(eventId);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
+      setSavingItemId(null);
     }
   }
 
@@ -639,7 +681,7 @@ export default function EventDetailPage({ params }: PageProps) {
                       return (
                         <li
                           key={item.id}
-                          draggable={!isBusy}
+                          draggable={!isBusy && editingItemId !== item.id}
                           onDragStart={() => setDraggedId(item.id)}
                           onDragOver={(e) => { e.preventDefault(); setDragOverId(item.id); }}
                           onDrop={() => {
@@ -651,7 +693,9 @@ export default function EventDetailPage({ params }: PageProps) {
                           style={{
                             ...itemCardStyle,
                             opacity: draggedId === item.id ? 0.4 : 1,
-                            border: dragOverId === item.id && draggedId !== item.id
+                            border: editingItemId === item.id
+                              ? "1.5px solid #7cf2a2"
+                              : dragOverId === item.id && draggedId !== item.id
                               ? "2px solid #7cf2a2"
                               : itemCardStyle.border,
                             cursor: isBusy ? "default" : "grab",
@@ -664,37 +708,93 @@ export default function EventDetailPage({ params }: PageProps) {
                                 disabled={isBusy || isFirst}
                                 onClick={() => void moveItem(item.id, "up")}
                                 title="Mover para cima"
-                              >
-                                ▲
-                              </button>
+                              >▲</button>
                               <button
                                 style={orderBtn}
                                 disabled={isBusy || isLast}
                                 onClick={() => void moveItem(item.id, "down")}
                                 title="Mover para baixo"
-                              >
-                                ▼
-                              </button>
+                              >▼</button>
                             </div>
                             <div style={{ flex: 1 }}>
-                              <p style={{ margin: 0, fontWeight: 700, opacity: isMoving ? 0.5 : 1 }}>
+                              {/* Linha do título — clicável para abrir edição */}
+                              <p
+                                style={{ margin: 0, fontWeight: 700, opacity: isMoving ? 0.5 : 1, cursor: "pointer" }}
+                                onClick={() => editingItemId === item.id ? setEditingItemId(null) : openEditItem(item)}
+                                title="Clique para editar"
+                              >
                                 <span style={{ color: "#8fa9c8", marginRight: 6, fontSize: 13 }}>{idx + 1}.</span>
                                 {item.songTitle}
                                 {isMoving && <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 8 }}>movendo...</span>}
+                                <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 8, opacity: 0.6 }}>✎</span>
                               </p>
-                              <p style={{ margin: "4px 0 0", fontSize: 12, color: "#8fa9c8" }}>
-                                {[
-                                  item.key && `Tom: ${item.key}`,
-                                  item.leaderName && `Líder: ${item.leaderName}`,
-                                  item.zone && `${TABERNACLE_ZONES.find((z) => z.value === item.zone)?.label ?? item.zone}`,
-                                ]
-                                  .filter(Boolean)
-                                  .join("  ·  ")}
-                              </p>
-                              {item.transitionNotes && (
-                                <p style={{ margin: "2px 0 0", fontSize: 11, color: "#5a7a9a", fontStyle: "italic" }}>
-                                  {item.transitionNotes}
-                                </p>
+
+                              {/* Visualização (quando não está editando) */}
+                              {editingItemId !== item.id && (
+                                <>
+                                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "#8fa9c8" }}>
+                                    {[
+                                      item.key && `Tom: ${item.key}`,
+                                      item.leaderName && `Líder: ${item.leaderName}`,
+                                      item.zone && `${TABERNACLE_ZONES.find((z) => z.value === item.zone)?.label ?? item.zone}`,
+                                    ].filter(Boolean).join("  ·  ")}
+                                  </p>
+                                  {item.transitionNotes && (
+                                    <p style={{ margin: "2px 0 0", fontSize: 11, color: "#5a7a9a", fontStyle: "italic" }}>
+                                      {item.transitionNotes}
+                                    </p>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Formulário inline de edição */}
+                              {editingItemId === item.id && (
+                                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }} onClick={(e) => e.stopPropagation()}>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                    <input
+                                      style={inputStyle}
+                                      placeholder="Tom (ex: G)"
+                                      value={editItemKey}
+                                      onChange={(e) => setEditItemKey(e.target.value)}
+                                      disabled={savingItemId === item.id}
+                                    />
+                                    <select
+                                      style={{ ...inputStyle, appearance: "none" as const }}
+                                      value={editItemLeader}
+                                      onChange={(e) => setEditItemLeader(e.target.value)}
+                                      disabled={savingItemId === item.id}
+                                    >
+                                      <option value="">Líder vocal (opcional)</option>
+                                      {teamUsers.map((u) => (
+                                        <option key={u.id} value={u.name}>{u.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <input
+                                    style={inputStyle}
+                                    placeholder="Notas de transição"
+                                    value={editItemNotes}
+                                    onChange={(e) => setEditItemNotes(e.target.value)}
+                                    disabled={savingItemId === item.id}
+                                  />
+                                  <div style={{ display: "flex", gap: 8 }}>
+                                    <button
+                                      type="button"
+                                      style={primaryBtn}
+                                      disabled={savingItemId === item.id}
+                                      onClick={() => void saveSetlistItem(item.id)}
+                                    >
+                                      {savingItemId === item.id ? "Salvando..." : "Salvar"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      style={{ ...primaryBtn, background: "transparent", color: "#8fa9c8", border: "1px solid #2d4b6d" }}
+                                      onClick={() => setEditingItemId(null)}
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
                               )}
                             </div>
                             <button
