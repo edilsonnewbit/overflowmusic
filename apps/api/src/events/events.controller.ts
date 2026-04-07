@@ -54,6 +54,13 @@ export class EventsController {
     });
   }
 
+  @Get("my-invites")
+  async getMyInvites(@Headers("authorization") authorization: string | undefined) {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const { user } = await this.authService.getMe(token);
+    return this.eventsService.getMyInvites(user.id);
+  }
+
   @Get(":id")
   async getById(@Param("id") id: string) {
     return this.eventsService.getById(id);
@@ -131,13 +138,6 @@ export class EventsController {
     const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
     const { user } = await this.authService.getMe(token);
     return this.eventsService.respondMusician(musicianId, user.id, body.accept);
-  }
-
-  @Get("my-invites")
-  async getMyInvites(@Headers("authorization") authorization: string | undefined) {
-    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
-    const { user } = await this.authService.getMe(token);
-    return this.eventsService.getMyInvites(user.id);
   }
 
   @Post("slots/:slotId/respond")
