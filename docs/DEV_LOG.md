@@ -2,6 +2,15 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-15 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: (1) fix texto cifra saindo da tela no mobile web ao aumentar fonte; (2) paridade mobile: transpor + metrônomo
+- Feito:
+  - `apps/web/app/events/[eventId]/present/page.tsx`: `lineStyle()` — `whiteSpace: "pre"` → `"pre-wrap"` + `overflowWrap: "break-word"` + `wordBreak: "break-word"` — resolve overflow horizontal no Chrome Android
+  - `apps/mobile/app/present.tsx`: funções `transposeChordLine`/`shiftNote`/`transposeToken` portadas do web; estado `transposeSemitones` + controles `− Tom × +` na toolbar; reset ao trocar música (em `goTo`)
+  - `apps/mobile/app/present.tsx`: metrônomo com `setInterval` + `Vibration.vibrate()` (RN built-in); estados `metroOn`/`metroBpm`/`metroBeat`; visualizador de 4 beats (dots); acento no beat 1 com vibração mais longa; controles `♩BPM − +` na segunda linha da toolbar
+- Commit: `84c50b2` — `feat(present): pre-wrap cifra web + transposição e metrônomo no mobile`
+- Status: ✅ completo, 0 erros TS
+
 ### [2026-04-14 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Corrigir `ThrottlerException: Too Many Requests` (429) em `GET /api/events/:id`
 - Causa raiz: limite global do ThrottlerModule era `100 req/min` — a página de evento faz múltiplas chamadas (evento, setlist, músicos, charts), estoura rapidamente por um único IP
