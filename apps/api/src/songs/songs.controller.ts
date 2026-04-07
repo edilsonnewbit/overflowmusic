@@ -11,6 +11,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthService } from "../auth/auth.service";
 import { SongsService } from "./songs.service";
@@ -39,6 +40,7 @@ type PreviewTxtBody = {
   content: string;
 };
 
+@SkipThrottle()
 @Controller("api/songs")
 export class SongsController {
   constructor(

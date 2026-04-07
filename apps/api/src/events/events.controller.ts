@@ -9,6 +9,7 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { EventsService } from "./events.service";
 import { AuditService } from "../audit/audit.service";
 import { AuthService } from "../auth/auth.service";
@@ -34,6 +35,7 @@ type MusicianBody = {
   priority: number;
 };
 
+@SkipThrottle()
 @Controller("api/events")
 export class EventsController {
   constructor(
