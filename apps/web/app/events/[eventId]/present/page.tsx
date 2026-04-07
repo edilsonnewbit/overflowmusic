@@ -99,6 +99,15 @@ export default function PresentPage({ params }: PageProps) {
   const cifraControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [transposeSemitones, setTransposeSemitones] = useState(0);
 
+  // ── Metronome ──────────────────────────────────────────────────────────────
+  const [metroOn, setMetroOn] = useState(false);
+  const [metroBpm, setMetroBpm] = useState(80);
+  const [metroBeat, setMetroBeat] = useState(0); // 0-3 (quarter beats)
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const metroTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nextBeatTimeRef = useRef(0);
+  const beatCountRef = useRef(0);
+
   useEffect(() => {
     void params.then(({ eventId: id }) => setEventId(id));
   }, [params]);
@@ -163,6 +172,66 @@ export default function PresentPage({ params }: PageProps) {
     }, 16);
     return () => clearInterval(id);
   }, [autoScroll, showCifra, scrollSpeed]);
+
+  // ── Metronome engine (Web Audio API scheduler) ────────────────────────────
+  useEffect(() => {
+    if (!metroOn) {
+      if (metroTimerRef.current) clearTimeout(metroTimerRef.current);
+      return;
+    }
+
+    const ctx = audioCtxRef.current ?? new AudioContext();
+    audioCtxRef.current = ctx;
+    if (ctx.state === "suspended") void ctx.resume();
+
+    nextBeatTimeRef.current = ctx.currentTime + 0.05;
+    beatCountRef.current = 0;
+
+    function scheduleClick(time: number, isAccent: boolean) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = isAccent ? 1800 : 1000;
+      gain.gain.setValueAtTime(isAccent ? 0.5 : 0.3, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+      osc.start(time);
+      osc.stop(time + 0.05);
+    }
+
+    function tick() {
+      const lookahead = 0.1; // seconds ahead to schedule
+      const scheduleInterval = 25; // ms between scheduler ticks
+      const interval = 60 / metroBpm;
+
+      while (nextBeatTimeRef.current < ctx.currentTime + lookahead) {
+        const beat = beatCountRef.current % 4;
+        scheduleClick(nextBeatTimeRef.current, beat === 0);
+        // Trigger visual beat update in sync
+        const delay = Math.max(0, (nextBeatTimeRef.current - ctx.currentTime) * 1000);
+        const capturedBeat = beat;
+        setTimeout(() => setMetroBeat(capturedBeat), delay);
+        nextBeatTimeRef.current += interval;
+        beatCountRef.current += 1;
+      }
+
+      metroTimerRef.current = setTimeout(tick, scheduleInterval);
+    }
+
+    tick();
+
+    return () => {
+      if (metroTimerRef.current) clearTimeout(metroTimerRef.current);
+    };
+  }, [metroOn, metroBpm]);
+
+  // Stop metronome when navigating away from page
+  useEffect(() => {
+    return () => {
+      if (metroTimerRef.current) clearTimeout(metroTimerRef.current);
+      if (audioCtxRef.current) void audioCtxRef.current.close();
+    };
+  }, []);
 
   const showControlsTemporarily = useCallback(() => {
     setShowCifraControls(true);
@@ -345,6 +414,69 @@ export default function PresentPage({ params }: PageProps) {
               </div>
             </div>
           </div>
+
+          {/* Metrônomo */}
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #1e3650" }}>
+            <p style={{ margin: "0 0 10px", color: "#8fa9c8", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Metrônomo</p>
+            {/* Beat visualizer */}
+            <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 12 }}>
+              {[0, 1, 2, 3].map((b) => (
+                <div key={b} style={{ width: 28, height: 28, borderRadius: 6, background: metroOn && metroBeat === b ? (b === 0 ? "#7cf2a2" : "#a5c8ff") : "#1e3650", transition: "background 0.06s", border: `1px solid ${b === 0 ? "#7cf2a244" : "#2d4b6d"}` }} />
+              ))}
+            </div>
+            {/* BPM */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <p style={{ margin: 0, color: "#8fa9c8", fontSize: 12 }}>
+                BPM: <strong style={{ color: "#e2f0ff" }}>{metroBpm}</strong>
+              </p>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button onClick={() => setMetroBpm((v) => Math.max(20, v - 5))} style={stepBtn}>−5</button>
+                <button onClick={() => setMetroBpm((v) => Math.max(20, v - 1))} style={stepBtn}>−1</button>
+                <button onClick={() => setMetroBpm((v) => Math.min(300, v + 1))} style={stepBtn}>+1</button>
+                <button onClick={() => setMetroBpm((v) => Math.min(300, v + 5))} style={stepBtn}>+5</button>
+              </div>
+            </div>
+            <input type="range" min={20} max={300} step={1} value={metroBpm} onChange={(e) => setMetroBpm(Number(e.target.value))} style={{ width: "100%", accentColor: "#a5c8ff", marginBottom: 8 }} />
+            {/* Common tempos */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+              {([["Largo", 50], ["Andante", 76], ["Moderato", 108], ["Allegro", 132], ["Presto", 168]] as [string, number][]).map(([label, val]) => (
+                <button key={label} onClick={() => setMetroBpm(val)} style={{ flex: 1, background: metroBpm === val ? "#1a2d4a" : "transparent", border: "1px solid #2d4b6d", color: "#8fa9c8", borderRadius: 6, padding: "3px 0", fontSize: 10, cursor: "pointer", minWidth: 50 }}>
+                  {label}<br /><span style={{ color: "#5a7a96" }}>{val}</span>
+                </button>
+              ))}
+            </div>
+            {/* Load from chart BPM */}
+            {activeChart?.parsedJson?.metadata?.bpm && (
+              <button
+                onClick={() => setMetroBpm(activeChart.parsedJson!.metadata!.bpm!)}
+                style={{ width: "100%", background: "#0a1a2d", border: "1px solid #a5c8ff44", color: "#a5c8ff", borderRadius: 8, padding: "6px", fontSize: 12, cursor: "pointer", marginBottom: 8 }}
+              >
+                🎵 Usar BPM da música ({activeChart.parsedJson!.metadata!.bpm} BPM)
+              </button>
+            )}
+            {/* Toggle */}
+            <button
+              onClick={() => setMetroOn((v) => !v)}
+              style={{ width: "100%", background: metroOn ? "#0f3020" : "transparent", border: `1px solid ${metroOn ? "#7cf2a244" : "#2d4b6d"}`, color: metroOn ? "#7cf2a2" : "#8fa9c8", borderRadius: 8, padding: "8px", fontSize: 13, cursor: "pointer", fontWeight: 700 }}
+            >
+              {metroOn ? "⏹ Parar metrônomo" : "▶ Iniciar metrônomo"}
+            </button>
+          </div>
+        </div>
+      }}
+
+      {/* Metronome floating pill */}
+      {metroOn && (
+        <div
+          style={{ position: "fixed", top: autoScroll ? 90 : 60, left: "50%", transform: "translateX(-50%)", zIndex: 15, background: "rgba(165,200,255,0.12)", border: "1px solid #a5c8ff44", borderRadius: 20, padding: "4px 16px", fontSize: 12, color: "#a5c8ff", cursor: "pointer", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", gap: 10, userSelect: "none" }}
+          onClick={(e) => { e.stopPropagation(); setMetroOn(false); }}
+        >
+          <div style={{ display: "flex", gap: 4 }}>
+            {[0, 1, 2, 3].map((b) => (
+              <div key={b} style={{ width: 8, height: 8, borderRadius: "50%", background: metroBeat === b ? (b === 0 ? "#7cf2a2" : "#a5c8ff") : "#1e3650", transition: "background 0.05s" }} />
+            ))}
+          </div>
+          🥁 {metroBpm} BPM — clique para parar
         </div>
       )}
 
