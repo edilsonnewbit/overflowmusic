@@ -74,6 +74,15 @@ const MUSICIAN_STATUS_COLOR: Record<string, string> = {
 };
 const INSTRUMENT_ROLES = ["Bateria", "Baixo", "Guitarra", "Teclado", "Violão", "Vocal", "Trompete", "Saxofone", "Outro"];
 
+// Tabernáculo de Moisés — 5 zonas de louvor
+const TABERNACLE_ZONES = [
+  { value: "Z1", label: "Z1 — Átrios", description: "Graças, abertura • Reconhecimento de Jesus, gratidão pelo que Ele fez" },
+  { value: "Z2", label: "Z2 — Altar", description: "Entrega, rendición, clamor • 'Vem Espírito Santo', 'Toma tudo', 'Me rendo'" },
+  { value: "Z3", label: "Z3 — Santo Lugar", description: "Exaltação, resposta • 'Tu és tudo', honra, 'Eu bendirei ao Senhor'" },
+  { value: "Z4", label: "Z4 — Santuário (Intimidade)", description: "Intimidade, suave • Susurro perante Deus, contemplação" },
+  { value: "Z5", label: "Z5 — Santuário (Alegria)", description: "Alegria, dança, liberdade • Célebração na presença de Deus" },
+];
+
 export default function EventDetailPage({ params }: PageProps) {
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
@@ -673,7 +682,7 @@ export default function EventDetailPage({ params }: PageProps) {
                                 {[
                                   item.key && `Tom: ${item.key}`,
                                   item.leaderName && `Líder: ${item.leaderName}`,
-                                  item.zone && `Zona: ${item.zone}`,
+                                  item.zone && `${TABERNACLE_ZONES.find((z) => z.value === item.zone)?.label ?? item.zone}`,
                                 ]
                                   .filter(Boolean)
                                   .join("  ·  ")}
@@ -788,13 +797,18 @@ export default function EventDetailPage({ params }: PageProps) {
                         <option key={u.id} value={u.name}>{u.name}</option>
                       ))}
                     </select>
-                    <input
-                      style={inputStyle}
-                      placeholder="Zona (Z1..Z5)"
+                    <select
+                      style={{ ...inputStyle, appearance: "none" as const }}
                       value={addSongZone}
                       onChange={(e) => setAddSongZone(e.target.value)}
                       disabled={addingItem}
-                    />
+                      title={TABERNACLE_ZONES.find((z) => z.value === addSongZone)?.description ?? ""}
+                    >
+                      <option value="">Zona (Taber. de Moisés)</option>
+                      {TABERNACLE_ZONES.map((z) => (
+                        <option key={z.value} value={z.value} title={z.description}>{z.label}</option>
+                      ))}
+                    </select>
                     <input
                       style={inputStyle}
                       placeholder="Notas de transição"

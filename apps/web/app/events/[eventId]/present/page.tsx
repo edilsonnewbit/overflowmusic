@@ -4,6 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { SetlistItem, EventSetlist, SongChordChart, SongSectionLine } from "@/lib/types";
 
+const TABERNACLE_ZONES: Record<string, string> = {
+  Z1: "Z1 — Átrios",
+  Z2: "Z2 — Altar",
+  Z3: "Z3 — Santo Lugar",
+  Z4: "Z4 — Santuário (Intimidade)",
+  Z5: "Z5 — Santuário (Alegria)",
+};
+
 type Setlist = NonNullable<EventSetlist>;
 
 type Event = {
@@ -169,7 +177,7 @@ export default function PresentPage({ params }: PageProps) {
             <div style={chipsRow}>
               {item.key && <span style={chip("#7cf2a2", "#0f3020")}>🎵 {item.key}</span>}
               {item.leaderName && <span style={chip("#a5c8ff", "#0f2040")}>🎤 {item.leaderName}</span>}
-              {item.zone && <span style={chip("#fbbf24", "#2a1f00")}>◎ {item.zone}</span>}
+              {item.zone && <span style={chip("#fbbf24", "#2a1f00")}>◎ {TABERNACLE_ZONES[item.zone] ?? item.zone}</span>}
             </div>
             {item.transitionNotes && <p style={transitionStyle}>{item.transitionNotes}</p>}
             {parsed && (
