@@ -28,12 +28,6 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="overflowmusic"/>
       </intent-filter>
-      <intent-filter>
-        <action android:name="android.intent.action.VIEW"/>
-        <category android:name="android.intent.category.DEFAULT"/>
-        <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="com.googleusercontent.apps.1013535529872-3k2u1atvl0n3v9p2m39qevgtlafmfqs5"/>
-      </intent-filter>
     </activity>
   </application>
 </manifest>

@@ -3,10 +3,18 @@ import * as WebBrowser from "expo-web-browser";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import type { LoginPayload } from "../types";
 import { styles, colors } from "../styles";
 
 WebBrowser.maybeCompleteAuthSession();
+
+// Configura Google Sign-In nativo (Android/iOS)
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+  offlineAccess: false,
+});
 
 type Props = {
   onSubmit: (payload: LoginPayload) => Promise<void>;
@@ -24,71 +32,38 @@ export function LoginScreen({ onSubmit }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const googleClientId = useMemo(() => {
-    const fallbackClientId = (process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || "").trim();
-    const platformClientId = Platform.select({
-      web: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-      ios: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      android: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-      default: "",
-    });
-    return (platformClientId || fallbackClientId || "").trim();
-  }, []);
-
   const [googleInfoText, setGoogleInfoText] = useState("");
 
-  const discovery = AuthSession.useAutoDiscovery("https://accounts.google.com");
-  const redirectUri = useMemo(() => {
-    if (Platform.OS === "android") {
-      const androidId = (process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? "").trim();
-      const reverseId = "com.googleusercontent.apps." + androidId.replace(".apps.googleusercontent.com", "");
-      const uri = `${reverseId}:/oauth2redirect/google`;
-      console.log("🔗 Redirect URI Android:", uri);
-      console.log("🔑 Client ID:", googleClientId);
-      return uri;
-    }
-    const uri = AuthSession.makeRedirectUri({ scheme: "overflowmusic" });
-    console.log("🔗 Redirect URI gerado:", uri);
-    console.log("🔑 Client ID:", googleClientId);
-    return uri;
-  }, [googleClientId]);
-  
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: googleClientId,
-      redirectUri,
-      responseType: AuthSession.ResponseType.IdToken,
-      scopes: ["openid", "profile", "email"],
-      usePKCE: false,
-      extraParams: {
-        nonce: "overflow-music-login",
-      },
-    },
-    discovery,
-  );
-
-  useEffect(() => {
-    async function onGoogleResponse() {
-      if (response?.type !== "success") {
-        if (response?.type === "error") {
-          setGoogleInfoText("Falha ao autenticar com Google.");
-        }
-        return;
-      }
-
-      const idToken = response.params?.id_token;
+  // ── Google Sign-In nativo (Android/iOS) ──────────────────────────────────
+  async function handleGoogleSignIn() {
+    setLoading(true);
+    setGoogleInfoText("Abrindo conta Google...");
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken;
       if (!idToken) {
         setGoogleInfoText("Google não retornou idToken.");
         return;
       }
-
       setGoogleInfoText("Token Google recebido. Validando sessão...");
       await onSubmit({ idToken });
+    } catch (error: unknown) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code: string }).code === statusCodes.SIGN_IN_CANCELLED
+      ) {
+        setGoogleInfoText("Login cancelado.");
+      } else {
+        console.error("Google Sign-In error:", error);
+        setGoogleInfoText("Falha ao autenticar com Google.");
+      }
+    } finally {
+      setLoading(false);
     }
-
-    void onGoogleResponse();
-  }, [onSubmit, response]);
+  }
 
   async function handleEmailLogin() {
     if (!email.trim() || !password.trim()) {
@@ -193,23 +168,13 @@ export function LoginScreen({ onSubmit }: Props) {
       {loginMethod === "google" ? (
         <View style={{ gap: 16 }}>
           <Pressable
-            style={[
-              styles.loginButton,
-              !request || !googleClientId ? styles.buttonDisabled : null
-            ]}
-            onPress={() => {
-              if (!googleClientId) {
-                setGoogleInfoText("Configure EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID");
-                return;
-              }
-              if (!request) {
-                setGoogleInfoText("Google Auth inicializando...");
-                return;
-              }
-              void promptAsync();
-            }}
+            style={[styles.loginButton, loading ? styles.buttonDisabled : null]}
+            onPress={() => void handleGoogleSignIn()}
+            disabled={loading}
           >
-            <Text style={styles.loginButtonText}>Entrar com Google</Text>
+            <Text style={styles.loginButtonText}>
+              {loading ? "Aguarde..." : "Entrar com Google"}
+            </Text>
           </Pressable>
 
           {googleInfoText ? (
