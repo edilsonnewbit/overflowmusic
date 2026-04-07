@@ -21,6 +21,7 @@ type CreateEventBody = {
   description?: string;
   eventType?: "CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO";
   status?: "DRAFT" | "ACTIVE" | "PUBLISHED" | "FINISHED" | "ARCHIVED";
+  confirmationDeadline?: string;
   confirmationDeadlineDays?: number;
   responseWindowHours?: number;
 };
@@ -52,6 +53,23 @@ export class EventsController {
       offset: offset ? parseInt(offset, 10) : undefined,
       status,
     });
+  }
+
+  @Get(":id/instrument-configs")
+  async getInstrumentConfigs(@Param("id") id: string) {
+    const configs = await this.eventsService.getInstrumentConfigs(id);
+    return { ok: true, configs };
+  }
+
+  @Post(":id/instrument-configs")
+  async setInstrumentConfig(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { instrumentRole: string; requiredCount: number },
+  ) {
+    await this.authService.assertAdminKeyOrContentManager(authorization);
+    const config = await this.eventsService.setInstrumentConfig(id, body.instrumentRole, body.requiredCount);
+    return { ok: true, config };
   }
 
   @Get("my-invites")

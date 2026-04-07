@@ -124,6 +124,7 @@ model Event {
   description              String?
   eventType                EventType   @default(CULTO)
   status                   EventStatus @default(DRAFT)
+  confirmationDeadline     DateTime?
   confirmationDeadlineDays Int         @default(3)
   responseWindowHours      Int         @default(24)
   createdAt                DateTime    @default(now())
@@ -131,6 +132,20 @@ model Event {
   setlist                  Setlist?
   checklistRuns            ChecklistRun[]
   musicians                EventMusician[]
+  instrumentConfigs        EventInstrumentConfig[]
+}
+
+model EventInstrumentConfig {
+  id             String   @id @default(uuid())
+  eventId        String
+  instrumentRole String
+  requiredCount  Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, instrumentRole])
+  @@index([eventId])
 }
 
 model EventMusician {

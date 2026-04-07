@@ -11,6 +11,7 @@ type CreateEventInput = {
   description?: string;
   eventType?: EventType;
   status?: EventStatus;
+  confirmationDeadline?: string;
   confirmationDeadlineDays?: number;
   responseWindowHours?: number;
 };
@@ -80,6 +81,7 @@ export class EventsService {
           },
           orderBy: [{ instrumentRole: "asc" }, { priority: "asc" }],
         },
+        instrumentConfigs: true,
       },
     });
 
@@ -116,6 +118,7 @@ export class EventsService {
         description: input.description?.trim() || null,
         eventType: input.eventType || "CULTO",
         status: input.status || "DRAFT",
+        confirmationDeadline: input.confirmationDeadline ? new Date(input.confirmationDeadline) : null,
         confirmationDeadlineDays: input.confirmationDeadlineDays ?? 3,
         responseWindowHours: input.responseWindowHours ?? 24,
       },
@@ -138,6 +141,7 @@ export class EventsService {
       description?: string | null;
       eventType?: EventType;
       status?: EventStatus;
+      confirmationDeadline?: Date | null;
       confirmationDeadlineDays?: number;
       responseWindowHours?: number;
     } = {};
@@ -161,6 +165,11 @@ export class EventsService {
     if (input.eventType) data.eventType = input.eventType;
     if (typeof input.confirmationDeadlineDays === "number") data.confirmationDeadlineDays = input.confirmationDeadlineDays;
     if (typeof input.responseWindowHours === "number") data.responseWindowHours = input.responseWindowHours;
+    if (typeof input.confirmationDeadline === "string") {
+      data.confirmationDeadline = input.confirmationDeadline ? new Date(input.confirmationDeadline) : null;
+    } else if (input.confirmationDeadline === null) {
+      data.confirmationDeadline = null;
+    }
 
     const event = await this.prisma.event.update({ where: { id }, data });
 
@@ -280,60 +289,86 @@ export class EventsService {
     return { ok: true, invites };
   }
 
+  async setInstrumentConfig(eventId: string, instrumentRole: string, requiredCount: number) {
+    return this.prisma.eventInstrumentConfig.upsert({
+      where: { eventId_instrumentRole: { eventId, instrumentRole } },
+      create: { eventId, instrumentRole, requiredCount },
+      update: { requiredCount },
+    });
+  }
+
+  async getInstrumentConfigs(eventId: string) {
+    return this.prisma.eventInstrumentConfig.findMany({ where: { eventId } });
+  }
+
   private async triggerMusicianNotifications(eventId: string) {
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
     if (!event) return;
 
-    // Get all instrument roles with PENDING priority=1 musicians
-    const firstSlots = await this.prisma.eventMusician.findMany({
-      where: { eventId, priority: 1, status: "PENDING" },
-      include: { user: { select: { id: true, name: true } } },
+    const allSlots = await this.prisma.eventMusician.findMany({
+      where: { eventId },
+      orderBy: [{ instrumentRole: "asc" }, { priority: "asc" }],
     });
 
-    for (const slot of firstSlots) {
-      await this.notifications.sendMusicianConfirmationRequest(
-        slot.userId,
-        event.title,
-        slot.instrumentRole,
-        slot.id,
-      );
+    const configs = await this.prisma.eventInstrumentConfig.findMany({ where: { eventId } });
+    const configMap = new Map(configs.map((c) => [c.instrumentRole, c.requiredCount]));
 
-      await this.prisma.eventMusician.update({
-        where: { id: slot.id },
-        data: { notifiedAt: new Date() },
-      });
+    // Group slots by role
+    const byRole = new Map<string, typeof allSlots>();
+    for (const slot of allSlots) {
+      if (!byRole.has(slot.instrumentRole)) byRole.set(slot.instrumentRole, []);
+      byRole.get(slot.instrumentRole)!.push(slot);
+    }
+
+    for (const [role, slots] of byRole) {
+      const required = configMap.get(role) ?? 1;
+      // Notify the first `required` musicians (by priority) that are PENDING and not yet notified
+      const toNotify = slots
+        .sort((a, b) => a.priority - b.priority)
+        .slice(0, required)
+        .filter((s) => s.status === "PENDING" && !s.notifiedAt);
+
+      for (const slot of toNotify) {
+        await this.notifications.sendMusicianConfirmationRequest(slot.userId, event.title, role, slot.id);
+        await this.prisma.eventMusician.update({ where: { id: slot.id }, data: { notifiedAt: new Date() } });
+      }
     }
   }
 
   async escalateMusician(eventId: string, instrumentRole: string, currentPriority: number) {
-    const next = await this.prisma.eventMusician.findFirst({
-      where: { eventId, instrumentRole, priority: { gt: currentPriority }, status: "PENDING" },
-      orderBy: { priority: "asc" },
-    });
-
-    if (!next) return; // No more candidates
-
     const event = await this.prisma.event.findUnique({ where: { id: eventId } });
     if (!event) return;
 
-    await this.notifications.sendMusicianConfirmationRequest(
-      next.userId,
-      event.title,
-      instrumentRole,
-      next.id,
-    );
-
-    await this.prisma.eventMusician.update({
-      where: { id: next.id },
-      data: { notifiedAt: new Date() },
+    const config = await this.prisma.eventInstrumentConfig.findUnique({
+      where: { eventId_instrumentRole: { eventId, instrumentRole } },
     });
+    const required = config?.requiredCount ?? 1;
+
+    // Count how many are already confirmed or notified (active in the queue)
+    const activeCount = await this.prisma.eventMusician.count({
+      where: { eventId, instrumentRole, status: { in: ["CONFIRMED", "PENDING"] }, notifiedAt: { not: null } },
+    });
+
+    if (activeCount >= required) return; // Já temos confirmados/notificados suficientes
+
+    // Notificar o próximo da fila que ainda não foi notificado
+    const next = await this.prisma.eventMusician.findFirst({
+      where: { eventId, instrumentRole, priority: { gt: currentPriority }, status: "PENDING", notifiedAt: null },
+      orderBy: { priority: "asc" },
+    });
+
+    if (!next) return;
+
+    await this.notifications.sendMusicianConfirmationRequest(next.userId, event.title, instrumentRole, next.id);
+    await this.prisma.eventMusician.update({ where: { id: next.id }, data: { notifiedAt: new Date() } });
   }
 
-  /** Called by the worker/cron: expire musicians who didn't respond within responseWindowHours */
+  /** Called by the worker/cron: expire musicians who didn't respond within responseWindowHours,
+   *  and alert admins when confirmationDeadline is passed with pending slots */
   async processExpiredMusicians() {
     const eventsToCheck = await this.prisma.event.findMany({
       where: { status: { in: ["ACTIVE", "PUBLISHED"] } },
-      select: { id: true, title: true, responseWindowHours: true },
+      select: { id: true, title: true, responseWindowHours: true, confirmationDeadline: true },
     });
 
     for (const event of eventsToCheck) {
@@ -349,11 +384,16 @@ export class EventsService {
       });
 
       for (const slot of expiredSlots) {
-        await this.prisma.eventMusician.update({
-          where: { id: slot.id },
+        await this.prisma.eventMusician.update({ where: { id: slot.id }, data: { status: "EXPIRED" } });
+        void this.escalateMusician(slot.eventId, slot.instrumentRole, slot.priority);
+      }
+
+      // Se passou o prazo de confirmação, expirar todos os PENDING não notificados
+      if (event.confirmationDeadline && new Date() > event.confirmationDeadline) {
+        await this.prisma.eventMusician.updateMany({
+          where: { eventId: event.id, status: "PENDING", notifiedAt: null },
           data: { status: "EXPIRED" },
         });
-        void this.escalateMusician(slot.eventId, slot.instrumentRole, slot.priority);
       }
     }
 
