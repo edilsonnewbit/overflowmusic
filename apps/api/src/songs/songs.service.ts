@@ -7,6 +7,7 @@ type CreateSongInput = {
   title: string;
   artist?: string;
   defaultKey?: string;
+  zone?: string;
   tags?: string[];
 };
 
@@ -76,6 +77,7 @@ export class SongsService {
         title,
         artist: input.artist?.trim() || null,
         defaultKey: input.defaultKey?.trim() || null,
+        zone: input.zone?.trim() || null,
         tags: Array.isArray(input.tags) ? (input.tags as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
@@ -93,6 +95,7 @@ export class SongsService {
       title?: string;
       artist?: string | null;
       defaultKey?: string | null;
+      zone?: string | null;
       tags?: Prisma.InputJsonValue;
     } = {};
 
@@ -106,6 +109,7 @@ export class SongsService {
 
     if (typeof input.artist === "string") data.artist = input.artist.trim() || null;
     if (typeof input.defaultKey === "string") data.defaultKey = input.defaultKey.trim() || null;
+    if (typeof input.zone === "string") data.zone = input.zone.trim() || null;
     if (Array.isArray(input.tags)) data.tags = input.tags as Prisma.InputJsonValue;
 
     const song = await this.prisma.song.update({

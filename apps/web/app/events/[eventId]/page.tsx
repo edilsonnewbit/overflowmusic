@@ -36,6 +36,7 @@ type SongOption = {
   title: string;
   artist: string | null;
   defaultKey: string | null;
+  zone: string | null;
 };
 
 type TeamUser = {
@@ -748,6 +749,7 @@ export default function EventDetailPage({ params }: PageProps) {
                                 setSelectedSong(s);
                                 setAddSongTitle(s.title);
                                 setAddSongKey(s.defaultKey ?? "");
+                                setAddSongZone(s.zone ?? "");
                                 setSongSearch("");
                                 setShowSongDropdown(false);
                               }}
@@ -795,18 +797,6 @@ export default function EventDetailPage({ params }: PageProps) {
                       <option value="">Líder vocal (opcional)</option>
                       {teamUsers.map((u) => (
                         <option key={u.id} value={u.name}>{u.name}</option>
-                      ))}
-                    </select>
-                    <select
-                      style={{ ...inputStyle, appearance: "none" as const }}
-                      value={addSongZone}
-                      onChange={(e) => setAddSongZone(e.target.value)}
-                      disabled={addingItem}
-                      title={TABERNACLE_ZONES.find((z) => z.value === addSongZone)?.description ?? ""}
-                    >
-                      <option value="">Zona (Taber. de Moisés)</option>
-                      {TABERNACLE_ZONES.map((z) => (
-                        <option key={z.value} value={z.value} title={z.description}>{z.label}</option>
                       ))}
                     </select>
                     <input
