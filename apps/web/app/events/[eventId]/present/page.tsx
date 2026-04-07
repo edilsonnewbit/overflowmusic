@@ -41,6 +41,7 @@ export default function PresentPage({ params }: PageProps) {
   const [scrollSpeed, setScrollSpeed] = useState(20);
   const [showChords, setShowChords] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [fontSize, setFontSize] = useState(14);
 
   useEffect(() => {
     void params.then(({ eventId: id }) => setEventId(id));
@@ -234,9 +235,15 @@ export default function PresentPage({ params }: PageProps) {
           </label>
 
           {/* Speed */}
-          <p style={{ margin: "0 0 6px", color: "#8fa9c8", fontSize: 12 }}>
-            Velocidade: <strong style={{ color: "#e2f0ff" }}>{scrollSpeed} px/s</strong>
-          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <p style={{ margin: 0, color: "#8fa9c8", fontSize: 12 }}>
+              Velocidade: <strong style={{ color: "#e2f0ff" }}>{scrollSpeed} px/s</strong>
+            </p>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button onClick={() => setScrollSpeed((v) => Math.max(5, v - 5))} style={stepBtn} title="Diminuir velocidade">▼</button>
+              <button onClick={() => setScrollSpeed((v) => Math.min(100, v + 5))} style={stepBtn} title="Aumentar velocidade">▲</button>
+            </div>
+          </div>
           <input type="range" min={5} max={100} step={5} value={scrollSpeed} onChange={(e) => setScrollSpeed(Number(e.target.value))} style={{ width: "100%", accentColor: "#7cf2a2", marginBottom: 6 }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#3a5a6a", marginBottom: 10 }}>
             <span>Lento</span><span>Médio</span><span>Rápido</span>
@@ -258,6 +265,19 @@ export default function PresentPage({ params }: PageProps) {
               🎵 Usar BPM da música ({activeChart.parsedJson!.metadata!.bpm} BPM → {Math.max(5, Math.round(activeChart.parsedJson!.metadata!.bpm! / 6))} px/s)
             </button>
           )}
+
+          {/* Tamanho da letra */}
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #1e3650" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <p style={{ margin: 0, color: "#8fa9c8", fontSize: 12 }}>
+                Tamanho da letra: <strong style={{ color: "#e2f0ff" }}>{fontSize}px</strong>
+              </p>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button onClick={() => setFontSize((v) => Math.max(10, v - 2))} style={{ ...stepBtn, fontWeight: 700 }}>A-</button>
+                <button onClick={() => setFontSize((v) => Math.min(32, v + 2))} style={{ ...stepBtn, fontWeight: 700 }}>A+</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -310,17 +330,21 @@ export default function PresentPage({ params }: PageProps) {
                 >
                   {autoScroll ? "⏸ Pausar" : "▶ Rolar"}
                 </button>
+                <button onClick={(e) => { e.stopPropagation(); setScrollSpeed((v) => Math.max(5, v - 5)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px" }} title="Diminuir velocidade">▼</button>
+                <button onClick={(e) => { e.stopPropagation(); setScrollSpeed((v) => Math.min(100, v + 5)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px" }} title="Aumentar velocidade">▲</button>
+                <button onClick={(e) => { e.stopPropagation(); setFontSize((v) => Math.max(10, v - 2)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px", fontWeight: 700 }}>A-</button>
+                <button onClick={(e) => { e.stopPropagation(); setFontSize((v) => Math.min(32, v + 2)); }} style={{ ...closeCifraBtn, color: "#8fa9c8", padding: "4px 8px", fontWeight: 700 }}>A+</button>
                 <button onClick={() => setShowCifra(false)} style={closeCifraBtn}>✕ Ocultar</button>
               </div>
             </div>
             <div ref={cifraScrollRef} style={{ overflowY: "auto", maxHeight: "calc(100dvh - 200px)" }}>
               {parsed.sections.map((section, si) => (
                 <div key={si} style={{ marginBottom: 20 }}>
-                  <p style={sectionNameStyle}>[{section.name}]</p>
+                  <p style={{ ...sectionNameStyle, fontSize: Math.max(11, fontSize - 2) }}>[{section.name}]</p>
                   {section.lines
                     .filter((line) => showChords || line.type !== "chords")
                     .map((line, li) => (
-                      <pre key={li} style={lineStyle(line.type)}>{line.content || " "}</pre>
+                      <pre key={li} style={lineStyle(line.type, fontSize)}>{line.content || " "}</pre>
                     ))}
                 </div>
               ))}
@@ -443,10 +467,10 @@ const sectionNameStyle: React.CSSProperties = {
   fontSize: 13, letterSpacing: 1, textTransform: "uppercase", fontFamily: "inherit",
 };
 
-function lineStyle(type: SongSectionLine["type"]): React.CSSProperties {
+function lineStyle(type: SongSectionLine["type"], size: number): React.CSSProperties {
   const base: React.CSSProperties = {
     margin: "0 0 2px", whiteSpace: "pre",
-    fontFamily: "'Courier New', Courier, monospace", fontSize: 14, lineHeight: 1.6,
+    fontFamily: "'Courier New', Courier, monospace", fontSize: size, lineHeight: 1.6,
   };
   if (type === "chords") return { ...base, color: "#7cf2a2", fontWeight: 700 };
   if (type === "tab") return { ...base, color: "#93c5fd" };
@@ -464,4 +488,10 @@ const closeCifraBtn: React.CSSProperties = {
   background: "transparent", border: "1px solid #2d4b6d",
   color: "#f87171", borderRadius: 8, padding: "4px 12px",
   fontSize: 12, cursor: "pointer",
+};
+
+const stepBtn: React.CSSProperties = {
+  background: "transparent", border: "1px solid #2d4b6d",
+  color: "#b3c6e0", borderRadius: 6, padding: "2px 8px",
+  fontSize: 12, cursor: "pointer", lineHeight: 1.4,
 };
