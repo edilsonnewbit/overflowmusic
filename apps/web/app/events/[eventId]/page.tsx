@@ -25,10 +25,17 @@ type Event = {
   description: string | null;
   status: EventStatus | "ACTIVE" | "FINISHED";
   computedStatus?: string;
+  confirmationDeadline?: string | null;
   confirmationDeadlineDays?: number;
   responseWindowHours?: number;
   musicians?: EventMusician[];
   setlist: Setlist | null;
+};
+
+type InstrumentConfig = {
+  id: string;
+  instrumentRole: string;
+  requiredCount: number;
 };
 
 type SongOption = {
@@ -100,6 +107,7 @@ export default function EventDetailPage({ params }: PageProps) {
   const [editLocation, setEditLocation] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editConfirmationDeadline, setEditConfirmationDeadline] = useState("");
   const [saving, setSaving] = useState(false);
 
   // songs catalog
@@ -110,6 +118,10 @@ export default function EventDetailPage({ params }: PageProps) {
 
   // team members for leader selector
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+
+  // instrument configs (vagas por instrumento)
+  const [instrumentConfigs, setInstrumentConfigs] = useState<InstrumentConfig[]>([]);
+  const [savingConfig, setSavingConfig] = useState(false);
 
   // musician team
   const [musicRole, setMusicRole] = useState(INSTRUMENT_ROLES[0]);
@@ -176,9 +188,16 @@ export default function EventDetailPage({ params }: PageProps) {
     setLoading(true);
     setStatus("Carregando evento...");
     try {
-      const response = await fetch(`/api/events/${id}`, { method: "GET" });
-      const body = await parseJson<{ event: Event }>(response);
+      const [evRes, cfgRes] = await Promise.all([
+        fetch(`/api/events/${id}`, { method: "GET" }),
+        fetch(`/api/events/${id}/instrument-configs`, { method: "GET" }),
+      ]);
+      const body = await parseJson<{ event: Event }>(evRes);
       setEvent(body.event);
+      if (cfgRes.ok) {
+        const cfgBody = (await cfgRes.json()) as { configs?: InstrumentConfig[] };
+        setInstrumentConfigs(cfgBody.configs ?? []);
+      }
       setStatus("OK");
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Erro ao carregar.");
@@ -202,6 +221,9 @@ export default function EventDetailPage({ params }: PageProps) {
           location: editLocation.trim() || null,
           address: editAddress.trim() || null,
           description: editDescription.trim() || null,
+          confirmationDeadline: editConfirmationDeadline
+            ? new Date(editConfirmationDeadline).toISOString()
+            : null,
         }),
       });
       await parseJson<unknown>(response);
@@ -212,6 +234,27 @@ export default function EventDetailPage({ params }: PageProps) {
       setStatus(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveInstrumentConfig(role: string, count: number) {
+    if (!eventId) return;
+    setSavingConfig(true);
+    try {
+      await fetch(`/api/events/${eventId}/instrument-configs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instrumentRole: role, requiredCount: count }),
+      });
+      setInstrumentConfigs((prev) => {
+        const exists = prev.find((c) => c.instrumentRole === role);
+        if (exists) return prev.map((c) => c.instrumentRole === role ? { ...c, requiredCount: count } : c);
+        return [...prev, { id: "", instrumentRole: role, requiredCount: count }];
+      });
+    } catch {
+      // silently ignore
+    } finally {
+      setSavingConfig(false);
     }
   }
 
@@ -519,6 +562,23 @@ export default function EventDetailPage({ params }: PageProps) {
                     }}>
                       {STATUS_LABEL[displayStatus] ?? displayStatus}
                     </span>
+                    {event.confirmationDeadline && (() => {
+                      const deadline = new Date(event.confirmationDeadline);
+                      const now = new Date();
+                      const passed = now > deadline;
+                      const hoursLeft = (deadline.getTime() - now.getTime()) / 36e5;
+                      const urgent = !passed && hoursLeft < 24;
+                      return (
+                        <span style={{
+                          fontSize: 11, fontWeight: 600,
+                          color: passed ? "#f87171" : urgent ? "#fbbf24" : "#8fa9c8",
+                          border: `1px solid ${passed ? "#f87171" : urgent ? "#fbbf24" : "#4a6278"}`,
+                          borderRadius: 6, padding: "2px 10px",
+                        }}>
+                          {passed ? "⚠ Prazo encerrado" : `⏱ Prazo: ${deadline.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}
+                        </span>
+                      );
+                    })()}
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
                       {event.status === "DRAFT" && (
                         <button style={smallBtn("#60a5fa")} disabled={saving} onClick={() => void changeStatus("ACTIVE")}>Ativar</button>
@@ -537,6 +597,11 @@ export default function EventDetailPage({ params }: PageProps) {
                           setEditLocation(event.location ?? "");
                           setEditAddress(event.address ?? "");
                           setEditDescription(event.description ?? "");
+                          setEditConfirmationDeadline(
+                            event.confirmationDeadline
+                              ? new Date(event.confirmationDeadline).toISOString().slice(0, 16)
+                              : ""
+                          );
                           setShowEdit((v) => !v);
                         }}
                       >
@@ -565,6 +630,19 @@ export default function EventDetailPage({ params }: PageProps) {
               <input style={inputStyle} value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="Rua das Flores, 123, São Paulo" disabled={saving} />
               <label style={labelStyle}>Descrição</label>
               <textarea style={{ ...inputStyle, height: 72, resize: "vertical" }} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} disabled={saving} />
+              <label style={labelStyle}>Prazo para confirmar escala</label>
+              <input
+                style={inputStyle}
+                type="datetime-local"
+                value={editConfirmationDeadline}
+                onChange={(e) => setEditConfirmationDeadline(e.target.value)}
+                disabled={saving}
+              />
+              {editConfirmationDeadline && (
+                <p style={{ margin: "-4px 0 4px", fontSize: 11, color: "#8fa9c8" }}>
+                  Músicos pendentes após este prazo terão seu slot expirado automaticamente.
+                </p>
+              )}
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="submit" style={primaryBtn} disabled={saving}>{saving ? "Salvando..." : "Salvar"}</button>
                 <button type="button" style={{ ...primaryBtn, background: "transparent", color: "#8fa9c8", border: "1px solid #2d4b6d" }} onClick={() => setShowEdit(false)}>Cancelar</button>
@@ -581,9 +659,35 @@ export default function EventDetailPage({ params }: PageProps) {
                 {/* Grouped by instrument role */}
                 {INSTRUMENT_ROLES.filter((role) => (event.musicians ?? []).some((m) => m.instrumentRole === role)).map((role) => {
                   const roleMusicians = (event.musicians ?? []).filter((m) => m.instrumentRole === role).sort((a, b) => a.priority - b.priority);
+                  const cfg = instrumentConfigs.find((c) => c.instrumentRole === role);
+                  const required = cfg?.requiredCount ?? 1;
+                  const confirmed = roleMusicians.filter((m) => m.status === "CONFIRMED").length;
                   return (
                     <div key={role} style={{ marginBottom: 12 }}>
-                      <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#b3c6e0", fontSize: 14 }}>{role}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                        <p style={{ margin: 0, fontWeight: 700, color: "#b3c6e0", fontSize: 14 }}>{role}</p>
+                        <span style={{
+                          fontSize: 11, color: confirmed >= required ? "#7cf2a2" : "#fbbf24",
+                          border: `1px solid ${confirmed >= required ? "#7cf2a2" : "#fbbf24"}`,
+                          borderRadius: 999, padding: "1px 8px", fontWeight: 600,
+                        }}>
+                          {confirmed}/{required} vaga{required > 1 ? "s" : ""}
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                          <span style={{ fontSize: 11, color: "#5a7a9a" }}>Vagas:</span>
+                          <button
+                            style={{ ...orderBtn, padding: "2px 7px", fontSize: 13 }}
+                            disabled={savingConfig || required <= 1}
+                            onClick={() => void saveInstrumentConfig(role, required - 1)}
+                          >−</button>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "#b3c6e0", minWidth: 16, textAlign: "center" }}>{required}</span>
+                          <button
+                            style={{ ...orderBtn, padding: "2px 7px", fontSize: 13 }}
+                            disabled={savingConfig}
+                            onClick={() => void saveInstrumentConfig(role, required + 1)}
+                          >+</button>
+                        </div>
+                      </div>
                       {roleMusicians.map((m, idx) => {
                         const isFirst = idx === 0;
                         const isLast = idx === roleMusicians.length - 1;
