@@ -274,6 +274,9 @@ export default function PresentPage({ params }: PageProps) {
       if (e.key === "f" || e.key === "F") {
         setCifraFullscreen((v) => !v);
       }
+      if (e.key === "m" || e.key === "M") {
+        setMetroOn((v) => !v);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -331,7 +334,7 @@ export default function PresentPage({ params }: PageProps) {
           {event.title}{event.setlist?.title ? ` — ${event.setlist.title}` : ""}
         </span>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <span style={{ color: "#5a7a9a", fontSize: 11 }}>H=nav • C=cifra • G=acordes • S=scroll • F=fullscreen • ←→=navegar</span>
+          <span style={{ color: "#5a7a9a", fontSize: 11 }}>H=nav • C=cifra • G=acordes • S=scroll • F=fullscreen • M=metrônomo • ←→=navegar</span>
           <button
             onClick={(e) => { e.stopPropagation(); setShowSettings((v) => !v); }}
             style={{ background: showSettings ? "#1e3a5a" : "transparent", border: "1px solid #2d4b6d", color: "#b3c6e0", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}
