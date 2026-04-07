@@ -36,6 +36,11 @@ export default function PresentPage({ params }: PageProps) {
   const [showCifra, setShowCifra] = useState(false);
   const [chartMap, setChartMap] = useState<Record<string, SongChordChart | null>>({});
   const chartCacheRef = useRef<Record<string, SongChordChart | null>>({});
+  const cifraScrollRef = useRef<HTMLDivElement>(null);
+  const [autoScroll, setAutoScroll] = useState(false);
+  const [scrollSpeed, setScrollSpeed] = useState(20);
+  const [showChords, setShowChords] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     void params.then(({ eventId: id }) => setEventId(id));
@@ -83,6 +88,24 @@ export default function PresentPage({ params }: PageProps) {
     void loadChart(items[current].songTitle);
   }, [current, items]);
 
+  useEffect(() => {
+    setAutoScroll(false);
+    if (cifraScrollRef.current) cifraScrollRef.current.scrollTop = 0;
+  }, [current]);
+
+  useEffect(() => {
+    if (!autoScroll || !showCifra) return;
+    const id = setInterval(() => {
+      const el = cifraScrollRef.current;
+      if (!el) return;
+      el.scrollTop += (scrollSpeed * 16) / 1000;
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) {
+        setAutoScroll(false);
+      }
+    }, 16);
+    return () => clearInterval(id);
+  }, [autoScroll, showCifra, scrollSpeed]);
+
   const goTo = useCallback(
     (idx: number) => {
       if (idx >= 0 && idx < items.length) setCurrent(idx);
@@ -108,6 +131,12 @@ export default function PresentPage({ params }: PageProps) {
       }
       if (e.key === "c" || e.key === "C") {
         setShowCifra((v) => !v);
+      }
+      if (e.key === "s" || e.key === "S") {
+        setAutoScroll((v) => !v);
+      }
+      if (e.key === "g" || e.key === "G") {
+        setShowChords((v) => !v);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -164,8 +193,83 @@ export default function PresentPage({ params }: PageProps) {
         <span style={{ color: "#8fa9c8", fontSize: 13 }}>
           {event.title}{event.setlist?.title ? ` — ${event.setlist.title}` : ""}
         </span>
-        <span style={{ color: "#5a7a9a", fontSize: 11 }}>H=nav • C=cifra • ←→=navegar</span>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <span style={{ color: "#5a7a9a", fontSize: 11 }}>H=nav • C=cifra • G=acordes • S=scroll • ←→=navegar</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowSettings((v) => !v); }}
+            style={{ background: showSettings ? "#1e3a5a" : "transparent", border: "1px solid #2d4b6d", color: "#b3c6e0", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}
+          >
+            ⚙ Config
+          </button>
+        </div>
       </div>
+
+      {/* Settings panel */}
+      {showSettings && (
+        <div
+          style={{ position: "fixed", top: 56, right: 20, zIndex: 20, background: "rgba(8, 16, 30, 0.97)", border: "1px solid #2d4b6d", borderRadius: 16, padding: "16px 20px", width: 290, backdropFilter: "blur(10px)" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <p style={{ margin: 0, fontWeight: 700, color: "#e2f0ff", fontSize: 14 }}>⚙ Configurações</p>
+            <button onClick={() => setShowSettings(false)} style={{ background: "transparent", border: "none", color: "#5a7a9a", cursor: "pointer", fontSize: 16 }}>✕</button>
+          </div>
+
+          {/* Mostrar acordes */}
+          <p style={{ margin: "0 0 6px", color: "#8fa9c8", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Cifra</p>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 16 }} onClick={() => setShowChords((v) => !v)}>
+            <div style={{ width: 36, height: 20, borderRadius: 99, position: "relative", background: showChords ? "#7cf2a2" : "#1e3650", transition: "background 0.2s", cursor: "pointer", flexShrink: 0 }}>
+              <div style={{ position: "absolute", top: 2, left: showChords ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+            </div>
+            <span style={{ color: "#b3c6e0", fontSize: 13 }}>Mostrar acordes na cifra</span>
+          </label>
+
+          {/* Auto-scroll */}
+          <p style={{ margin: "0 0 6px", color: "#8fa9c8", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Rolagem automática</p>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 12 }} onClick={() => setAutoScroll((v) => !v)}>
+            <div style={{ width: 36, height: 20, borderRadius: 99, position: "relative", background: autoScroll ? "#7cf2a2" : "#1e3650", transition: "background 0.2s", cursor: "pointer", flexShrink: 0 }}>
+              <div style={{ position: "absolute", top: 2, left: autoScroll ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+            </div>
+            <span style={{ color: "#b3c6e0", fontSize: 13 }}>{autoScroll ? "Rolando..." : "Pausado"}</span>
+          </label>
+
+          {/* Speed */}
+          <p style={{ margin: "0 0 6px", color: "#8fa9c8", fontSize: 12 }}>
+            Velocidade: <strong style={{ color: "#e2f0ff" }}>{scrollSpeed} px/s</strong>
+          </p>
+          <input type="range" min={5} max={100} step={5} value={scrollSpeed} onChange={(e) => setScrollSpeed(Number(e.target.value))} style={{ width: "100%", accentColor: "#7cf2a2", marginBottom: 6 }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#3a5a6a", marginBottom: 10 }}>
+            <span>Lento</span><span>Médio</span><span>Rápido</span>
+          </div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            {([["Lento", 10], ["Normal", 20], ["Rápido", 40]] as [string, number][]).map(([label, val]) => (
+              <button key={label} onClick={() => setScrollSpeed(val)} style={{ flex: 1, background: scrollSpeed === val ? "#1e3a5a" : "transparent", border: "1px solid #2d4b6d", color: "#b3c6e0", borderRadius: 6, padding: "4px 0", fontSize: 12, cursor: "pointer" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* BPM */}
+          {activeChart?.parsedJson?.metadata?.bpm && (
+            <button
+              onClick={() => setScrollSpeed(Math.max(5, Math.round(activeChart.parsedJson!.metadata!.bpm! / 6)))}
+              style={{ width: "100%", background: "#0f2d1a", border: "1px solid #7cf2a244", color: "#7cf2a2", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer" }}
+            >
+              🎵 Usar BPM da música ({activeChart.parsedJson!.metadata!.bpm} BPM → {Math.max(5, Math.round(activeChart.parsedJson!.metadata!.bpm! / 6))} px/s)
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Auto-scroll pill */}
+      {autoScroll && (
+        <div
+          style={{ position: "fixed", top: 60, left: "50%", transform: "translateX(-50%)", zIndex: 15, background: "rgba(124,242,162,0.12)", border: "1px solid #7cf2a244", borderRadius: 20, padding: "4px 16px", fontSize: 12, color: "#7cf2a2", cursor: "pointer", backdropFilter: "blur(6px)" }}
+          onClick={(e) => { e.stopPropagation(); setAutoScroll(false); }}
+        >
+          ▶ Rolando automaticamente — clique para pausar
+        </div>
+      )}
 
       {/* Main content */}
       <main style={mainStyle}>
@@ -193,20 +297,31 @@ export default function PresentPage({ params }: PageProps) {
 
         {showCifra && parsed && (
           <div style={cifraContainerStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: 20, color: "#e2f0ff" }}>{item.songTitle}</h2>
-              <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 18, color: "#e2f0ff" }}>{item.songTitle}</h2>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                 {item.key && <span style={chip("#7cf2a2", "#0f3020")}>🎵 {item.key}</span>}
+                <button onClick={(e) => { e.stopPropagation(); setShowChords((v) => !v); }} style={{ ...closeCifraBtn, color: showChords ? "#7cf2a2" : "#8fa9c8" }}>
+                  {showChords ? "♪ Sem acordes" : "♪ Com acordes"}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setAutoScroll((v) => !v); }}
+                  style={{ ...closeCifraBtn, color: autoScroll ? "#7cf2a2" : "#8fa9c8", borderColor: autoScroll ? "#7cf2a244" : "#2d4b6d" }}
+                >
+                  {autoScroll ? "⏸ Pausar" : "▶ Rolar"}
+                </button>
                 <button onClick={() => setShowCifra(false)} style={closeCifraBtn}>✕ Ocultar</button>
               </div>
             </div>
-            <div style={{ overflowY: "auto", maxHeight: "calc(100dvh - 200px)" }}>
+            <div ref={cifraScrollRef} style={{ overflowY: "auto", maxHeight: "calc(100dvh - 200px)" }}>
               {parsed.sections.map((section, si) => (
                 <div key={si} style={{ marginBottom: 20 }}>
                   <p style={sectionNameStyle}>[{section.name}]</p>
-                  {section.lines.map((line, li) => (
-                    <pre key={li} style={lineStyle(line.type)}>{line.content || " "}</pre>
-                  ))}
+                  {section.lines
+                    .filter((line) => showChords || line.type !== "chords")
+                    .map((line, li) => (
+                      <pre key={li} style={lineStyle(line.type)}>{line.content || " "}</pre>
+                    ))}
                 </div>
               ))}
             </div>
