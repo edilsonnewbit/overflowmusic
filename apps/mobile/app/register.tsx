@@ -118,6 +118,8 @@ export default function RegisterScreen() {
   const [birthDate, setBirthDate] = useState("");
   const [church, setChurch] = useState("");
   const [pastorName, setPastorName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
 
   // ─── Terms state ────────────────────────────────────────────────────────────
@@ -151,6 +153,32 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (!instagramProfile.trim()) {
+      Alert.alert("Erro", "Informe seu Instagram");
+      return;
+    }
+    const isoDate = parseBirthDate(birthDate.trim());
+    if (!isoDate) {
+      Alert.alert("Erro", "Informe uma data de nascimento válida (DD/MM/AAAA)");
+      return;
+    }
+    if (!church.trim()) {
+      Alert.alert("Erro", "Informe a igreja que você faz parte");
+      return;
+    }
+    if (!pastorName.trim()) {
+      Alert.alert("Erro", "Informe o nome do pastor");
+      return;
+    }
+    if (!whatsapp.trim()) {
+      Alert.alert("Erro", "Informe o número do WhatsApp");
+      return;
+    }
+    if (!address.trim()) {
+      Alert.alert("Erro", "Informe seu endereço");
+      return;
+    }
+
     if (!termsAccepted) {
       Alert.alert(
         "Termo obrigatório",
@@ -168,14 +196,13 @@ export default function RegisterScreen() {
         password,
         name: name.trim(),
         volunteerTermsAccepted: true,
+        instagramProfile: instagramProfile.trim(),
+        birthDate: isoDate,
+        church: church.trim(),
+        pastorName: pastorName.trim(),
+        whatsapp: whatsapp.trim(),
+        address: address.trim(),
       };
-      if (instagramProfile.trim()) body.instagramProfile = instagramProfile.trim();
-      if (birthDate.trim()) {
-        const iso = parseBirthDate(birthDate.trim());
-        if (iso) body.birthDate = iso;
-      }
-      if (church.trim()) body.church = church.trim();
-      if (pastorName.trim()) body.pastorName = pastorName.trim();
 
       const response = await fetch(`${apiUrl}/api/auth/register`, {
         method: "POST",
@@ -268,7 +295,7 @@ export default function RegisterScreen() {
 
             {/* ── Instagram ── */}
             <View>
-              <Text style={labelStyle}>Instagram (opcional)</Text>
+              <Text style={labelStyle}>Instagram *</Text>
               <TextInput
                 style={inputStyle}
                 value={instagramProfile}
@@ -281,7 +308,7 @@ export default function RegisterScreen() {
 
             {/* ── Data de nascimento ── */}
             <View>
-              <Text style={labelStyle}>Data de nascimento (opcional)</Text>
+              <Text style={labelStyle}>Data de nascimento *</Text>
               <TextInput
                 style={inputStyle}
                 value={birthDate}
@@ -295,7 +322,7 @@ export default function RegisterScreen() {
 
             {/* ── Igreja ── */}
             <View>
-              <Text style={labelStyle}>Igreja que faz parte (opcional)</Text>
+              <Text style={labelStyle}>Igreja que faz parte *</Text>
               <TextInput
                 style={inputStyle}
                 value={church}
@@ -308,12 +335,39 @@ export default function RegisterScreen() {
 
             {/* ── Pastor ── */}
             <View>
-              <Text style={labelStyle}>Nome do pastor (opcional)</Text>
+              <Text style={labelStyle}>Nome do pastor *</Text>
               <TextInput
                 style={inputStyle}
                 value={pastorName}
                 onChangeText={setPastorName}
                 placeholder="Nome do pastor"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="words"
+              />
+            </View>
+
+            {/* ── WhatsApp ── */}
+            <View>
+              <Text style={labelStyle}>WhatsApp *</Text>
+              <TextInput
+                style={inputStyle}
+                value={whatsapp}
+                onChangeText={setWhatsapp}
+                placeholder="(11) 99999-9999"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="phone-pad"
+                maxLength={20}
+              />
+            </View>
+
+            {/* ── Endereço ── */}
+            <View>
+              <Text style={labelStyle}>Endereço *</Text>
+              <TextInput
+                style={inputStyle}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Rua, número, bairro, cidade"
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="words"
               />

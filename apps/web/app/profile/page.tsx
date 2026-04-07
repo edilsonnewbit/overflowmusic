@@ -18,6 +18,8 @@ export default function ProfilePage() {
   const [birthDate, setBirthDate] = useState("");
   const [church, setChurch] = useState("");
   const [pastorName, setPastorName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -45,6 +47,8 @@ export default function ProfilePage() {
         setBirthDate(body.user.birthDate ?? "");
         setChurch(body.user.church ?? "");
         setPastorName(body.user.pastorName ?? "");
+        setWhatsapp(body.user.whatsapp ?? "");
+        setAddress(body.user.address ?? "");
       } catch {
         router.replace("/login");
       } finally {
@@ -62,6 +66,30 @@ export default function ProfilePage() {
       setErrorMsg("O nome não pode estar vazio.");
       return;
     }
+    if (!instagramProfile.trim()) {
+      setErrorMsg("Instagram é obrigatório.");
+      return;
+    }
+    if (!birthDate.trim()) {
+      setErrorMsg("Data de nascimento é obrigatória.");
+      return;
+    }
+    if (!church.trim()) {
+      setErrorMsg("Igreja que faz parte é obrigatória.");
+      return;
+    }
+    if (!pastorName.trim()) {
+      setErrorMsg("Nome do pastor é obrigatório.");
+      return;
+    }
+    if (!whatsapp.trim()) {
+      setErrorMsg("WhatsApp é obrigatório.");
+      return;
+    }
+    if (!address.trim()) {
+      setErrorMsg("Endereço é obrigatório.");
+      return;
+    }
     setErrorMsg("");
     setSaving(true);
     try {
@@ -71,10 +99,12 @@ export default function ProfilePage() {
         body: JSON.stringify({
           name: trimmed,
           instruments,
-          instagramProfile: instagramProfile.trim() || null,
-          birthDate: birthDate.trim() || null,
-          church: church.trim() || null,
-          pastorName: pastorName.trim() || null,
+          instagramProfile: instagramProfile.trim(),
+          birthDate: birthDate.trim(),
+          church: church.trim(),
+          pastorName: pastorName.trim(),
+          whatsapp: whatsapp.trim(),
+          address: address.trim(),
         }),
       });
       const body = (await res.json()) as { ok?: boolean; user?: AuthUser; message?: string };
@@ -158,7 +188,7 @@ export default function ProfilePage() {
           />
 
           <label style={labelStyle} htmlFor="profile-instagram">
-            Instagram (opcional)
+            Instagram *
           </label>
           <input
             id="profile-instagram"
@@ -172,7 +202,7 @@ export default function ProfilePage() {
           />
 
           <label style={labelStyle} htmlFor="profile-birthdate">
-            Data de nascimento
+            Data de nascimento *
           </label>
           <input
             id="profile-birthdate"
@@ -184,7 +214,7 @@ export default function ProfilePage() {
           />
 
           <label style={labelStyle} htmlFor="profile-church">
-            Igreja que faz parte
+            Igreja que faz parte *
           </label>
           <input
             id="profile-church"
@@ -197,7 +227,7 @@ export default function ProfilePage() {
           />
 
           <label style={labelStyle} htmlFor="profile-pastor">
-            Nome do pastor
+            Nome do pastor *
           </label>
           <input
             id="profile-pastor"
@@ -205,6 +235,37 @@ export default function ProfilePage() {
             value={pastorName}
             onChange={(e) => setPastorName(e.target.value)}
             maxLength={120}
+            required
+            disabled={saving}
+            style={inputStyle}
+          />
+
+          <label style={labelStyle} htmlFor="profile-whatsapp">
+            WhatsApp *
+          </label>
+          <input
+            id="profile-whatsapp"
+            type="tel"
+            placeholder="(11) 99999-9999"
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+            maxLength={20}
+            required
+            disabled={saving}
+            style={inputStyle}
+          />
+
+          <label style={labelStyle} htmlFor="profile-address">
+            Endereço *
+          </label>
+          <input
+            id="profile-address"
+            type="text"
+            placeholder="Rua, número, bairro, cidade"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            maxLength={200}
+            required
             disabled={saving}
             style={inputStyle}
           />

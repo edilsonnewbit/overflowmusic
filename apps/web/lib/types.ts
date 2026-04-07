@@ -22,6 +22,8 @@ export type AuthUser = {
   birthDate?: string | null;
   church?: string | null;
   pastorName?: string | null;
+  whatsapp?: string | null;
+  address?: string | null;
   volunteerTermsVersion?: string | null;
   volunteerTermsAcceptedAt?: string | null;
 };
