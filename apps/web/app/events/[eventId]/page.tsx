@@ -770,17 +770,6 @@ export default function EventDetailPage({ params }: PageProps) {
                                       ))}
                                     </select>
                                   </div>
-                                  <select
-                                    style={{ ...inputStyle, appearance: "none" as const }}
-                                    value={editItemZone}
-                                    onChange={(e) => setEditItemZone(e.target.value)}
-                                    disabled={savingItemId === item.id}
-                                  >
-                                    <option value="">Zona do Tabernáculo (opcional)</option>
-                                    {TABERNACLE_ZONES.map((z) => (
-                                      <option key={z.value} value={z.value}>{z.label}</option>
-                                    ))}
-                                  </select>
                                   <input
                                     style={inputStyle}
                                     placeholder="Notas de transição"
