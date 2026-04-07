@@ -20,6 +20,7 @@ type CreateSongBody = {
   title: string;
   artist?: string;
   defaultKey?: string;
+  zone?: string;
   tags?: string[];
 };
 

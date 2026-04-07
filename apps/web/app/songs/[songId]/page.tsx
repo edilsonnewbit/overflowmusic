@@ -5,6 +5,15 @@ import { CSSProperties, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import type { Song, SongSectionLine } from "@/lib/types";
 
+// ── Tabernáculo de Moisés — 5 zonas de louvor ───────────────────────────────
+const TABERNACLE_ZONES = [
+  { value: "Z1", label: "Z1 — Átrios", description: "Graças, abertura • Reconhecimento de Jesus, gratidão pelo que Ele fez" },
+  { value: "Z2", label: "Z2 — Altar", description: "Entrega, rendição, clamor • 'Vem Espírito Santo', 'Toma tudo', 'Me rendo'" },
+  { value: "Z3", label: "Z3 — Santo Lugar", description: "Exaltação, resposta • 'Tu és tudo', honra, 'Eu bendirei ao Senhor'" },
+  { value: "Z4", label: "Z4 — Santuário (Intimidade)", description: "Intimidade, suave • Susurro perante Deus, contemplação" },
+  { value: "Z5", label: "Z5 — Santuário (Alegria)", description: "Alegria, dança, liberdade • Celebração na presença de Deus" },
+];
+
 // ── page ─────────────────────────────────────────────────────────────────────
 
 export default function SongDetailPage({ params }: { params: Promise<{ songId: string }> }) {
@@ -21,6 +30,9 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeChartIndex, setActiveChartIndex] = useState(0);
+  const [zoneEdit, setZoneEdit] = useState<string | null>(null);
+  const [savingZone, setSavingZone] = useState(false);
+  const [zoneSaveMsg, setZoneSaveMsg] = useState("");
 
   useEffect(() => {
     void params.then((p) => setSongId(p.songId));
@@ -43,6 +55,28 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
       setError(e instanceof Error ? e.message : "Erro ao carregar música.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveZone() {
+    if (!songId || zoneEdit === null) return;
+    setSavingZone(true);
+    setZoneSaveMsg("");
+    try {
+      const res = await fetch(`/api/songs/${songId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zone: zoneEdit || null }),
+      });
+      const body = (await res.json()) as { ok: boolean; message?: string };
+      if (!body.ok) throw new Error(body.message || "Erro ao salvar.");
+      setZoneSaveMsg("Zona salva.");
+      setZoneEdit(null);
+      await loadSong(songId);
+    } catch (e) {
+      setZoneSaveMsg(e instanceof Error ? e.message : "Erro ao salvar.");
+    } finally {
+      setSavingZone(false);
     }
   }
 
@@ -79,13 +113,50 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
           {song.artist && <p style={{ margin: 0, color: "#b3c6e0", fontSize: 15 }}>{song.artist}</p>}
 
           {/* meta pills */}
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
             {song.defaultKey && <MetaPill label="Tom" value={song.defaultKey} />}
             {meta?.suggestedKey && meta.suggestedKey !== song.defaultKey && (
               <MetaPill label="Tom cifra" value={meta.suggestedKey} />
             )}
             {meta?.bpm && <MetaPill label="BPM" value={String(meta.bpm)} />}
             {meta?.capo && <MetaPill label="Capo" value={String(meta.capo)} />}
+            {song.zone && (
+              <MetaPill label="Zona" value={TABERNACLE_ZONES.find((z) => z.value === song.zone)?.label ?? song.zone} />
+            )}
+          </div>
+
+          {/* zone editor */}
+          <div style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {zoneEdit === null ? (
+              <button
+                onClick={() => setZoneEdit(song.zone ?? "")}
+                style={zoneEditBtnStyle}
+              >
+                {song.zone ? "✏ Alterar zona" : "+ Definir zona (Tabernaculo)"}
+              </button>
+            ) : (
+              <>
+                <select
+                  value={zoneEdit}
+                  onChange={(e) => setZoneEdit(e.target.value)}
+                  disabled={savingZone}
+                  style={zoneSelectStyle}
+                  title={TABERNACLE_ZONES.find((z) => z.value === zoneEdit)?.description ?? ""}
+                >
+                  <option value="">Sem zona</option>
+                  {TABERNACLE_ZONES.map((z) => (
+                    <option key={z.value} value={z.value} title={z.description}>{z.label}</option>
+                  ))}
+                </select>
+                <button onClick={() => void saveZone()} disabled={savingZone} style={zoneSaveBtnStyle}>
+                  {savingZone ? "..." : "Salvar"}
+                </button>
+                <button onClick={() => { setZoneEdit(null); setZoneSaveMsg(""); }} disabled={savingZone} style={zoneCancelBtnStyle}>
+                  Cancelar
+                </button>
+              </>
+            )}
+            {zoneSaveMsg && <span style={{ fontSize: 12, color: "#7cf2a2" }}>{zoneSaveMsg}</span>}
           </div>
         </div>
 
@@ -273,4 +344,44 @@ const importLinkStyle: CSSProperties = {
   border: "1px solid #7cf2a2",
   borderRadius: 8,
   padding: "6px 14px",
+};
+
+const zoneEditBtnStyle: CSSProperties = {
+  background: "transparent",
+  color: "#8fa9c8",
+  border: "1px dashed #2d4b6d",
+  borderRadius: 8,
+  padding: "4px 12px",
+  fontSize: 12,
+  cursor: "pointer",
+};
+
+const zoneSelectStyle: CSSProperties = {
+  background: "#0d2035",
+  border: "1px solid #2d4b6d",
+  borderRadius: 8,
+  color: "#e8f2ff",
+  padding: "5px 10px",
+  fontSize: 13,
+};
+
+const zoneSaveBtnStyle: CSSProperties = {
+  background: "#7cf2a2",
+  color: "#0f2137",
+  border: "none",
+  borderRadius: 8,
+  padding: "5px 14px",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const zoneCancelBtnStyle: CSSProperties = {
+  background: "transparent",
+  color: "#8fa9c8",
+  border: "1px solid #2d4b6d",
+  borderRadius: 8,
+  padding: "5px 12px",
+  fontSize: 13,
+  cursor: "pointer",
 };

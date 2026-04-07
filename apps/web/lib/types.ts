@@ -77,6 +77,7 @@ export type Song = {
   title: string;
   artist: string | null;
   defaultKey: string | null;
+  zone: string | null;
   tags: string[] | null;
   chordCharts: SongChordChart[];
 };
