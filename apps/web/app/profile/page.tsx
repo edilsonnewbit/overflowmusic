@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthUser } from "@/lib/types";
@@ -120,8 +121,11 @@ export default function ProfilePage() {
 
   return (
     <main style={layoutStyle}>
+      <div style={{ marginBottom: 16 }}>
+        <Link href="/" style={{ color: "#7cf2a2", textDecoration: "none", fontSize: 14 }}>← Home</Link>
+        <h1 style={{ ...headingStyle, margin: "6px 0 0" }}>Meu Perfil</h1>
+      </div>
       <div style={cardStyle}>
-        <h1 style={headingStyle}>Meu Perfil</h1>
 
         {/* ── Read-only info ─────────────────────────────────────────── */}
         <div style={infoGridStyle}>
