@@ -29,8 +29,17 @@ enum EventType {
 
 enum EventStatus {
   DRAFT
+  ACTIVE
   PUBLISHED
+  FINISHED
   ARCHIVED
+}
+
+enum MusicianSlotStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  EXPIRED
 }
 
 enum ChordChartSourceType {
@@ -49,6 +58,12 @@ model User {
   role              UserRole   @default(MEMBER)
   status            UserStatus @default(PENDING_APPROVAL)
   instruments       String[]   @default([])
+  instagramProfile  String?
+  birthDate         DateTime?
+  church            String?
+  pastorName        String?
+  volunteerTermsVersion    String?
+  volunteerTermsAcceptedAt DateTime?
   createdAt         DateTime   @default(now())
   reviewedAt        DateTime?
   lastLoginAt       DateTime?
@@ -57,6 +72,7 @@ model User {
   memberships          OrganizationMember[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens  PasswordResetToken[]
+  eventMusicians       EventMusician[]
 
   @@index([status])
   @@index([emailVerified])
@@ -100,17 +116,40 @@ model PushToken {
 }
 
 model Event {
-  id          String      @id @default(uuid())
-  title       String
-  dateTime    DateTime
-  location    String?
-  description String?
-  eventType   EventType   @default(CULTO)
-  status      EventStatus @default(DRAFT)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  setlist     Setlist?
-  checklistRuns ChecklistRun[]
+  id                       String      @id @default(uuid())
+  title                    String
+  dateTime                 DateTime
+  location                 String?
+  address                  String?
+  description              String?
+  eventType                EventType   @default(CULTO)
+  status                   EventStatus @default(DRAFT)
+  confirmationDeadlineDays Int         @default(3)
+  responseWindowHours      Int         @default(24)
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+  setlist                  Setlist?
+  checklistRuns            ChecklistRun[]
+  musicians                EventMusician[]
+}
+
+model EventMusician {
+  id             String             @id @default(uuid())
+  eventId        String
+  instrumentRole String
+  userId         String
+  priority       Int
+  status         MusicianSlotStatus @default(PENDING)
+  notifiedAt     DateTime?
+  respondedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  event          Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, instrumentRole, userId])
+  @@index([eventId, instrumentRole, priority])
+  @@index([eventId, status])
 }
 
 model Setlist {

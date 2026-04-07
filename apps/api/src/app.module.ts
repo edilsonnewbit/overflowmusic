@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ScheduleModule } from "@nestjs/schedule";
 import { APP_GUARD } from "@nestjs/core";
 import { AppController } from "./app.controller";
 import { AuditService } from "./audit/audit.service";
@@ -10,6 +11,7 @@ import { ChecklistRunsService } from "./checklist/checklist-runs.service";
 import { ChecklistTemplatesController } from "./checklist/checklist-templates.controller";
 import { ChecklistTemplatesService } from "./checklist/checklist-templates.service";
 import { EmailService } from "./email/email.service";
+import { EventsCronService } from "./events/events.cron";
 import { EventsController } from "./events/events.controller";
 import { EventsService } from "./events/events.service";
 import { NotificationsController } from "./notifications/notifications.controller";
@@ -26,6 +28,7 @@ import { SongsService } from "./songs/songs.service";
 @Module({
   imports: [
     PrismaModule,
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       { name: "global", ttl: 60000, limit: 100 },
       { name: "auth", ttl: 60000, limit: 10 },
@@ -47,6 +50,7 @@ import { SongsService } from "./songs/songs.service";
     AuditService,
     AuthService,
     EmailService,
+    EventsCronService,
     EventsService,
     NotificationsService,
     QueueService,

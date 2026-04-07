@@ -299,7 +299,7 @@ export async function fetchEvents(): Promise<{ ok: boolean; events: MusicEvent[]
 }
 
 export async function createEvent(
-  input: { title: string; dateTime: string; location?: string; description?: string },
+  input: { title: string; dateTime: string; location?: string; description?: string; address?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
   const bearerToken = (accessToken || "").trim();
@@ -326,7 +326,7 @@ export async function createEvent(
 
 export async function updateEvent(
   id: string,
-  input: { title?: string; dateTime?: string; location?: string },
+  input: { title?: string; dateTime?: string; location?: string; address?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
   const bearerToken = (accessToken || "").trim();
@@ -365,6 +365,25 @@ export async function deleteEvent(
       ok: false,
       message: typeof body.message === "string" ? body.message : "Falha ao excluir evento.",
     };
+  }
+  return { ok: true };
+}
+
+export async function respondMusicianSlot(
+  slotId: string,
+  accept: boolean,
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(`${API_BASE}/events/slots/${encodeURIComponent(slotId)}/respond`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+    body: JSON.stringify({ accept }),
+  });
+  const body = await parseJson(response);
+  if (!response.ok) {
+    return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao responder convite." };
   }
   return { ok: true };
 }

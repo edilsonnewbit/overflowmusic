@@ -18,7 +18,7 @@ Notifications.setNotificationHandler({
 
 // ─── Auth guard + notification routing ───────────────────────────────────────
 function ProtectedLayout() {
-  const { user, loadingSession } = useSession();
+  const { user, loadingSession, setPendingInvite } = useSession();
   const segments = useSegments();
   const router = useRouter();
 
@@ -53,8 +53,15 @@ function ProtectedLayout() {
       // Foreground notification — handled by setNotificationHandler
     });
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {
-      // Tap on notification → navega para home
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      if (data?.type === "musician_invite" || data?.type === "musician_reminder") {
+        setPendingInvite({
+          slotId: String(data.slotId ?? ""),
+          eventTitle: String(data.eventTitle ?? ""),
+          role: String(data.instrumentRole ?? ""),
+        });
+      }
       router.replace("/(tabs)/home");
     });
 

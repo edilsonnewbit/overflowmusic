@@ -9,8 +9,11 @@ type Event = {
   title: string;
   dateTime: string;
   location: string | null;
+  address?: string | null;
   description: string | null;
-  status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  eventType?: "CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO";
+  status: "DRAFT" | "ACTIVE" | "PUBLISHED" | "FINISHED" | "ARCHIVED";
+  computedStatus?: string;
   createdAt: string;
 };
 
@@ -36,7 +39,9 @@ export default function EventsPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formDateTime, setFormDateTime] = useState("");
   const [formLocation, setFormLocation] = useState("");
+  const [formAddress, setFormAddress] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formEventType, setFormEventType] = useState<"CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO">("CULTO");
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -75,14 +80,18 @@ export default function EventsPage() {
           title: formTitle.trim(),
           dateTime: new Date(formDateTime).toISOString(),
           location: formLocation.trim() || undefined,
+          address: formAddress.trim() || undefined,
           description: formDescription.trim() || undefined,
+          eventType: formEventType,
         }),
       });
       await parseJson<{ event: Event }>(response);
       setFormTitle("");
       setFormDateTime("");
       setFormLocation("");
+      setFormAddress("");
       setFormDescription("");
+      setFormEventType("CULTO");
       setShowForm(false);
       setStatus("Evento criado.");
       await loadEvents();
@@ -149,6 +158,28 @@ export default function EventsPage() {
                 disabled={creating}
               />
 
+              <label style={labelStyle}>Endereço completo</label>
+              <input
+                style={inputStyle}
+                value={formAddress}
+                onChange={(e) => setFormAddress(e.target.value)}
+                placeholder="Ex: Rua das Flores, 123, São Paulo"
+                disabled={creating}
+              />
+
+              <label style={labelStyle}>Tipo de Evento</label>
+              <select
+                style={inputStyle}
+                value={formEventType}
+                onChange={(e) => setFormEventType(e.target.value as typeof formEventType)}
+                disabled={creating}
+              >
+                <option value="CULTO">Culto</option>
+                <option value="CONFERENCIA">Conferência</option>
+                <option value="ENSAIO">Ensaio</option>
+                <option value="OUTRO">Outro</option>
+              </select>
+
               <label style={labelStyle}>Descrição</label>
               <textarea
                 style={{ ...inputStyle, height: 72, resize: "vertical" }}
@@ -184,7 +215,7 @@ export default function EventsPage() {
                           <p style={{ margin: 0, color: "#8fa9c8", fontSize: 12 }}>{ev.description}</p>
                         )}
                       </div>
-                      <span style={statusBadge(ev.status)}>{ev.status}</span>
+                      <span style={statusBadge(ev.computedStatus ?? ev.status)}>{ev.computedStatus ?? ev.status}</span>
                     </div>
                   </Link>
                 </li>
@@ -260,8 +291,17 @@ const eventCardStyle: CSSProperties = {
 function statusBadge(status: string): CSSProperties {
   const colors: Record<string, string> = {
     DRAFT: "#8fa9c8",
+    ACTIVE: "#60a5fa",
     PUBLISHED: "#7cf2a2",
-    ARCHIVED: "#5a7a9a",
+    FINISHED: "#94a3b8",
+    ARCHIVED: "#4b5563",
+  };
+  const labels: Record<string, string> = {
+    DRAFT: "Rascunho",
+    ACTIVE: "Ativo",
+    PUBLISHED: "Publicado",
+    FINISHED: "Encerrado",
+    ARCHIVED: "Arquivado",
   };
   return {
     fontSize: 11,
@@ -273,5 +313,6 @@ function statusBadge(status: string): CSSProperties {
     borderRadius: 6,
     padding: "2px 8px",
     whiteSpace: "nowrap",
+    content: labels[status] ?? status,
   };
 }

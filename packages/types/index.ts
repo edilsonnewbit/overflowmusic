@@ -4,7 +4,9 @@ export type UserRole = "SUPER_ADMIN" | "ADMIN" | "LEADER" | "MEMBER";
 
 export type UserStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
 
-export type EventStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+export type EventStatus = "DRAFT" | "ACTIVE" | "PUBLISHED" | "FINISHED" | "ARCHIVED";
+
+export type EventType = "CULTO" | "CONFERENCIA" | "ENSAIO" | "OUTRO";
 
 export type ChordChartSourceType = "TXT_IMPORT" | "MANUAL";
 
@@ -16,6 +18,13 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   status: UserStatus;
+  instruments?: string[];
+  instagramProfile?: string | null;
+  birthDate?: string | null;
+  church?: string | null;
+  pastorName?: string | null;
+  volunteerTermsVersion?: string | null;
+  volunteerTermsAcceptedAt?: string | null;
 };
 
 export type LoginPayload = {
@@ -93,13 +102,37 @@ export type SongImportResult = {
 
 // ── Events ────────────────────────────────────────────────────────────────────
 
+export type MusicianSlotStatus = "PENDING" | "CONFIRMED" | "DECLINED" | "EXPIRED";
+
+export type EventMusician = {
+  id: string;
+  instrumentRole: string;
+  userId: string;
+  priority: number;
+  status: MusicianSlotStatus;
+  notifiedAt?: string | null;
+  respondedAt?: string | null;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    instruments: string[];
+  };
+};
+
 export type MusicEvent = {
   id: string;
   title: string;
   dateTime: string;
   location: string | null;
+  address?: string | null;
   description: string | null;
   status: EventStatus;
+  eventType?: EventType;
+  computedStatus?: string;
+  confirmationDeadlineDays?: number;
+  responseWindowHours?: number;
+  musicians?: EventMusician[];
 };
 
 // ── Setlist ───────────────────────────────────────────────────────────────────

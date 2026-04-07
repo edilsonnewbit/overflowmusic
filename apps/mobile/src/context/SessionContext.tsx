@@ -18,6 +18,7 @@ import {
   refreshAccessToken,
   removeSetlistItem,
   reorderSetlist,
+  respondMusicianSlot,
   setTokenHandlers,
   setUnauthorizedHandler,
   updateChecklistItem,
@@ -70,12 +71,17 @@ export interface SessionContextValue {
     itemId: string,
     input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string },
   ) => Promise<void>;
-  handleCreateEvent: (input: { title: string; dateTime: string; location?: string }) => Promise<void>;
+  handleCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
   handleUpdateEvent: (
     id: string,
-    input: { title?: string; dateTime?: string; location?: string },
+    input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string },
   ) => Promise<void>;
   handleDeleteEvent: (id: string) => Promise<void>;
+
+  // Musician invite
+  pendingInvite: { slotId: string; eventTitle: string; role: string } | null;
+  setPendingInvite: (invite: { slotId: string; eventTitle: string; role: string } | null) => void;
+  handleRespondInvite: (accept: boolean) => Promise<void>;
 
   // Checklist
   templates: ChecklistTemplate[];
@@ -123,6 +129,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [eventsStatus, setEventsStatus] = useState("Carregue os eventos.");
   const [isOffline, setIsOffline] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
+
+  // Musician invite
+  const [pendingInvite, setPendingInvite] = useState<{ slotId: string; eventTitle: string; role: string } | null>(null);
 
   // Checklist
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
@@ -423,7 +432,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function handleCreateEvent(input: { title: string; dateTime: string; location?: string }) {
+  async function handleCreateEvent(input: { title: string; dateTime: string; location?: string; address?: string; eventType?: string }) {
     setCreatingEvent(true);
     setEventsStatus("Criando evento...");
     try {
@@ -443,7 +452,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   async function handleUpdateEvent(
     id: string,
-    input: { title?: string; dateTime?: string; location?: string },
+    input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string },
   ) {
     setEventsStatus("Salvando alterações...");
     try {
@@ -475,6 +484,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await loadEventsList();
     } catch {
       setEventsStatus("Erro de rede ao excluir evento.");
+    }
+  }
+
+  // ── Musician invite ──────────────────────────────────────────────────────────
+
+  async function handleRespondInvite(accept: boolean) {
+    if (!pendingInvite) return;
+    const { slotId } = pendingInvite;
+    setPendingInvite(null);
+    try {
+      await respondMusicianSlot(slotId, accept, accessTokenRef.current);
+    } catch {
+      // silently ignore — user already dismissed the modal
     }
   }
 
@@ -623,6 +645,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     handleCreateEvent,
     handleUpdateEvent,
     handleDeleteEvent,
+    pendingInvite,
+    setPendingInvite,
+    handleRespondInvite,
     templates,
     eventId,
     setEventId,

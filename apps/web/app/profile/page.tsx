@@ -13,6 +13,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [instruments, setInstruments] = useState<string[]>([]);
+  const [instagramProfile, setInstagramProfile] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [church, setChurch] = useState("");
+  const [pastorName, setPastorName] = useState("");
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -36,6 +40,10 @@ export default function ProfilePage() {
         setUser(body.user);
         setName(body.user.name ?? "");
         setInstruments(body.user.instruments ?? []);
+        setInstagramProfile(body.user.instagramProfile ?? "");
+        setBirthDate(body.user.birthDate ?? "");
+        setChurch(body.user.church ?? "");
+        setPastorName(body.user.pastorName ?? "");
       } catch {
         router.replace("/login");
       } finally {
@@ -59,7 +67,14 @@ export default function ProfilePage() {
       const res = await fetch("/api/auth/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, instruments }),
+        body: JSON.stringify({
+          name: trimmed,
+          instruments,
+          instagramProfile: instagramProfile.trim() || null,
+          birthDate: birthDate.trim() || null,
+          church: church.trim() || null,
+          pastorName: pastorName.trim() || null,
+        }),
       });
       const body = (await res.json()) as { ok?: boolean; user?: AuthUser; message?: string };
       if (!res.ok) {
@@ -70,6 +85,10 @@ export default function ProfilePage() {
         setUser(body.user);
         setName(body.user.name ?? trimmed);
         setInstruments(body.user.instruments ?? []);
+        setInstagramProfile(body.user.instagramProfile ?? "");
+        setBirthDate(body.user.birthDate ?? "");
+        setChurch(body.user.church ?? "");
+        setPastorName(body.user.pastorName ?? "");
       }
       setSuccessMsg("Perfil atualizado com sucesso!");
       if (successTimer.current) clearTimeout(successTimer.current);
@@ -132,6 +151,58 @@ export default function ProfilePage() {
             disabled={saving}
             style={inputStyle}
             autoComplete="name"
+          />
+
+          <label style={labelStyle} htmlFor="profile-instagram">
+            Instagram (opcional)
+          </label>
+          <input
+            id="profile-instagram"
+            type="text"
+            placeholder="@seu_instagram"
+            value={instagramProfile}
+            onChange={(e) => setInstagramProfile(e.target.value)}
+            maxLength={60}
+            disabled={saving}
+            style={inputStyle}
+          />
+
+          <label style={labelStyle} htmlFor="profile-birthdate">
+            Data de nascimento
+          </label>
+          <input
+            id="profile-birthdate"
+            type="date"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            disabled={saving}
+            style={inputStyle}
+          />
+
+          <label style={labelStyle} htmlFor="profile-church">
+            Igreja que faz parte
+          </label>
+          <input
+            id="profile-church"
+            type="text"
+            value={church}
+            onChange={(e) => setChurch(e.target.value)}
+            maxLength={120}
+            disabled={saving}
+            style={inputStyle}
+          />
+
+          <label style={labelStyle} htmlFor="profile-pastor">
+            Nome do pastor
+          </label>
+          <input
+            id="profile-pastor"
+            type="text"
+            value={pastorName}
+            onChange={(e) => setPastorName(e.target.value)}
+            maxLength={120}
+            disabled={saving}
+            style={inputStyle}
           />
 
           {errorMsg && <p style={errorStyle}>{errorMsg}</p>}

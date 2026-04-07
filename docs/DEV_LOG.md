@@ -2,6 +2,69 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-10 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Perfil estendido (Instagram, data de nascimento, igreja, pastor) + Termo de Adesão Voluntária com validade jurídica no cadastro
+- Feito:
+  - `apps/api/prisma/schema.prisma`: 6 novos campos em `User` — `instagramProfile`, `birthDate`, `church`, `pastorName`, `volunteerTermsVersion`, `volunteerTermsAcceptedAt`
+  - `apps/api/src/auth/auth.types.ts`: `AuthUser` atualizado com os 6 novos campos
+  - `packages/types/index.ts`: `AuthUser` compartilhado atualizado
+  - `apps/api/src/auth/auth.service.ts`: `DbUserRecord`, `emailRegister` (valida `volunteerTermsAccepted`, grava versão `"1.0-2026"` e timestamp), `updateMe` e `toAuthUser` atualizados
+  - `apps/api/src/auth/auth.controller.ts`: body types de `emailRegister` e `updateMe` expandidos
+  - `apps/web/app/api/auth/me/route.ts`: PATCH BFF passa os 4 campos de perfil
+  - `apps/web/app/profile/page.tsx`: 4 novos inputs (Instagram, data de nascimento `<input type="date">`, Igreja, Pastor)
+  - `apps/mobile/app/register.tsx`: 4 novos campos opcionais + ScrollView com Termo de Adesão legal em 8 cláusulas; botão "Li e aceito" só ativa após rolar até o fim; cadastro bloqueado sem aceite
+- Base legal do Termo: Lei 9.608/1998, Código Civil (Lei 10.406/2002), LGPD (Lei 13.709/2018), MP 2.200-2/2001, Lei 14.063/2020
+- Status: 0 erros TS em todos os arquivos modificados
+- Pendência: `prisma migrate dev --name add-user-profile-fields` + `git push origin develop`
+- Próximo passo: rodar migration e deploy
+
+### [2026-04-09 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: `eventType` nos formulários de evento (web + mobile) + fluxo completo de resposta a convite de músico no mobile
+- Feito:
+  - `packages/types/index.ts`: `EventType` = CULTO|CONFERENCIA|ENSAIO|OUTRO, campo `eventType?` em `MusicEvent`
+  - `apps/web/app/events/page.tsx`: `<select>` de tipo no form de criação de evento
+  - `apps/mobile/src/screens/EventsScreen.tsx`: seletores visuais de tipo (botões) nos forms de criação e edição
+  - `apps/api/src/events/events.service.ts`: `respondMusicianBySlotId` (wrapper leve para `respondMusician`)
+  - `apps/api/src/events/events.controller.ts`: `POST /events/slots/:slotId/respond` (endpoint sem eventId para uso direto do mobile)
+  - `apps/api/src/notifications/notifications.service.ts`: dados de notificação incluem `eventTitle` e `instrumentRole`
+  - `apps/mobile/src/lib/api.ts`: função `respondMusicianSlot(slotId, accept, token)`
+  - `apps/mobile/src/context/SessionContext.tsx`: estado `pendingInvite`, `setPendingInvite`, `handleRespondInvite`; assinaturas de create/update incluem `eventType?`
+  - `apps/mobile/app/_layout.tsx`: listener de notificação extrai `slotId/eventTitle/instrumentRole` e chama `setPendingInvite`
+  - `apps/mobile/src/screens/HomeScreen.tsx`: modal overlay de confirmação/recusa de convite quando `pendingInvite !== null`
+- Commit: `d10f158` na branch develop
+- Status: 0 erros TS nos arquivos modificados; erros pré-existentes de PrismaService em events.service.ts não alterados
+- Próximo passo: `git push origin develop` para deploy
+
+### [2026-04-06 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Cron jobs para expiração de músicos e lembretes; propagar `address` pelo mobile
+- Feito:
+  - `apps/api/package.json`: adicionada dependência `@nestjs/schedule@^4.1.0`
+  - `apps/api/src/events/events.cron.ts` (novo): `EventsCronService` com `@Cron` para `processExpiredMusicians` (a cada hora) e `sendPendingReminders` (8h, 13h, 20h BRT = 11h, 16h, 23h UTC)
+  - `apps/api/src/app.module.ts`: importa `ScheduleModule.forRoot()`, registra `EventsCronService` como provider
+  - `apps/mobile/src/lib/api.ts`: `createEvent` e `updateEvent` aceitam `address?` no input
+  - `apps/mobile/src/context/SessionContext.tsx`: assinaturas de `handleCreateEvent` e `handleUpdateEvent` incluem `address?`
+  - `apps/mobile/App.tsx`: assinaturas de `handleCreateEvent` e `handleUpdateEvent` incluem `address?`
+- Commit: na branch develop
+- Status: 0 erros TypeScript no mobile/web; erro @nestjs/schedule esperado localmente (resolve no docker build com npm install)
+- Próximo passo: `git push origin develop` para deploy; reconstruir containers para aplicar alterações
+
+### [2026-04-08 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Endereço com Maps/Waze, edição e controle de status (ACTIVE/FINISHED automático), equipe de músicos por instrumento com prioridade e notificações
+- Feito:
+  - `apps/api/prisma/schema.prisma`: enum `EventStatus` (+ ACTIVE, FINISHED), novo enum `MusicianSlotStatus`, campos `address`, `confirmationDeadlineDays`, `responseWindowHours` em Event, novo model `EventMusician` com unique+index
+  - `apps/api/src/events/events.service.ts`: reescrita completa — CreateEventInput com novos campos, `computedStatus` (ACTIVE + data passada = FINISHED), `getById` inclui musicians, endpoints CRUD de músicos, `respondMusician`, `triggerMusicianNotifications`, `escalateMusician`, `processExpiredMusicians` (cron), `sendPendingReminders` (3x/dia)
+  - `apps/api/src/events/events.controller.ts`: novos endpoints `GET/POST :id/musicians`, `DELETE :id/musicians/:musicianId`, `POST :id/musicians/:musicianId/respond`
+  - `apps/api/src/notifications/notifications.service.ts`: novos métodos `sendMusicianConfirmationRequest` e `sendMusicianReminder`
+  - `packages/types/index.ts`: `EventStatus` com novos valores, novo tipo `MusicianSlotStatus`, novo tipo `EventMusician`, `MusicEvent` com address/computedStatus/musicians
+  - `apps/web/app/api/events/[eventId]/musicians/route.ts` (novo): BFF GET/POST músicos
+  - `apps/web/app/api/events/[eventId]/musicians/[musicianId]/route.ts` (novo): BFF DELETE músico
+  - `apps/web/app/events/page.tsx`: campo `address` no form, novos status (ACTIVE/FINISHED/ARCHIVED) com cores, label em português
+  - `apps/web/app/events/[eventId]/page.tsx`: endereço com botões Google Maps / Waze, form edição inline, botões de status (Ativar/Publicar/Arquivar), seção equipe músicos por instrumento com prioridade/status
+  - `apps/mobile/src/screens/EventsScreen.tsx`: campo address no form criação/edição, badge de status colorido, botões Maps/Waze com `Linking.openURL`
+- Commit: `17f3bb9` na branch develop
+- Status: TypeScript OK no web/mobile; erros @prisma/client no editor são esperados (Prisma generate roda no `docker build`)
+- Próximo passo: `git push origin develop` para deploy; worker deve ser configurado para chamar `processExpiredMusicians()` e `sendPendingReminders()` via cron
+
 ### [2026-04-07 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Instrumentos no perfil, líder vocal por dropdown, gerenciamento de equipe com edição
 - Feito:
