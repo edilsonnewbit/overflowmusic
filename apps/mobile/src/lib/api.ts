@@ -569,3 +569,75 @@ export async function updateProfile(
   }
   return { ok: true, user: body.user as AuthUser };
 }
+
+// ── Rehearsals ────────────────────────────────────────────────────────────────
+
+export type Rehearsal = {
+  id: string;
+  title: string;
+  dateTime: string;
+  location: string | null;
+  address: string | null;
+  description: string | null;
+  notes: string | null;
+  durationMinutes: number | null;
+};
+
+export async function fetchRehearsals(): Promise<{ ok: boolean; rehearsals: Rehearsal[] }> {
+  const response = await fetch(`${API_BASE}/rehearsals`, { method: "GET" });
+  const body = await parseJson(response);
+  if (!response.ok || !Array.isArray(body.rehearsals)) return { ok: false, rehearsals: [] };
+  return { ok: true, rehearsals: body.rehearsals as Rehearsal[] };
+}
+
+export async function createRehearsal(
+  input: { title: string; dateTime: string; location?: string; address?: string; description?: string; notes?: string; durationMinutes?: number },
+  accessToken?: string | null,
+): Promise<{ ok: boolean; rehearsal?: Rehearsal; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(`${API_BASE}/rehearsals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+    body: JSON.stringify(input),
+  });
+  const body = await parseJson(response);
+  if (!response.ok) return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao criar ensaio." };
+  return { ok: true, rehearsal: body.rehearsal as Rehearsal };
+}
+
+export async function updateRehearsal(
+  id: string,
+  input: Partial<{ title: string; dateTime: string; location: string; address: string; description: string; notes: string; durationMinutes: number }>,
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(`${API_BASE}/rehearsals/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const body = await parseJson(response);
+    return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao atualizar ensaio." };
+  }
+  return { ok: true };
+}
+
+export async function deleteRehearsal(
+  id: string,
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(`${API_BASE}/rehearsals/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${bearerToken}` },
+  });
+  if (!response.ok) {
+    const body = await parseJson(response);
+    return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao excluir ensaio." };
+  }
+  return { ok: true };
+}

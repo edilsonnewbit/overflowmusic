@@ -9,6 +9,8 @@ import {
   PanResponder,
   StatusBar,
   Platform,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,6 +37,16 @@ export default function PresentScreen() {
   const [loadingCifra, setLoadingCifra] = useState(false);
   const [currentChart, setCurrentChart] = useState<ParsedChart | null>(null);
 
+  // Auto-scroll controls
+  const [fontSize, setFontSize] = useState(14);
+  const [scrollSpeed, setScrollSpeed] = useState(2); // 1–10
+  const [autoScrolling, setAutoScrolling] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+  const scrollHeightRef = useRef(0);
+  const scrollContainerRef = useRef(0);
+  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Stable refs to avoid stale closures in PanResponder
   const currentRef = useRef(current);
   currentRef.current = current;
@@ -45,6 +57,42 @@ export default function PresentScreen() {
   const chartCache = useRef<Map<string, ParsedChart | null>>(new Map());
   // Songs list cache: lower-cased title → song id
   const songIdCache = useRef<Map<string, string> | null>(null);
+
+  // ── Auto-scroll engine ────────────────────────────────────────────────────
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollTimerRef.current) {
+      clearInterval(autoScrollTimerRef.current);
+      autoScrollTimerRef.current = null;
+    }
+    setAutoScrolling(false);
+  }, []);
+
+  const startAutoScroll = useCallback(() => {
+    stopAutoScroll();
+    setAutoScrolling(true);
+    autoScrollTimerRef.current = setInterval(() => {
+      const next = scrollYRef.current + scrollSpeed;
+      if (next >= scrollHeightRef.current - scrollContainerRef.current) {
+        stopAutoScroll();
+        return;
+      }
+      scrollViewRef.current?.scrollTo({ y: next, animated: false });
+      scrollYRef.current = next;
+    }, 30);
+  }, [scrollSpeed, stopAutoScroll]);
+
+  // Restart auto-scroll when speed changes while active
+  useEffect(() => {
+    if (autoScrolling) {
+      startAutoScroll();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollSpeed]);
+
+  // Stop auto-scroll when cifra is closed or song changes
+  useEffect(() => {
+    if (!showCifra) stopAutoScroll();
+  }, [showCifra, stopAutoScroll]);
 
   // ── Auto-hide nav ─────────────────────────────────────────────────────────
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -241,10 +289,63 @@ export default function PresentScreen() {
                     <Text style={styles.cifraCloseText}>✕ Ocultar</Text>
                   </Pressable>
                 </View>
+
+                {/* ── Controls toolbar ─────────────────────────────────── */}
+                <View style={styles.cifraToolbar}>
+                  {/* Font size */}
+                  <View style={styles.toolbarGroup}>
+                    <Pressable
+                      style={styles.toolBtn}
+                      onPress={() => setFontSize((s) => Math.max(10, s - 2))}
+                    >
+                      <Text style={styles.toolBtnText}>A-</Text>
+                    </Pressable>
+                    <Text style={styles.toolLabel}>{fontSize}px</Text>
+                    <Pressable
+                      style={styles.toolBtn}
+                      onPress={() => setFontSize((s) => Math.min(28, s + 2))}
+                    >
+                      <Text style={styles.toolBtnText}>A+</Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Scroll speed */}
+                  <View style={styles.toolbarGroup}>
+                    <Pressable
+                      style={styles.toolBtn}
+                      onPress={() => setScrollSpeed((s) => Math.max(1, s - 1))}
+                    >
+                      <Text style={styles.toolBtnText}>▼</Text>
+                    </Pressable>
+                    <Text style={styles.toolLabel}>vel {scrollSpeed}</Text>
+                    <Pressable
+                      style={styles.toolBtn}
+                      onPress={() => setScrollSpeed((s) => Math.min(10, s + 1))}
+                    >
+                      <Text style={styles.toolBtnText}>▲</Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Play/stop */}
+                  <Pressable
+                    style={[styles.toolBtn, autoScrolling && styles.toolBtnActive]}
+                    onPress={() => (autoScrolling ? stopAutoScroll() : startAutoScroll())}
+                  >
+                    <Text style={styles.toolBtnText}>{autoScrolling ? "⏹" : "▶"}</Text>
+                  </Pressable>
+                </View>
+
                 <ScrollView
+                  ref={scrollViewRef}
                   style={styles.cifraScroll}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
+                  scrollEventThrottle={16}
+                  onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                    scrollYRef.current = e.nativeEvent.contentOffset.y;
+                  }}
+                  onContentSizeChange={(_w, h) => { scrollHeightRef.current = h; }}
+                  onLayout={(e) => { scrollContainerRef.current = e.nativeEvent.layout.height; }}
                 >
                   {currentChart?.sections.map((section, si) => (
                     <View key={si} style={styles.cifraSection}>
@@ -252,7 +353,11 @@ export default function PresentScreen() {
                       {section.lines.map((line, li) => (
                         <Text
                           key={li}
-                          style={line.type === "chords" ? styles.chordLine : styles.lyricLine}
+                          style={[
+                            line.type === "chords" ? styles.chordLine : styles.lyricLine,
+                            { fontSize },
+                            { lineHeight: fontSize * 1.55 },
+                          ]}
                         >
                           {line.content || " "}
                         </Text>
@@ -408,6 +513,44 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   cifraCloseText: { color: "#1ecad3", fontSize: 13 },
+  // ── Cifra toolbar ─────────────────────────────────────────────────────────
+  cifraToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1a2c44",
+    marginBottom: 10,
+    gap: 8,
+  },
+  toolbarGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  toolBtn: {
+    backgroundColor: "#1a3a5a",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    minWidth: 32,
+    alignItems: "center",
+  },
+  toolBtnActive: {
+    backgroundColor: "#1ecad3",
+  },
+  toolBtnText: {
+    color: "#b3c6e0",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  toolLabel: {
+    color: "#7a9dc0",
+    fontSize: 11,
+    minWidth: 40,
+    textAlign: "center",
+  },
   cifraScroll: { flex: 1 },
   cifraSection: { marginBottom: 18 },
   cifraSectionName: {
