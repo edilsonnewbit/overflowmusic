@@ -3,6 +3,16 @@
 Registro oficial de progresso para handoff entre LLMs.
 
 ### [2026-04-10 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Dashboard inicial com painel rico de eventos (confirmações, pendências e recusas de músicos)
+- Feito:
+  - `apps/web/app/api/events/upcoming/route.ts` (NOVO): BFF `GET /api/events/upcoming` — busca 3 próximos eventos com slots completos, agrupa músicos em confirmed/pending/declined (priority=1), retorna contagens e status computado
+  - `apps/web/components/HomeClient.tsx`: componente reescrito — removida seção "Próximo Evento" simples; adicionado painel "Próximos Eventos" com até 3 cards detalhados por evento; cada card exibe: título, tipo, status, countdown "Em X dias", data/horário/local, box de contagem confirmados/total, e três listas de músicos (✓ confirmados verde, ⏳ aguardando amarelo, ✗ recusados vermelho) com papel do instrumento em cada nome; cards admin preservados
+- Commit: `feat(dashboard): painel de eventos com confirmações de músicos` → `0f07078` — `origin/develop`
+- Status: 0 erros TS, commit e push OK
+- Pendência: migration ainda pendente (`prisma migrate dev --name add-user-profile-fields`)
+- Próximo passo: rodar a migration de perfil no servidor + testar dashboard em prod
+
+### [2026-04-10 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Perfil estendido (Instagram, data de nascimento, igreja, pastor) + Termo de Adesão Voluntária com validade jurídica no cadastro
 - Feito:
   - `apps/api/prisma/schema.prisma`: 6 novos campos em `User` — `instagramProfile`, `birthDate`, `church`, `pastorName`, `volunteerTermsVersion`, `volunteerTermsAcceptedAt`
