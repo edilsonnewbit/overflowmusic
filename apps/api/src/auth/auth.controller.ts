@@ -21,6 +21,12 @@ type GoogleLoginBody = {
   name?: string;
   googleSub?: string;
   volunteerTermsAccepted?: boolean;
+  instagramProfile?: string;
+  birthDate?: string;
+  church?: string;
+  pastorName?: string;
+  whatsapp?: string;
+  address?: string;
 };
 
 type ApproveBody = {
@@ -56,8 +62,18 @@ export class AuthController {
   @Throttle({ auth: { limit: 10, ttl: 60000 } })
   @Post("api/auth/google")
   async googleLogin(@Body() body: GoogleLoginBody) {
+    const profileFields = {
+      volunteerTermsAccepted: body.volunteerTermsAccepted,
+      instagramProfile: body.instagramProfile,
+      birthDate: body.birthDate,
+      church: body.church,
+      pastorName: body.pastorName,
+      whatsapp: body.whatsapp,
+      address: body.address,
+    };
+
     if (body.idToken) {
-      return this.googleLoginWithIdToken(body.idToken, body.volunteerTermsAccepted);
+      return this.googleLoginWithIdToken(body.idToken, profileFields);
     }
 
     if (this.authBootstrapMode && body.email && body.name && body.googleSub) {
@@ -65,7 +81,7 @@ export class AuthController {
         email: body.email,
         name: body.name,
         googleSub: body.googleSub,
-        volunteerTermsAccepted: body.volunteerTermsAccepted,
+        ...profileFields,
       });
     }
 
@@ -244,7 +260,18 @@ export class AuthController {
     }
   }
 
-  private async googleLoginWithIdToken(idToken: string, volunteerTermsAccepted?: boolean) {
+  private async googleLoginWithIdToken(
+    idToken: string,
+    profileFields?: {
+      volunteerTermsAccepted?: boolean;
+      instagramProfile?: string;
+      birthDate?: string;
+      church?: string;
+      pastorName?: string;
+      whatsapp?: string;
+      address?: string;
+    },
+  ) {
     if (this.googleClientIds.length === 0) {
       throw new UnauthorizedException("GOOGLE_CLIENT_ID or GOOGLE_CLIENT_IDS is not configured");
     }
@@ -283,7 +310,7 @@ export class AuthController {
       }
     }
 
-    return this.authService.googleLogin({ email, name, googleSub, volunteerTermsAccepted });
+    return this.authService.googleLogin({ email, name, googleSub, ...profileFields });
   }
 
   private resolveGoogleClientIds(): string[] {

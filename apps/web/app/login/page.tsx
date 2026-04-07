@@ -10,6 +10,8 @@ type LoginResponse = {
   ok: boolean;
   status?: AuthStatus;
   message?: string;
+  needsProfileCompletion?: boolean;
+  user?: { volunteerTermsVersion?: string | null };
 };
 
 type GoogleConfigResponse = {
@@ -37,6 +39,7 @@ type Screen =
   | { view: "pending" }
   | { view: "rejected" }
   | { view: "email_not_verified"; email: string }
+  | { view: "complete_profile"; idToken: string }
   | { view: "error"; message: string };
 
 export default function LoginPage() {
@@ -51,7 +54,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Complete-profile form state (used when new Google user needs to fill mandatory fields)
+  const [cpTermsAccepted, setCpTermsAccepted] = useState(false);
+  const [cpInstagram, setCpInstagram] = useState("");
+  const [cpBirthDate, setCpBirthDate] = useState("");
+  const [cpChurch, setCpChurch] = useState("");
+  const [cpPastor, setCpPastor] = useState("");
+  const [cpWhatsapp, setCpWhatsapp] = useState("");
+  const [cpAddress, setCpAddress] = useState("");
 
   const [screen, setScreen] = useState<Screen>({ view: "login" });
   const [errorMsg, setErrorMsg] = useState("");
@@ -128,7 +139,50 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, volunteerTermsAccepted: termsAccepted }),
+        body: JSON.stringify({ idToken }),
+      });
+      const body = (await res.json()) as LoginResponse;
+      // New Google user who needs to fill in mandatory profile fields
+      if (res.ok && body.status === "PENDING_APPROVAL" && body.needsProfileCompletion) {
+        setScreen({ view: "complete_profile", idToken });
+        return;
+      }
+      processAuthResponse(res.ok, body, "");
+    } catch {
+      setErrorMsg("Erro inesperado. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCompleteProfile(idToken: string) {
+    if (!cpTermsAccepted) {
+      setErrorMsg("Você precisa aceitar o Termo de Adesão para continuar.");
+      return;
+    }
+    if (!cpInstagram.trim()) { setErrorMsg("Instagram é obrigatório."); return; }
+    if (!cpBirthDate.trim()) { setErrorMsg("Data de nascimento é obrigatória."); return; }
+    if (!cpChurch.trim()) { setErrorMsg("Igreja é obrigatória."); return; }
+    if (!cpPastor.trim()) { setErrorMsg("Nome do pastor é obrigatório."); return; }
+    if (!cpWhatsapp.trim()) { setErrorMsg("WhatsApp é obrigatório."); return; }
+    if (!cpAddress.trim()) { setErrorMsg("Endereço é obrigatório."); return; }
+
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idToken,
+          volunteerTermsAccepted: true,
+          instagramProfile: cpInstagram.trim(),
+          birthDate: cpBirthDate.trim(),
+          church: cpChurch.trim(),
+          pastorName: cpPastor.trim(),
+          whatsapp: cpWhatsapp.trim(),
+          address: cpAddress.trim(),
+        }),
       });
       const body = (await res.json()) as LoginResponse;
       processAuthResponse(res.ok, body, "");
@@ -183,6 +237,95 @@ export default function LoginPage() {
   }
 
   // ── Telas de estado ─────────────────────────────────────────────────────────
+
+  if (screen.view === "complete_profile") {
+    const idToken = screen.idToken;
+    return (
+      <AuthLayout>
+        <div style={cardStyle}>
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <p style={{ margin: 0, fontSize: 11, letterSpacing: "2px", textTransform: "uppercase", color: "#7cf2a2", marginBottom: 4 }}>
+              OVERFLOW MUSIC
+            </p>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#f4f8ff" }}>
+              Complete seu cadastro
+            </h1>
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#b3c6e0" }}>
+              Preencha os dados abaixo para finalizar o cadastro
+            </p>
+          </div>
+
+          {errorMsg && (
+            <p style={{ padding: "10px 14px", background: "rgba(239,68,68,0.12)", border: "1px solid #ef4444", borderRadius: 8, fontSize: 13, color: "#fca5a5", margin: "0 0 16px" }}>
+              {errorMsg}
+            </p>
+          )}
+
+          <div style={{ display: "grid", gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Instagram *</label>
+              <input type="text" value={cpInstagram} onChange={(e) => setCpInstagram(e.target.value)}
+                placeholder="@seu.perfil" style={inputStyle}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Data de nascimento * (DD/MM/AAAA)</label>
+              <input type="text" value={cpBirthDate} onChange={(e) => setCpBirthDate(e.target.value)}
+                placeholder="01/01/1990" maxLength={10} style={inputStyle}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Igreja que faz parte *</label>
+              <input type="text" value={cpChurch} onChange={(e) => setCpChurch(e.target.value)}
+                placeholder="Nome da sua igreja" style={inputStyle}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Nome do pastor *</label>
+              <input type="text" value={cpPastor} onChange={(e) => setCpPastor(e.target.value)}
+                placeholder="Nome do pastor responsável" style={inputStyle}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }} />
+            </div>
+            <div>
+              <label style={labelStyle}>WhatsApp *</label>
+              <input type="tel" value={cpWhatsapp} onChange={(e) => setCpWhatsapp(e.target.value)}
+                placeholder="(11) 99999-9999" style={inputStyle}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Endereço *</label>
+              <input type="text" value={cpAddress} onChange={(e) => setCpAddress(e.target.value)}
+                placeholder="Rua, número, bairro, cidade" style={inputStyle}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#1ecad3"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }} />
+            </div>
+
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 12, color: "#b3c6e0", lineHeight: 1.5 }}>
+              <input type="checkbox" checked={cpTermsAccepted} onChange={(e) => setCpTermsAccepted(e.target.checked)}
+                style={{ marginTop: 2, accentColor: "#1ecad3", flexShrink: 0 }} />
+              Li e aceito o{" "}
+              <Link href="/register" style={{ color: "#1ecad3", textDecoration: "underline" }}>
+                Termo de Adesão ao Serviço Voluntário
+              </Link>
+            </label>
+
+            <button
+              onClick={() => void handleCompleteProfile(idToken)}
+              disabled={loading}
+              style={{ ...primaryButtonStyle, opacity: loading ? 0.6 : 1 }}
+            >
+              {loading ? "Salvando..." : "Finalizar cadastro"}
+            </button>
+          </div>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   if (screen.view === "pending") {
     return (
@@ -275,53 +418,15 @@ export default function LoginPage() {
         {/* Google Sign-In */}
         {clientId ? (
           <div style={{ marginBottom: 20 }}>
-            {/* Termo obrigatório para Google */}
-            <label
+            <div
+              ref={googleButtonRef}
               style={{
                 display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                marginBottom: 12,
-                cursor: "pointer",
-                fontSize: 12,
-                color: "#b3c6e0",
-                lineHeight: 1.5,
+                justifyContent: "center",
+                minHeight: 44,
+                opacity: loading ? 0.4 : 1,
               }}
-            >
-              <input
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                style={{ marginTop: 2, accentColor: "#1ecad3", flexShrink: 0 }}
-              />
-              Li e aceito o{" "}
-              <Link href="/register" style={{ color: "#1ecad3", textDecoration: "underline" }}>
-                Termo de Adesão ao Serviço Voluntário
-              </Link>
-            </label>
-            <div style={{ position: "relative" }}>
-              <div
-                ref={googleButtonRef}
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  minHeight: 44,
-                  opacity: loading || !termsAccepted ? 0.4 : 1,
-                }}
-              />
-              {/* Overlay bloqueando o botão quando termo não aceito */}
-              {!termsAccepted && (
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    cursor: "not-allowed",
-                    zIndex: 10,
-                  }}
-                  title="Aceite o Termo de Adesão para continuar"
-                />
-              )}
-            </div>
+            />
             {!gisReady && (
               <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 13, color: "#b3c6e0" }}>
                 Carregando Google Sign-In...
