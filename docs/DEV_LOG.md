@@ -2,6 +2,22 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-11 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Diagnosticar e corrigir erro 500 em `POST /api/auth/resend-verification` ("Failed to send verification email")
+- Causa raiz: variáveis `SMTP_USER`/`SMTP_PASS`/`SMTP_HOST` não estavam sendo validadas no startup nem no script de deploy — servidor de produção provavelmente não as tem configuradas
+- Feito:
+  - `apps/api/src/email/email.service.ts`: implementado `OnModuleInit` que loga warn claro se SMTP não configurado e tenta `verify()` na inicialização com diagnóstico detalhado; adicionado getter `fromAddress` que usa `SMTP_FROM` quando disponível (corrige inconsistência com docker-compose); ambos sendMail usam `this.fromAddress`
+  - `scripts/check-hostinger-env.sh`: adicionados `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` na lista de aviso opcional — deploy agora exibe warn se SMTP não configurado
+- Commit: `fix(email): verifica SMTP no startup e corrige campo from` → `8debde8` — `origin/develop`
+- Status: código ok; solução definitiva depende de configurar as variáveis SMTP no `.env` do servidor
+- **AÇÃO NECESSÁRIA NO SERVIDOR:** adicionar ao `.env` de produção:
+  - `SMTP_HOST` (ex: `smtp.gmail.com`)
+  - `SMTP_USER` (email remetente)
+  - `SMTP_PASS` (senha de app Gmail de 16 chars — gerar em myaccount.google.com → Segurança → Senhas de app)
+  - `SMTP_FROM` (ex: `"Overflow Music" <no-reply@overflowmvmt.com>`)
+- Pendência: ver logs do servidor (`docker logs overflow_api | grep EmailService`) para confirmar diagnóstico
+- Próximo passo: configurar SMTP no servidor e redeploy
+
 ### [2026-04-10 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Dashboard inicial com painel rico de eventos (confirmações, pendências e recusas de músicos)
 - Feito:
