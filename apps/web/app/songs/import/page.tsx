@@ -54,7 +54,7 @@ export default function SongImportPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [loadingSongs, setLoadingSongs] = useState(false);
-  const [status, setStatus] = useState("Ready");
+  const [status, setStatus] = useState("Pronto");
 
   useEffect(() => {
     void loadSongs();
@@ -76,7 +76,7 @@ export default function SongImportPage() {
   async function previewFromText() {
     const content = txtPreviewInput.trim();
     if (!content) {
-      setStatus("Paste .txt content first");
+      setStatus("Cole o conteúdo .txt primeiro");
       return;
     }
 
@@ -91,9 +91,9 @@ export default function SongImportPage() {
       const body = await parseJson<{ parsed: ParsedChordPreview }>(response);
       setPreviewData(body.parsed);
       setPreviewSource("text");
-      setStatus("Song preview generated from text");
+      setStatus("Pré-visualização gerada a partir do texto");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to preview from text");
+      setStatus(error instanceof Error ? error.message : "Falha ao gerar pré-visualização do texto");
     } finally {
       setPreviewLoading(false);
     }
@@ -101,7 +101,7 @@ export default function SongImportPage() {
 
   async function previewFromFile() {
     if (!txtPreviewFile) {
-      setStatus("Select a .txt file first");
+      setStatus("Selecione um arquivo .txt primeiro");
       return;
     }
 
@@ -118,9 +118,9 @@ export default function SongImportPage() {
       const body = await parseJson<{ parsed: ParsedChordPreview }>(response);
       setPreviewData(body.parsed);
       setPreviewSource("file");
-      setStatus("Song preview generated from file");
+      setStatus("Pré-visualização gerada a partir do arquivo");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to preview from file");
+      setStatus(error instanceof Error ? error.message : "Falha ao gerar pré-visualização do arquivo");
     } finally {
       setPreviewLoading(false);
     }
@@ -128,7 +128,7 @@ export default function SongImportPage() {
 
   async function saveChartImport() {
     if (!previewData || !previewSource) {
-      setStatus("Generate preview before saving");
+      setStatus("Gere a pré-visualização antes de salvar");
       return;
     }
 
@@ -150,7 +150,7 @@ export default function SongImportPage() {
         setLastImportedChartVersion(body.chordChart?.version ?? null);
       } else {
         if (!txtPreviewFile) {
-          throw new Error("Selected file is missing");
+          throw new Error("Arquivo selecionado não encontrado");
         }
 
         const formData = new FormData();
@@ -168,10 +168,10 @@ export default function SongImportPage() {
         setLastImportedChartVersion(body.chordChart?.version ?? null);
       }
 
-      setStatus("Chord chart saved successfully");
+      setStatus("Cifra salva com sucesso!");
       await loadSongs();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to save chord chart");
+      setStatus(error instanceof Error ? error.message : "Falha ao salvar a cifra");
     } finally {
       setSaveLoading(false);
     }
@@ -183,9 +183,9 @@ export default function SongImportPage() {
         <AuthGate>
           <header style={headerStyle}>
             <p style={tagStyle}>Music</p>
-            <h1 style={{ margin: "8px 0 12px", fontSize: 36, lineHeight: 1.1 }}>Song TXT Import</h1>
+            <h1 style={{ margin: "8px 0 12px", fontSize: 36, lineHeight: 1.1 }}>Importar Cifra (TXT)</h1>
             <p style={{ margin: 0, color: "#d6e5f8" }}>
-              API target: <code>{apiUrl}</code>
+              API: <code>{apiUrl}</code>
             </p>
             <p style={{ margin: "8px 0 0", color: "#1ecad3" }}>{status}</p>
             <p style={{ margin: "10px 0 0" }}>
@@ -196,7 +196,7 @@ export default function SongImportPage() {
           </header>
 
           <article style={cardStyle}>
-            <h2 style={{ marginTop: 0 }}>Preview + Save</h2>
+            <h2 style={{ marginTop: 0 }}>Pré-visualizar e Salvar</h2>
 
           <div style={{ display: "grid", gap: 10 }}>
             <textarea
@@ -207,7 +207,7 @@ export default function SongImportPage() {
               style={inputStyle}
             />
             <button type="button" style={primaryButtonStyle} onClick={() => void previewFromText()}>
-              {previewLoading ? "Generating..." : "Preview from text"}
+              {previewLoading ? "Gerando..." : "Pré-visualizar texto"}
             </button>
           </div>
 
@@ -219,7 +219,7 @@ export default function SongImportPage() {
               onChange={(event) => setTxtPreviewFile(event.target.files?.[0] || null)}
             />
             <button type="button" style={secondaryButtonStyle} onClick={() => void previewFromFile()}>
-              {previewLoading ? "Generating..." : "Preview from file"}
+              {previewLoading ? "Gerando..." : "Pré-visualizar arquivo"}
             </button>
           </div>
 
@@ -235,40 +235,91 @@ export default function SongImportPage() {
             </select>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button type="button" style={secondaryButtonStyle} onClick={() => void loadSongs()}>
-                {loadingSongs ? "Loading songs..." : `Atualizar músicas (${songs.length})`}
+                {loadingSongs ? "Carregando..." : `Atualizar músicas (${songs.length})`}
               </button>
               {targetSongId ? (
-                <p style={{ margin: 0, color: "#b3c6e0", alignSelf: "center", fontSize: 13 }}>songId: {targetSongId}</p>
+                <p style={{ margin: 0, color: "#b3c6e0", alignSelf: "center", fontSize: 13 }}>ID: {targetSongId}</p>
               ) : (
                 <p style={{ margin: 0, color: "#b3c6e0", alignSelf: "center", fontSize: 13 }}>Nova música será criada se não existir</p>
               )}
             </div>
             <button type="button" style={primaryButtonStyle} onClick={() => void saveChartImport()}>
-              {saveLoading ? "Saving..." : "Salvar cifra"}
+              {saveLoading ? "Salvando..." : "Salvar cifra"}
             </button>
           </div>
 
             <div style={{ marginTop: 16 }}>
               {previewData ? (
                 <div style={previewBoxStyle}>
-                  <p style={{ margin: 0, fontWeight: 800 }}>
+                  {/* Cabeçalho resumido */}
+                  <p style={{ margin: 0, fontWeight: 800, fontSize: 18 }}>
                     {previewData.title}
                     {previewData.artist ? ` - ${previewData.artist}` : ""}
                   </p>
-                  <p style={{ margin: 0, color: "#b3c6e0", fontSize: 14 }}>
+                  <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>
                     Key: {previewData.metadata?.suggestedKey || "-"} | BPM: {previewData.metadata?.bpm ?? "-"} | Capo:{" "}
                     {previewData.metadata?.capo ?? "-"}
                   </p>
-                  <p style={{ margin: 0, color: "#b3c6e0", fontSize: 14 }}>
-                    Sections: {previewData.sections.length} | Chords mapped: {Object.keys(previewData.chordDictionary || {}).length}
+                  <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>
+                    Seções: {previewData.sections.length} | Acordes mapeados: {Object.keys(previewData.chordDictionary || {}).length}
                   </p>
-                  <p style={{ margin: 0, color: "#7cf2a2", fontSize: 13 }}>
-                    Source: {previewSource || "-"} | Last save:{" "}
-                    {lastImportedSongId ? `song ${lastImportedSongId} (v${lastImportedChartVersion ?? "?"})` : "none"}
+                  <p style={{ margin: 0, color: "#7cf2a2", fontSize: 12 }}>
+                    Origem: {previewSource === "file" ? "arquivo" : previewSource === "text" ? "texto" : "-"} | Último salvamento:{" "}
+                    {lastImportedSongId ? `música ${lastImportedSongId} (v${lastImportedChartVersion ?? "?"})` : "nenhum"}
                   </p>
+
+                  {/* Cifra completa */}
+                  <div style={{ marginTop: 14, display: "grid", gap: 20 }}>
+                    {previewData.sections.map((section, si) => (
+                      <div key={si}>
+                        <p style={{ margin: "0 0 6px 0", fontWeight: 700, color: "#1ecad3", fontSize: 13, letterSpacing: 1 }}>
+                          [{section.name}]
+                        </p>
+                        <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: 13, lineHeight: 1.6 }}>
+                          {section.lines.map((line, li) => {
+                            if (line.type === "chords") {
+                              return (
+                                <pre key={li} style={{ margin: 0, color: "#7cf2a2", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                  {line.content || "\u00a0"}
+                                </pre>
+                              );
+                            }
+                            if (line.type === "tab") {
+                              return (
+                                <pre key={li} style={{ margin: 0, color: "#f59e0b", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                  {line.content || "\u00a0"}
+                                </pre>
+                              );
+                            }
+                            return (
+                              <pre key={li} style={{ margin: 0, color: "#e2eaf5", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                {line.content || "\u00a0"}
+                              </pre>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Dicionário de acordes */}
+                  {Object.keys(previewData.chordDictionary || {}).length > 0 && (
+                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid #1e3a5a" }}>
+                      <p style={{ margin: "0 0 6px 0", fontWeight: 700, color: "#1ecad3", fontSize: 12, letterSpacing: 1 }}>
+                        [DICIONÁRIO DE ACORDES]
+                      </p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
+                        {Object.entries(previewData.chordDictionary).map(([chord, def]) => (
+                          <span key={chord} style={{ fontFamily: "monospace", fontSize: 12, color: "#b3c6e0" }}>
+                            <span style={{ color: "#7cf2a2" }}>{chord}</span> = {def}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <p style={{ margin: 0, color: "#b3c6e0" }}>No preview yet.</p>
+                <p style={{ margin: 0, color: "#b3c6e0" }}>Nenhuma pré-visualização ainda.</p>
               )}
             </div>
           </article>
