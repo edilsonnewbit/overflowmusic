@@ -4,7 +4,6 @@ import Link from "next/link";
 import { CSSProperties, FormEvent, useCallback, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import type { EventStatus, SetlistItem, EventSetlist } from "@/lib/types";
-
 type Setlist = NonNullable<EventSetlist>;
 
 type EventMusician = {
@@ -1030,6 +1029,9 @@ export default function EventDetailPage({ params }: PageProps) {
                   → Ver Checklists do evento
                 </Link>
               </section>
+
+              {/* Ensaios */}
+              <RehearsalsSection eventId={eventId} />
             </>
           )}
         </section>
@@ -1165,4 +1167,184 @@ function smallBtn(color: string): CSSProperties {
     fontWeight: 700,
     cursor: "pointer",
   };
+}
+
+// ── Rehearsals Section ────────────────────────────────────────────────────────
+
+type RehearsalItem = {
+  id: string;
+  title: string;
+  dateTime: string;
+  location: string | null;
+  address: string | null;
+  description: string | null;
+  notes: string | null;
+  durationMinutes: number | null;
+};
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", {
+    weekday: "short", day: "2-digit", month: "2-digit",
+    year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function mapsUrl(address: string) {
+  return `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+}
+function wazeUrl(address: string) {
+  return `https://waze.com/ul?q=${encodeURIComponent(address)}`;
+}
+
+function RehearsalsSection({ eventId }: { eventId: string }) {
+  const [rehearsals, setRehearsals] = useState<RehearsalItem[]>([]);
+  const [all, setAll] = useState<RehearsalItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadLinked();
+    void loadAll();
+  }, [eventId]);
+
+  async function loadLinked() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/rehearsals`);
+      const body = (await res.json()) as { ok: boolean; rehearsals?: RehearsalItem[] };
+      setRehearsals(body.rehearsals ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadAll() {
+    try {
+      const res = await fetch("/api/rehearsals?limit=100");
+      const body = (await res.json()) as { ok: boolean; rehearsals?: RehearsalItem[] };
+      setAll(body.rehearsals ?? []);
+    } catch { /* ignore */ }
+  }
+
+  async function addRehearsal(rehearsalId: string) {
+    setAdding(true);
+    setStatus("");
+    try {
+      const res = await fetch(`/api/events/${eventId}/rehearsals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rehearsalId }),
+      });
+      const body = (await res.json()) as { ok: boolean; message?: string };
+      if (!body.ok) throw new Error(body.message);
+      setShowPicker(false);
+      await loadLinked();
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao vincular.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function removeRehearsal(rehearsalId: string) {
+    setRemovingId(rehearsalId);
+    try {
+      await fetch(`/api/events/${eventId}/rehearsals/${rehearsalId}`, { method: "DELETE" });
+      setRehearsals((prev) => prev.filter((r) => r.id !== rehearsalId));
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  const linkedIds = new Set(rehearsals.map((r) => r.id));
+  const available = all.filter((r) => !linkedIds.has(r.id));
+
+  return (
+    <section style={{ ...sectionStyle, marginTop: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <h2 style={{ margin: 0, fontSize: 16, color: "#e2f0ff", fontWeight: 700 }}>🎸 Ensaios</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link href="/rehearsals" style={{ ...smallBtn("#8fa9c8"), textDecoration: "none", padding: "3px 12px" }}>
+            Gerenciar
+          </Link>
+          <button style={smallBtn("#7cf2a2")} onClick={() => setShowPicker((v) => !v)}>
+            + Vincular ensaio
+          </button>
+        </div>
+      </div>
+
+      {status && <p style={{ color: "#f87171", fontSize: 12, marginBottom: 8 }}>{status}</p>}
+
+      {/* Picker dropdown */}
+      {showPicker && (
+        <div style={{ background: "#060d17", border: "1px solid #2d4b6d", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+          {available.length === 0 ? (
+            <p style={{ color: "#5a7a9a", fontSize: 13, margin: 0 }}>
+              Nenhum ensaio disponível.{" "}
+              <Link href="/rehearsals" style={{ color: "#7cf2a2" }}>Crie um ensaio</Link> primeiro.
+            </p>
+          ) : (
+            <>
+              <p style={{ color: "#8fa9c8", fontSize: 12, margin: "0 0 8px" }}>Selecione um ensaio para vincular:</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {available.map((r) => (
+                  <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0c1929", borderRadius: 8, padding: "8px 12px" }}>
+                    <div>
+                      <p style={{ margin: 0, color: "#e2f0ff", fontSize: 13, fontWeight: 600 }}>{r.title}</p>
+                      <p style={{ margin: 0, color: "#7cf2a2", fontSize: 12 }}>📅 {formatDate(r.dateTime)}</p>
+                      {r.location && <p style={{ margin: 0, color: "#8fa9c8", fontSize: 12 }}>📌 {r.location}</p>}
+                    </div>
+                    <button style={smallBtn("#7cf2a2")} disabled={adding} onClick={() => void addRehearsal(r.id)}>
+                      {adding ? "..." : "Vincular"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Linked list */}
+      {loading ? (
+        <p style={{ color: "#5a7a9a", fontSize: 13 }}>Carregando ensaios...</p>
+      ) : rehearsals.length === 0 ? (
+        <p style={{ color: "#5a7a9a", fontSize: 13 }}>Nenhum ensaio vinculado a este evento.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {rehearsals.map((r) => (
+            <div key={r.id} style={{ background: "#060d17", border: "1px solid #1e3650", borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <p style={{ margin: "0 0 3px", color: "#e2f0ff", fontWeight: 700, fontSize: 14 }}>{r.title}</p>
+                <p style={{ margin: "0 0 2px", color: "#7cf2a2", fontSize: 12 }}>
+                  📅 {formatDate(r.dateTime)}
+                  {r.durationMinutes ? <span style={{ color: "#5a7a9a", marginLeft: 8 }}>⏱ {r.durationMinutes}min</span> : null}
+                </p>
+                {r.location && <p style={{ margin: "0 0 2px", color: "#b3c6e0", fontSize: 12 }}>📌 {r.location}</p>}
+                {r.address && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ color: "#5a7a9a", fontSize: 11 }}>{r.address}</span>
+                    <a href={mapsUrl(r.address)} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", fontSize: 11, border: "1px solid #60a5fa44", borderRadius: 4, padding: "1px 6px", textDecoration: "none" }}>📍 Maps</a>
+                    <a href={wazeUrl(r.address)} target="_blank" rel="noopener noreferrer" style={{ color: "#7cf2a2", fontSize: 11, border: "1px solid #7cf2a244", borderRadius: 4, padding: "1px 6px", textDecoration: "none" }}>🗺 Waze</a>
+                  </div>
+                )}
+                {r.description && <p style={{ margin: "4px 0 0", color: "#7a94b0", fontSize: 12, fontStyle: "italic" }}>{r.description}</p>}
+                {r.notes && <p style={{ margin: "2px 0 0", color: "#5a7a9a", fontSize: 11 }}>Obs: {r.notes}</p>}
+              </div>
+              <button
+                style={{ ...smallBtn("#f87171"), flexShrink: 0 }}
+                disabled={removingId === r.id}
+                onClick={() => void removeRehearsal(r.id)}
+              >
+                {removingId === r.id ? "..." : "Remover"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }

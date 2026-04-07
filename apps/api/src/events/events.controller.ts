@@ -13,6 +13,7 @@ import { SkipThrottle } from "@nestjs/throttler";
 import { EventsService } from "./events.service";
 import { AuditService } from "../audit/audit.service";
 import { AuthService } from "../auth/auth.service";
+import { RehearsalsService } from "../rehearsals/rehearsals.service";
 
 type CreateEventBody = {
   title: string;
@@ -42,6 +43,7 @@ export class EventsController {
     private readonly eventsService: EventsService,
     private readonly auditService: AuditService,
     private readonly authService: AuthService,
+    private readonly rehearsalsService: RehearsalsService,
   ) {}
 
   @Get()
@@ -169,5 +171,32 @@ export class EventsController {
     const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
     const { user } = await this.authService.getMe(token);
     return this.eventsService.respondMusicianBySlotId(slotId, user.id, body.accept);
+  }
+
+  // ── Rehearsals ────────────────────────────────────────────────────────────
+
+  @Get(":id/rehearsals")
+  async listRehearsals(@Param("id") id: string) {
+    return this.rehearsalsService.listForEvent(id);
+  }
+
+  @Post(":id/rehearsals")
+  async addRehearsal(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { rehearsalId: string },
+  ) {
+    await this.authService.assertAdminKeyOrContentManager(authorization);
+    return this.rehearsalsService.addToEvent(id, body.rehearsalId);
+  }
+
+  @Delete(":id/rehearsals/:rehearsalId")
+  async removeRehearsal(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Param("rehearsalId") rehearsalId: string,
+  ) {
+    await this.authService.assertAdminKeyOrContentManager(authorization);
+    return this.rehearsalsService.removeFromEvent(id, rehearsalId);
   }
 }

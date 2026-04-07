@@ -20,6 +20,8 @@ import { QueueService } from "./notifications/queue.service";
 import { OrganizationsController } from "./organizations/organizations.controller";
 import { OrganizationsService } from "./organizations/organizations.service";
 import { PrismaModule } from "./prisma/prisma.module";
+import { RehearsalsController } from "./rehearsals/rehearsals.controller";
+import { RehearsalsService } from "./rehearsals/rehearsals.service";
 import { SetlistController } from "./setlist/setlist.controller";
 import { SetlistService } from "./setlist/setlist.service";
 import { SongsController } from "./songs/songs.controller";
@@ -42,6 +44,7 @@ import { SongsService } from "./songs/songs.service";
     OrganizationsController,
     SetlistController,
     SongsController,
+    RehearsalsController,
     ChecklistTemplatesController,
     ChecklistRunsController,
   ],
@@ -57,6 +60,7 @@ import { SongsService } from "./songs/songs.service";
     OrganizationsService,
     SetlistService,
     SongsService,
+    RehearsalsService,
     ChecklistTemplatesService,
     ChecklistRunsService,
   ],
