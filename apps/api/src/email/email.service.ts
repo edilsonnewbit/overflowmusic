@@ -1,23 +1,55 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private transporter: Transporter;
 
   constructor() {
     // Configuração do transporter SMTP
-    // Variáveis de ambiente usadas: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+    // Variáveis de ambiente usadas: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587', 10),
       secure: (process.env.SMTP_PORT || '587') === '465',
       auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS, // docker-compose e CI/CD usam SMTP_PASS
+        pass: process.env.SMTP_PASS,
       },
     });
+  }
+
+  async onModuleInit(): Promise<void> {
+    const missing: string[] = [];
+    if (!process.env.SMTP_USER) missing.push('SMTP_USER');
+    if (!process.env.SMTP_PASS) missing.push('SMTP_PASS');
+    if (!process.env.SMTP_HOST) missing.push('SMTP_HOST (usando smtp.gmail.com)');
+
+    if (missing.length > 0) {
+      console.warn(
+        `[EmailService] ATENÇÃO: variáveis SMTP não configuradas: ${missing.join(', ')}. ` +
+        'Envio de emails está desabilitado. Configure no .env do servidor.',
+      );
+      return;
+    }
+
+    try {
+      await this.transporter.verify();
+      console.log('[EmailService] Conexão SMTP verificada com sucesso');
+    } catch (error) {
+      console.error('[EmailService] Falha na verificação SMTP ao iniciar:', {
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: process.env.SMTP_PORT || '587',
+        user: process.env.SMTP_USER,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private get fromAddress(): string {
+    if (process.env.SMTP_FROM) return process.env.SMTP_FROM;
+    return `"${process.env.APP_NAME || 'Overflow Music'}" <${process.env.SMTP_USER}>`;
   }
 
   /**
@@ -27,7 +59,7 @@ export class EmailService {
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
     const mailOptions = {
-      from: `"${process.env.APP_NAME || 'Overflow Music'}" <${process.env.SMTP_USER}>`,
+      from: this.fromAddress,
       to,
       subject: 'Verifique seu email - Overflow Music',
       html: `
@@ -114,7 +146,7 @@ export class EmailService {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
     const mailOptions = {
-      from: `"${process.env.APP_NAME || 'Overflow Music'}" <${process.env.SMTP_USER}>`,
+      from: this.fromAddress,
       to,
       subject: 'Recuperação de Senha - Overflow Music',
       html: `
