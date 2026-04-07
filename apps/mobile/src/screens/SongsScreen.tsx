@@ -280,7 +280,7 @@ function BrowseTab({
                   style={{ paddingHorizontal: 10, paddingVertical: 8 }}
                   accessibilityLabel={`Adicionar ${song.title} ao setlist`}
                 >
-                  <Text style={{ color: "#7cf2a2", fontSize: 24, fontWeight: "700" }}>＋</Text>
+                  <Text style={{ color: "#7cf2a2", fontSize: 18, fontWeight: "700" }}>＋</Text>
                 </Pressable>
               ) : null}
             </View>

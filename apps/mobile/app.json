@@ -7,16 +7,24 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/logo.png",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.overflow.music"
+      "bundleIdentifier": "com.overflow.music",
+      "icon": "./assets/logo.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#07101d"
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#ffffff"
       },
       "package": "com.overflow.music",
       "permissions": [

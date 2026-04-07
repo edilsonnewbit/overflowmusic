@@ -180,6 +180,8 @@ export class AuthController {
       birthDate?: string | null;
       church?: string | null;
       pastorName?: string | null;
+      whatsapp?: string | null;
+      address?: string | null;
     },
   ) {
     const token = (authorization || "").replace(/^Bearer\s+/i, "");
@@ -194,6 +196,8 @@ export class AuthController {
       birthDate: body.birthDate,
       church: body.church,
       pastorName: body.pastorName,
+      whatsapp: body.whatsapp,
+      address: body.address,
     });
   }
 
@@ -281,6 +285,7 @@ export class AuthController {
           email?: string;
           name?: string;
           sub?: string;
+          picture?: string;
           email_verified?: boolean;
         }
       | undefined;
@@ -298,6 +303,7 @@ export class AuthController {
     const name = payload?.name || email.split("@")[0] || "user";
     const googleSub = payload?.sub || "";
     const emailVerified = payload?.email_verified === true;
+    const photoUrl = payload?.picture || null;
 
     if (!email || !googleSub || !emailVerified) {
       throw new UnauthorizedException("invalid google token payload");
@@ -310,7 +316,7 @@ export class AuthController {
       }
     }
 
-    return this.authService.googleLogin({ email, name, googleSub, ...profileFields });
+    return this.authService.googleLogin({ email, name, googleSub, photoUrl, ...profileFields });
   }
 
   private resolveGoogleClientIds(): string[] {

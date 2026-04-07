@@ -20,6 +20,7 @@ type GoogleLoginInput = {
   pastorName?: string;
   whatsapp?: string;
   address?: string;
+  photoUrl?: string | null;
 };
 
 type DbUserRecord = {
@@ -39,6 +40,7 @@ type DbUserRecord = {
   pastorName: string | null;
   whatsapp: string | null;
   address: string | null;
+  photoUrl: string | null;
   volunteerTermsVersion: string | null;
   volunteerTermsAcceptedAt: Date | null;
   createdAt: Date;
@@ -94,6 +96,7 @@ export class AuthService implements OnModuleInit {
         pastorName: (input.pastorName || "").trim() || null,
         whatsapp: (input.whatsapp || "").trim() || null,
         address: (input.address || "").trim() || null,
+        photoUrl: input.photoUrl ?? null,
       };
       user = await this.prisma.user.create({
         data: {
@@ -119,7 +122,12 @@ export class AuthService implements OnModuleInit {
     if (foundByEmail && user.googleSub !== googleSub) {
       user = await this.prisma.user.update({
         where: { id: user.id },
-        data: { googleSub },
+        data: { googleSub, ...(input.photoUrl ? { photoUrl: input.photoUrl } : {}) },
+      });
+    } else if (input.photoUrl && user.photoUrl !== input.photoUrl) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { photoUrl: input.photoUrl },
       });
     }
 
@@ -743,6 +751,7 @@ export class AuthService implements OnModuleInit {
       pastorName: user.pastorName ?? null,
       whatsapp: user.whatsapp ?? null,
       address: user.address ?? null,
+      photoUrl: user.photoUrl ?? null,
       volunteerTermsVersion: user.volunteerTermsVersion ?? null,
       volunteerTermsAcceptedAt: user.volunteerTermsAcceptedAt ? user.volunteerTermsAcceptedAt.toISOString() : null,
       createdAt: user.createdAt.toISOString(),

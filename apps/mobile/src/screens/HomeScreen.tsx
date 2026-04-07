@@ -4,31 +4,6 @@ import { useSession } from "../context/SessionContext";
 import { styles } from "../styles";
 import type { MusicEvent } from "../types";
 
-const ROLE_LABEL: Record<string, string> = {
-  SUPER_ADMIN: "Super Admin",
-  ADMIN: "Admin",
-  LEADER: "Líder",
-  MEMBER: "Membro",
-};
-
-const ROLE_COLOR: Record<string, string> = {
-  SUPER_ADMIN: "#f87171",
-  ADMIN: "#fbbf24",
-  LEADER: "#7cf2a2",
-  MEMBER: "#b3c6e0",
-};
-
-const INSTRUMENT_LABEL: Record<string, string> = {
-  BATERIA: "Bateria",
-  BAIXO: "Baixo",
-  GUITARRA: "Guitarra",
-  TECLADO: "Teclado",
-  VIOLAO: "Violão",
-  VOCAL: "Vocal",
-  TROMPETE: "Trompete",
-  SAXOFONE: "Saxofone",
-};
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
     weekday: "long",
@@ -56,7 +31,7 @@ function daysUntil(iso: string): number {
 
 export function HomeScreen() {
   const router = useRouter();
-  const { user, events, loadingEvents, loadEventsList, eventSetlist, activeEventId, selectEvent, pendingInvite, handleRespondInvite, pendingInvites, respondToInvite } = useSession();
+  const { events, loadingEvents, loadEventsList, eventSetlist, activeEventId, selectEvent, pendingInvite, handleRespondInvite } = useSession();
   const nextEvent = getNextEvent(events);
   const setlistCount = eventSetlist?.items?.length ?? 0;
 
@@ -67,91 +42,6 @@ export function HomeScreen() {
       contentContainerStyle={[styles.container, { gap: 16 }]}
       refreshControl={<RefreshControl refreshing={loadingEvents} onRefresh={loadEventsList} tintColor="#7cf2a2" />}
     >
-      {/* Saudação */}
-      {user && (
-        <View style={[styles.headerCard, { gap: 4 }]}>
-          <Text style={styles.kicker}>Overflow Music</Text>
-          <Text style={styles.title}>Olá, {user.name.split(" ")[0]} 👋</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 }}>
-            <View
-              style={{
-                backgroundColor: "#0b1d31",
-                borderRadius: 20,
-                paddingHorizontal: 10,
-                paddingVertical: 3,
-                borderWidth: 1,
-                borderColor: ROLE_COLOR[user.role] ?? "#b3c6e0",
-              }}
-            >
-              <Text style={{ color: ROLE_COLOR[user.role] ?? "#b3c6e0", fontSize: 12, fontWeight: "700" }}>
-                {ROLE_LABEL[user.role] ?? user.role}
-              </Text>
-            </View>
-            <Text style={{ color: "#4a6278", fontSize: 12 }}>{user.email}</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Convites pendentes */}
-      {pendingInvites.length > 0 && (
-        <>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Text style={{ fontSize: 18 }}>🔔</Text>
-            <Text style={[styles.kicker, { color: "#fbbf24", marginTop: 0 }]}>
-              {pendingInvites.length} convite{pendingInvites.length > 1 ? "s" : ""} pendente{pendingInvites.length > 1 ? "s" : ""}
-            </Text>
-          </View>
-          {pendingInvites.map((invite) => (
-            <View
-              key={invite.slotId}
-              style={{
-                borderWidth: 1,
-                borderColor: "#b45309",
-                borderRadius: 14,
-                padding: 16,
-                backgroundColor: "#1c1205",
-                gap: 6,
-              }}
-            >
-              <Text style={{ color: "#fbbf24", fontSize: 13, fontWeight: "700" }}>
-                🎵 Você foi escalado como {INSTRUMENT_LABEL[invite.instrumentRole.toUpperCase()] ?? invite.instrumentRole}
-              </Text>
-              <Text style={{ color: "#f4f8ff", fontSize: 15, fontWeight: "700" }}>{invite.eventTitle}</Text>
-              <Text style={{ color: "#1ecad3", fontSize: 12 }}>
-                {new Date(invite.eventDate).toLocaleString("pt-BR", {
-                  weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-                })}
-              </Text>
-              {invite.eventLocation ? (
-                <Text style={{ color: "#b3c6e0", fontSize: 12 }}>📍 {invite.eventLocation}</Text>
-              ) : null}
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
-                <Pressable
-                  onPress={() => void respondToInvite(invite.slotId, true)}
-                  style={({ pressed }) => ({
-                    flex: 1, backgroundColor: pressed ? "#1e4a2a" : "#0e2c1e",
-                    borderRadius: 10, padding: 10, alignItems: "center",
-                    borderWidth: 1, borderColor: "#7cf2a2",
-                  })}
-                >
-                  <Text style={{ color: "#7cf2a2", fontWeight: "700", fontSize: 13 }}>✓ Confirmar</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => void respondToInvite(invite.slotId, false)}
-                  style={({ pressed }) => ({
-                    flex: 1, backgroundColor: pressed ? "#3a1a1a" : "#2a1010",
-                    borderRadius: 10, padding: 10, alignItems: "center",
-                    borderWidth: 1, borderColor: "#f28c8c",
-                  })}
-                >
-                  <Text style={{ color: "#f28c8c", fontWeight: "700", fontSize: 13 }}>✗ Recusar</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </>
-      )}
-
       {/* Próximo Evento */}
       {nextEvent ? (
         <Pressable

@@ -2,6 +2,35 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-20 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: (1) Todos os campos no perfil mobile; (2) Foto do Google exibida no web e mobile
+- Feito:
+  - `apps/api/prisma/schema.prisma`: adicionado campo `photoUrl String?` ao model User
+  - `packages/types/index.ts`: adicionado `photoUrl?: string | null` ao tipo `AuthUser`
+  - `apps/api/src/auth/auth.types.ts`: adicionado `photoUrl?: string | null` ao tipo `AuthUser`
+  - `apps/api/src/auth/auth.service.ts`: 4 mudanças — `GoogleLoginInput` + `DbUserRecord` recebem `photoUrl`; create inclui `photoUrl`; update atualiza `photoUrl` se diferente; `toAuthUser` retorna `photoUrl`
+  - `apps/api/src/auth/auth.controller.ts`: extrai `picture` do payload Google e passa como `photoUrl`; PATCH `/auth/me` agora aceita e passa `whatsapp` e `address` (estavam sendo ignorados)
+  - `apps/mobile/src/lib/api.ts`: `updateProfile` expandido para incluir todos os campos de perfil
+  - `apps/mobile/src/screens/AccountScreen.tsx`: reescrito — avatar (foto Google ou iniciais), leitura de todos os campos, formulário completo com instrumentos (chips), campos whatsapp/address/church/etc., botões Salvar/Cancelar
+  - `apps/web/components/GlobalHeader.tsx`: avatar agora mostra `<img>` com foto Google se disponível, fallback inicial
+  - `apps/web/app/profile/page.tsx`: seção de avatar Google + nome no topo do card de perfil
+- Status: ✅ 0 erros TS em todos os arquivos alterados
+- Pendências: `cd apps/api && npx prisma db push` (precisa Docker) para aplicar coluna `photoUrl` no banco
+- Próximo passo: subir Docker local e rodar `prisma db push`
+
+### [2026-04-19 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: 5 ajustes visuais/funcionais no mobile — header, ícones, saudação, setlist, cifra
+- Feito:
+  - `apps/mobile/src/components/NotificationBell.tsx` (NOVO): sino de notificações com badge e bottom sheet modal; usa `useSession().pendingInvites/respondToInvite/loadMyInvites`
+  - `apps/mobile/app/(tabs)/_layout.tsx`: `headerShown: true`; header escuro `#0b1828`; `headerRight` com `NotificationBell` + botão 👤 → account; ícone checklist trocado para `☑️`; tab `account` oculta da barra (`href: null`)
+  - `apps/mobile/src/screens/HomeScreen.tsx`: removido card de saudação "Olá, {nome}", removida lista de convites pendentes (movidos para o sino), removidas constantes `ROLE_LABEL/COLOR`, `INSTRUMENT_LABEL`
+  - `apps/mobile/app/present.tsx`: bug "Ver cifra" corrigido — `handleToggleCifra` agora abre para músicas com `rawText` mesmo sem `parsedJson`; estado `currentRawText` adicionado; cache type atualizado; fallback render para texto puro
+  - `apps/mobile/src/screens/EventsScreen.tsx`: cabeçalho compacto com botão "Novo Evento" pill; cards de evento redesenhados (borda colorida por status, accent bar, botões Editar/Excluir compactos); fragmento de código duplicado removido; setlist redesenhado — controles ▲▼✕✏ em linha horizontal à direita do título (não em coluna), botões Compartilhar + Apresentar lado a lado; `actionBtnStyle` adicionado às constantes
+  - `apps/mobile/src/screens/SongsScreen.tsx`: ícone `＋` reduzido de fontSize 24 → 18
+- Status: ✅ 0 erros TS em todos os arquivos alterados
+- Pendências: rebuild APK release + instalar no dispositivo para validar visual
+- Próximo passo: `cd apps/mobile/android && ./gradlew assembleRelease --no-daemon`
+
 ### [2026-04-07 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Corrigir erro 400 `invalid_request` no login Google do app Android
 - Causa raiz: `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` estava com o Web Client ID — Google rejeita custom URI scheme (`overflowmusic://`) com Web client ID

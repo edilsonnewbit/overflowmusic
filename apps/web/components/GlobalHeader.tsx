@@ -81,7 +81,17 @@ export function GlobalHeader() {
                 className={`user-chip${isActive("/profile") ? " active" : ""}`}
                 title={user.email}
               >
-                <span className="user-avatar">{user.name.charAt(0).toUpperCase()}</span>
+                {(user as typeof user & { photoUrl?: string | null }).photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={(user as typeof user & { photoUrl?: string | null }).photoUrl!}
+                    alt={user.name}
+                    className="user-avatar"
+                    style={{ borderRadius: "50%", objectFit: "cover", width: 28, height: 28 }}
+                  />
+                ) : (
+                  <span className="user-avatar">{user.name.charAt(0).toUpperCase()}</span>
+                )}
                 <span className="user-name">{user.name}</span>
                 <span className="user-role-badge">{{ SUPER_ADMIN: "Super Admin", ADMIN: "Admin", LEADER: "Líder", MEMBER: "Membro" }[user.role] ?? user.role}</span>
               </Link>

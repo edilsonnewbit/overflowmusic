@@ -91,6 +91,9 @@ export default function PresentScreen() {
   // Transposition
   const [transposeSemitones, setTransposeSemitones] = useState(0);
 
+  // Raw text fallback (when parsedJson is unavailable)
+  const [currentRawText, setCurrentRawText] = useState<string | null>(null);
+
   // Metronome
   const [metroOn, setMetroOn] = useState(false);
   const [metroBpm, setMetroBpm] = useState(80);
@@ -104,8 +107,8 @@ export default function PresentScreen() {
   const sortedLengthRef = useRef(sortedItems.length);
   sortedLengthRef.current = sortedItems.length;
 
-  // Chart cache: lower-cased songTitle → ParsedChart | null
-  const chartCache = useRef<Map<string, ParsedChart | null>>(new Map());
+  // Chart cache: lower-cased songTitle → { parsed: ParsedChart | null; rawText: string | null }
+  const chartCache = useRef<Map<string, { parsed: ParsedChart | null; rawText: string | null }>>(new Map());
   // Songs list cache: lower-cased title → song id
   const songIdCache = useRef<Map<string, string> | null>(null);
 
@@ -144,6 +147,11 @@ export default function PresentScreen() {
   useEffect(() => {
     if (!showCifra) stopAutoScroll();
   }, [showCifra, stopAutoScroll]);
+
+  // Reset rawText when song changes
+  useEffect(() => {
+    setCurrentRawText(null);
+  }, [current]);
 
   // ── Metronome engine ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -222,9 +230,9 @@ export default function PresentScreen() {
   ).current;
 
   // ── Chart loading ─────────────────────────────────────────────────────────
-  async function loadChart(title: string): Promise<ParsedChart | null> {
+  async function loadChart(title: string): Promise<{ parsed: ParsedChart | null; rawText: string | null }> {
     const key = title.toLowerCase().trim();
-    if (chartCache.current.has(key)) return chartCache.current.get(key) ?? null;
+    if (chartCache.current.has(key)) return chartCache.current.get(key)!;
 
     // Lazy-load the songs list to look up song IDs by title
     if (!songIdCache.current) {
@@ -238,14 +246,19 @@ export default function PresentScreen() {
 
     const songId = songIdCache.current.get(key);
     if (!songId) {
-      chartCache.current.set(key, null);
-      return null;
+      const empty = { parsed: null, rawText: null };
+      chartCache.current.set(key, empty);
+      return empty;
     }
 
     const res = await fetchSongById(songId);
-    const chart = res.song?.chordCharts?.[0]?.parsedJson ?? null;
-    chartCache.current.set(key, chart);
-    return chart;
+    const firstChart = res.song?.chordCharts?.[0];
+    const result = {
+      parsed: firstChart?.parsedJson ?? null,
+      rawText: firstChart?.rawText ?? null,
+    };
+    chartCache.current.set(key, result);
+    return result;
   }
 
   async function handleToggleCifra() {
@@ -259,17 +272,19 @@ export default function PresentScreen() {
     // Check cache first for instant display
     const cacheKey = item.songTitle.toLowerCase().trim();
     if (chartCache.current.has(cacheKey)) {
-      const cached = chartCache.current.get(cacheKey) ?? null;
-      setCurrentChart(cached);
-      if (cached) setShowCifra(true);
+      const cached = chartCache.current.get(cacheKey)!;
+      setCurrentChart(cached.parsed);
+      setCurrentRawText(cached.rawText);
+      if (cached.parsed || cached.rawText) setShowCifra(true);
       return;
     }
 
     setLoadingCifra(true);
-    const chart = await loadChart(item.songTitle);
+    const result = await loadChart(item.songTitle);
     setLoadingCifra(false);
-    setCurrentChart(chart);
-    if (chart) setShowCifra(true);
+    setCurrentChart(result.parsed);
+    setCurrentRawText(result.rawText);
+    if (result.parsed || result.rawText) setShowCifra(true);
   }
 
   // ── Empty setlist guard ───────────────────────────────────────────────────
@@ -506,6 +521,21 @@ export default function PresentScreen() {
                       ))}
                     </View>
                   ))}
+                  {!currentChart && currentRawText ? (
+                    <Text
+                      style={[
+                        styles.lyricLine,
+                        { fontSize, lineHeight: fontSize * 1.55 },
+                      ]}
+                    >
+                      {currentRawText}
+                    </Text>
+                  ) : null}
+                  {!currentChart && !currentRawText ? (
+                    <Text style={[styles.lyricLine, { fontSize }]}>
+                      Nenhuma cifra disponível.
+                    </Text>
+                  ) : null}
                 </ScrollView>
               </View>
             )}

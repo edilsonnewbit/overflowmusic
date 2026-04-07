@@ -157,6 +157,31 @@ export default function ProfilePage() {
       </div>
       <div style={cardStyle}>
 
+        {/* ── Avatar ────────────────────────────────────────────────── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+          {(user as typeof user & { photoUrl?: string | null }).photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={(user as typeof user & { photoUrl?: string | null }).photoUrl!}
+              alt={user.name}
+              style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", border: "2px solid #1e3a5a" }}
+            />
+          ) : (
+            <div style={{
+              width: 64, height: 64, borderRadius: "50%",
+              background: "#1e3a5a", border: "2px solid #31557c",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 26, fontWeight: 700, color: "#7cf2a2",
+            }}>
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div style={{ color: "#f4f8ff", fontSize: 18, fontWeight: 700 }}>{user.name}</div>
+            <div style={{ color: "#7a9dbf", fontSize: 13 }}>{user.email}</div>
+          </div>
+        </div>
+
         {/* ── Read-only info ─────────────────────────────────────────── */}
         <div style={infoGridStyle}>
           <div style={infoRowStyle}>
