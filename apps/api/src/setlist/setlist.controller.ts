@@ -9,6 +9,7 @@ import {
   Post,
   Put,
 } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { SetlistService } from "./setlist.service";
 import { AuthService } from "../auth/auth.service";
 
@@ -32,6 +33,7 @@ type ReorderBody = {
   items: Array<{ id: string; order: number }>;
 };
 
+@SkipThrottle()
 @Controller("api/events/:eventId/setlist")
 export class SetlistController {
   constructor(
