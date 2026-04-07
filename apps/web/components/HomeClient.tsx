@@ -327,6 +327,15 @@ export function HomeClient() {
           </div>
         </Link>
 
+        <Link href="/rehearsals" className="dash-card">
+          <span style={dashIconStyle}>🎸</span>
+          <div>
+            <p style={dashTagStyle}>Rehearsals</p>
+            <h3 style={dashTitleStyle}>Ensaios</h3>
+            <p style={dashDescStyle}>Gerencie ensaios com local, endereço e vínculo a eventos.</p>
+          </div>
+        </Link>
+
         {(user?.role === "SUPER_ADMIN" || user?.role === "ADMIN") && (
           <>
             <Link href="/admin/team" className="dash-card">
