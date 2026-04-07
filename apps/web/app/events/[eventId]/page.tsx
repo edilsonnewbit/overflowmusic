@@ -73,6 +73,9 @@ const STATUS_COLOR: Record<string, string> = {
 const MUSICIAN_STATUS_COLOR: Record<string, string> = {
   PENDING: "#fbbf24", CONFIRMED: "#7cf2a2", DECLINED: "#f87171", EXPIRED: "#8fa9c8",
 };
+const MUSICIAN_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Aguardando", CONFIRMED: "Confirmado", DECLINED: "Recusou", EXPIRED: "Expirado",
+};
 const INSTRUMENT_ROLES = ["Bateria", "Baixo", "Guitarra", "Teclado", "Violão", "Vocal", "Trompete", "Saxofone", "Outro"];
 
 // Tabernáculo de Moisés — 5 zonas de louvor
@@ -561,7 +564,7 @@ export default function EventDetailPage({ params }: PageProps) {
                             </div>
                             <span style={{ flex: 1, fontSize: 13 }}>{m.user?.name ?? m.userId}</span>
                             <span style={{ fontSize: 11, fontWeight: 700, color: MUSICIAN_STATUS_COLOR[m.status] ?? "#8fa9c8", border: `1px solid ${MUSICIAN_STATUS_COLOR[m.status] ?? "#8fa9c8"}`, borderRadius: 5, padding: "1px 7px" }}>
-                              {m.status}
+                              {MUSICIAN_STATUS_LABEL[m.status] ?? m.status}
                             </span>
                             <button
                               style={deleteBtn}

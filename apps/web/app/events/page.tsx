@@ -215,7 +215,7 @@ export default function EventsPage() {
                           <p style={{ margin: 0, color: "#8fa9c8", fontSize: 12 }}>{ev.description}</p>
                         )}
                       </div>
-                      <span style={statusBadge(ev.computedStatus ?? ev.status)}>{ev.computedStatus ?? ev.status}</span>
+                      <span style={statusBadge(ev.computedStatus ?? ev.status)}>{STATUS_LABEL[ev.computedStatus ?? ev.status] ?? ev.computedStatus ?? ev.status}</span>
                     </div>
                   </Link>
                 </li>
@@ -288,6 +288,14 @@ const eventCardStyle: CSSProperties = {
   transition: "border-color 0.2s",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Rascunho",
+  ACTIVE: "Ativo",
+  PUBLISHED: "Publicado",
+  FINISHED: "Encerrado",
+  ARCHIVED: "Arquivado",
+};
+
 function statusBadge(status: string): CSSProperties {
   const colors: Record<string, string> = {
     DRAFT: "#8fa9c8",
@@ -295,13 +303,6 @@ function statusBadge(status: string): CSSProperties {
     PUBLISHED: "#7cf2a2",
     FINISHED: "#94a3b8",
     ARCHIVED: "#4b5563",
-  };
-  const labels: Record<string, string> = {
-    DRAFT: "Rascunho",
-    ACTIVE: "Ativo",
-    PUBLISHED: "Publicado",
-    FINISHED: "Encerrado",
-    ARCHIVED: "Arquivado",
   };
   return {
     fontSize: 11,
@@ -313,6 +314,5 @@ function statusBadge(status: string): CSSProperties {
     borderRadius: 6,
     padding: "2px 8px",
     whiteSpace: "nowrap",
-    content: labels[status] ?? status,
   };
 }

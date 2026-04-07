@@ -82,7 +82,7 @@ export function GlobalHeader() {
               >
                 <span className="user-avatar">{user.name.charAt(0).toUpperCase()}</span>
                 <span className="user-name">{user.name}</span>
-                <span className="user-role-badge">{user.role.replace("_", " ")}</span>
+                <span className="user-role-badge">{{ SUPER_ADMIN: "Super Admin", ADMIN: "Admin", LEADER: "Líder", MEMBER: "Membro" }[user.role] ?? user.role}</span>
               </Link>
               <button
                 className="logout-btn"

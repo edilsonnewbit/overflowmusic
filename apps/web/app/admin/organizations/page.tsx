@@ -185,9 +185,9 @@ function OrgsContent() {
                   value={memberRole}
                   onChange={e => setMemberRole(e.target.value as "OWNER" | "ADMIN" | "MEMBER")}
                 >
-                  <option value="MEMBER">MEMBER</option>
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="OWNER">OWNER</option>
+                  <option value="MEMBER">Membro</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="OWNER">Proprietário</option>
                 </select>
                 <input style={input} placeholder="Instrumento (opcional)" value={memberInstrument} onChange={e => setMemberInstrument(e.target.value)} />
                 <div>
@@ -211,7 +211,7 @@ function OrgsContent() {
                     <div style={{ flex: 1 }}>
                       <p style={{ margin: 0, fontWeight: 600 }}>{m.user.name}</p>
                       <p style={{ margin: "2px 0 0", fontSize: 12, color: "#8fa9c8" }}>
-                        {m.role}{m.instrument ? ` · ${m.instrument}` : ""} · {m.user.email}
+                        {{ MEMBER: "Membro", ADMIN: "Admin", OWNER: "Proprietário" }[m.role] ?? m.role}{m.instrument ? ` · ${m.instrument}` : ""} · {m.user.email}
                       </p>
                     </div>
                     <button
