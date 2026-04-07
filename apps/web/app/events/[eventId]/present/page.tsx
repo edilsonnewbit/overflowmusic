@@ -785,7 +785,7 @@ const sectionNameStyle: React.CSSProperties = {
 
 function lineStyle(type: SongSectionLine["type"], size: number): React.CSSProperties {
   const base: React.CSSProperties = {
-    margin: "0 0 2px", whiteSpace: "pre",
+    margin: "0 0 2px", whiteSpace: "pre-wrap", overflowWrap: "break-word", wordBreak: "break-word",
     fontFamily: "'Courier New', Courier, monospace", fontSize: size, lineHeight: 1.6,
   };
   if (type === "chords") return { ...base, color: "#7cf2a2", fontWeight: 700 };

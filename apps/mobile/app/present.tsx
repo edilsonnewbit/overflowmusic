@@ -9,6 +9,7 @@ import {
   PanResponder,
   StatusBar,
   Platform,
+  Vibration,
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
@@ -19,6 +20,46 @@ import { fetchSongs, fetchSongById } from "../src/lib/api";
 import type { ParsedChart } from "@overflow/types";
 
 // ─── Presentation screen — fullscreen mode for live worship events ─────────────
+
+// ── Transposition helpers ──────────────────────────────────────────────────────
+const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NOTES_FLAT  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const FLAT_PREFERRED = new Set(["F", "Bb", "Eb", "Ab", "Db", "Gb", "Cb"]);
+
+function noteToIndex(note: string): number {
+  const i = NOTES_SHARP.indexOf(note);
+  return i !== -1 ? i : NOTES_FLAT.indexOf(note);
+}
+function shiftNote(note: string, semitones: number): string {
+  const i = noteToIndex(note);
+  if (i === -1) return note;
+  const j = ((i + semitones) % 12 + 12) % 12;
+  const sharp = NOTES_SHARP[j];
+  return FLAT_PREFERRED.has(sharp) ? NOTES_FLAT[j] : sharp;
+}
+function transposeToken(token: string, semitones: number): string {
+  const m = token.match(/^([A-G][#b]?)(.*?)$/);
+  if (!m) return token;
+  const rest = m[2];
+  const slashIdx = rest.indexOf("/");
+  if (slashIdx !== -1) {
+    const quality = rest.slice(0, slashIdx);
+    const bassStr = rest.slice(slashIdx + 1);
+    const bassMatch = bassStr.match(/^([A-G][#b]?)(.*)$/);
+    if (bassMatch)
+      return shiftNote(m[1], semitones) + quality + "/" + shiftNote(bassMatch[1], semitones) + bassMatch[2];
+  }
+  return shiftNote(m[1], semitones) + rest;
+}
+function transposeChordLine(content: string, semitones: number): string {
+  if (semitones === 0) return content;
+  return content.replace(/\S+/g, (token) => {
+    if (!/^[A-G]/.test(token)) return token;
+    return transposeToken(token, semitones);
+  });
+}
+// Note names for display (cycle +/- 12 semitones from C)
+const NOTE_NAMES = NOTES_SHARP;
 
 export default function PresentScreen() {
   const router = useRouter();
@@ -46,6 +87,16 @@ export default function PresentScreen() {
   const scrollHeightRef = useRef(0);
   const scrollContainerRef = useRef(0);
   const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Transposition
+  const [transposeSemitones, setTransposeSemitones] = useState(0);
+
+  // Metronome
+  const [metroOn, setMetroOn] = useState(false);
+  const [metroBpm, setMetroBpm] = useState(80);
+  const [metroBeat, setMetroBeat] = useState(-1);
+  const metroIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const metroBeatCountRef = useRef(0);
 
   // Stable refs to avoid stale closures in PanResponder
   const currentRef = useRef(current);
@@ -94,6 +145,31 @@ export default function PresentScreen() {
     if (!showCifra) stopAutoScroll();
   }, [showCifra, stopAutoScroll]);
 
+  // ── Metronome engine ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (metroIntervalRef.current) {
+      clearInterval(metroIntervalRef.current);
+      metroIntervalRef.current = null;
+    }
+    if (!metroOn) {
+      setMetroBeat(-1);
+      return;
+    }
+    const intervalMs = Math.round(60000 / metroBpm);
+    metroBeatCountRef.current = 0;
+    setMetroBeat(0);
+    Vibration.vibrate(40);
+    metroIntervalRef.current = setInterval(() => {
+      metroBeatCountRef.current += 1;
+      const beat = metroBeatCountRef.current % 4;
+      setMetroBeat(beat);
+      Vibration.vibrate(beat === 0 ? 60 : 30);
+    }, intervalMs);
+    return () => {
+      if (metroIntervalRef.current) clearInterval(metroIntervalRef.current);
+    };
+  }, [metroOn, metroBpm]);
+
   // ── Auto-hide nav ─────────────────────────────────────────────────────────
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -118,6 +194,7 @@ export default function PresentScreen() {
       setCurrent(idx);
       setShowCifra(false);
       setCurrentChart(null);
+      setTransposeSemitones(0);
       resetNavTimer();
     },
     [sortedItems.length, resetNavTimer],
@@ -335,6 +412,69 @@ export default function PresentScreen() {
                   </Pressable>
                 </View>
 
+                {/* ── Row 2: Transpose + Metronome ─────────────────────── */}
+                <View style={styles.cifraToolbar2}>
+                  {/* Transpose */}
+                  <View style={styles.toolbarGroup}>
+                    <Pressable
+                      style={styles.toolBtn}
+                      onPress={() => setTransposeSemitones((s) => s - 1)}
+                    >
+                      <Text style={styles.toolBtnText}>−</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.toolBtnNeutral}
+                      onPress={() => setTransposeSemitones(0)}
+                    >
+                      <Text style={styles.toolLabelAccent}>
+                        {transposeSemitones === 0
+                          ? "Tom ×"
+                          : `${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}`}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.toolBtn}
+                      onPress={() => setTransposeSemitones((s) => s + 1)}
+                    >
+                      <Text style={styles.toolBtnText}>+</Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Metronome */}
+                  <View style={styles.toolbarGroup}>
+                    <Pressable
+                      style={styles.toolBtn}
+                      onPress={() => setMetroBpm((b) => Math.max(40, b - 5))}
+                    >
+                      <Text style={styles.toolBtnText}>−</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.toolBtn, metroOn && styles.toolBtnActive]}
+                      onPress={() => setMetroOn((v) => !v)}
+                    >
+                      <Text style={styles.toolBtnText}>♩{metroBpm}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.toolBtn}
+                      onPress={() => setMetroBpm((b) => Math.min(240, b + 5))}
+                    >
+                      <Text style={styles.toolBtnText}>+</Text>
+                    </Pressable>
+                    {/* Beat dots */}
+                    <View style={styles.beatDots}>
+                      {[0, 1, 2, 3].map((i) => (
+                        <View
+                          key={i}
+                          style={[
+                            styles.beatDot,
+                            metroOn && metroBeat === i && (i === 0 ? styles.beatDotAccent : styles.beatDotOn),
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
                 <ScrollView
                   ref={scrollViewRef}
                   style={styles.cifraScroll}
@@ -359,7 +499,9 @@ export default function PresentScreen() {
                             { lineHeight: fontSize * 1.55 },
                           ]}
                         >
-                          {line.content || " "}
+                          {line.type === "chords"
+                            ? transposeChordLine(line.content || " ", transposeSemitones)
+                            : (line.content || " ")}
                         </Text>
                       ))}
                     </View>
@@ -521,6 +663,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#1a2c44",
+    marginBottom: 6,
+    gap: 8,
+  },
+  cifraToolbar2: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1a2c44",
     marginBottom: 10,
     gap: 8,
   },
@@ -540,6 +692,16 @@ const styles = StyleSheet.create({
   toolBtnActive: {
     backgroundColor: "#1ecad3",
   },
+  toolBtnNeutral: {
+    backgroundColor: "#0f2137",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    minWidth: 52,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2d4b6d",
+  },
   toolBtnText: {
     color: "#b3c6e0",
     fontSize: 12,
@@ -550,6 +712,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     minWidth: 40,
     textAlign: "center",
+  },
+  toolLabelAccent: {
+    color: "#7cf2a2",
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  // Beat dots for metronome
+  beatDots: {
+    flexDirection: "row",
+    gap: 4,
+    alignItems: "center",
+    marginLeft: 4,
+  },
+  beatDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#1a3a5a",
+  },
+  beatDotOn: {
+    backgroundColor: "#1ecad3",
+  },
+  beatDotAccent: {
+    backgroundColor: "#7cf2a2",
   },
   cifraScroll: { flex: 1 },
   cifraSection: { marginBottom: 18 },
