@@ -148,6 +148,26 @@ export function HomeClient() {
 
   return (
     <section style={{ marginTop: 24 }}>
+      {/* ── Propósito ────────────────────────────────────────────────── */}
+      <div style={{
+        marginBottom: 28,
+        padding: "20px 24px",
+        borderRadius: 14,
+        background: "linear-gradient(135deg, rgba(12,30,50,0.9) 0%, rgba(10,24,40,0.95) 100%)",
+        border: "1px solid #1a3a5c",
+        borderLeft: "3px solid #7cf2a2",
+      }}>
+        <p style={{ margin: "0 0 10px", fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "#7cf2a2", fontWeight: 600 }}>
+          Nossa missão
+        </p>
+        <p style={{ margin: "0 0 14px", fontSize: 15, color: "#e0eaf5", lineHeight: 1.7, fontWeight: 400 }}>
+          O Overflow Music existe para levar excelência à adoração — usando música como instrumento de proclamação do evangelho e edificação da Igreja de Cristo.
+        </p>
+        <p style={{ margin: 0, fontSize: 13, color: "#5a8aaa", fontStyle: "italic", lineHeight: 1.6 }}>
+          "Cantai ao Senhor um cântico novo; cantai ao Senhor, todas as terras." — Salmos 96:1
+        </p>
+      </div>
+
       {/* ── Próximos Eventos (detalhado) ──────────────────────────────── */}
       {upcomingEvents.length > 0 && (
         <div style={{ marginBottom: 20 }}>
