@@ -47,7 +47,7 @@ function DashboardContent() {
 
   return (
     <main style={mainStyle}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <h1 style={{ margin: "0 0 8px", fontSize: 26, color: "#e2f0ff" }}>Painel do Administrador</h1>
         <p style={{ margin: "0 0 32px", color: "#7a94b0", fontSize: 14 }}>
           Visão geral do sistema
@@ -160,7 +160,7 @@ function StatCard({
 
 const mainStyle: CSSProperties = {
   minHeight: "100vh",
-  padding: "32px 16px 64px",
+  padding: "32px 24px 64px",
   background: "#071623",
   color: "#e2f0ff",
 };

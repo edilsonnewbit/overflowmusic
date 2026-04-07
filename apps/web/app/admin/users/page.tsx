@@ -109,8 +109,8 @@ export default function AdminUsersPage() {
 
   return (
     <AuthGate>
-      <main style={{ minHeight: "100vh", padding: "24px 16px 48px" }}>
-        <section style={{ maxWidth: 780, margin: "0 auto" }}>
+      <main style={{ minHeight: "100vh", padding: "24px 24px 48px" }}>
+        <section style={{ maxWidth: 1180, margin: "0 auto" }}>
           <header style={headerStyle}>
             <Link href="/" style={{ color: "#7cf2a2", fontSize: 13, textDecoration: "none" }}>
               ← Home
