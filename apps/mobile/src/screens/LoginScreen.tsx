@@ -40,6 +40,14 @@ export function LoginScreen({ onSubmit }: Props) {
 
   const discovery = AuthSession.useAutoDiscovery("https://accounts.google.com");
   const redirectUri = useMemo(() => {
+    if (Platform.OS === "android") {
+      const androidId = (process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? "").trim();
+      const reverseId = "com.googleusercontent.apps." + androidId.replace(".apps.googleusercontent.com", "");
+      const uri = `${reverseId}:/oauth2redirect/google`;
+      console.log("🔗 Redirect URI Android:", uri);
+      console.log("🔑 Client ID:", googleClientId);
+      return uri;
+    }
     const uri = AuthSession.makeRedirectUri({ scheme: "overflowmusic" });
     console.log("🔗 Redirect URI gerado:", uri);
     console.log("🔑 Client ID:", googleClientId);
