@@ -18,6 +18,17 @@ const ROLE_COLOR: Record<string, string> = {
   MEMBER: "#b3c6e0",
 };
 
+const INSTRUMENT_LABEL: Record<string, string> = {
+  BATERIA: "Bateria",
+  BAIXO: "Baixo",
+  GUITARRA: "Guitarra",
+  TECLADO: "Teclado",
+  VIOLAO: "Violão",
+  VOCAL: "Vocal",
+  TROMPETE: "Trompete",
+  SAXOFONE: "Saxofone",
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
     weekday: "long",
@@ -45,7 +56,7 @@ function daysUntil(iso: string): number {
 
 export function HomeScreen() {
   const router = useRouter();
-  const { user, events, loadingEvents, loadEventsList, eventSetlist, activeEventId, selectEvent, pendingInvite, handleRespondInvite } = useSession();
+  const { user, events, loadingEvents, loadEventsList, eventSetlist, activeEventId, selectEvent, pendingInvite, handleRespondInvite, pendingInvites, respondToInvite } = useSession();
   const nextEvent = getNextEvent(events);
   const setlistCount = eventSetlist?.items?.length ?? 0;
 
@@ -79,6 +90,66 @@ export function HomeScreen() {
             <Text style={{ color: "#4a6278", fontSize: 12 }}>{user.email}</Text>
           </View>
         </View>
+      )}
+
+      {/* Convites pendentes */}
+      {pendingInvites.length > 0 && (
+        <>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text style={{ fontSize: 18 }}>🔔</Text>
+            <Text style={[styles.kicker, { color: "#fbbf24", marginTop: 0 }]}>
+              {pendingInvites.length} convite{pendingInvites.length > 1 ? "s" : ""} pendente{pendingInvites.length > 1 ? "s" : ""}
+            </Text>
+          </View>
+          {pendingInvites.map((invite) => (
+            <View
+              key={invite.slotId}
+              style={{
+                borderWidth: 1,
+                borderColor: "#b45309",
+                borderRadius: 14,
+                padding: 16,
+                backgroundColor: "#1c1205",
+                gap: 6,
+              }}
+            >
+              <Text style={{ color: "#fbbf24", fontSize: 13, fontWeight: "700" }}>
+                🎵 Você foi escalado como {INSTRUMENT_LABEL[invite.instrumentRole.toUpperCase()] ?? invite.instrumentRole}
+              </Text>
+              <Text style={{ color: "#f4f8ff", fontSize: 15, fontWeight: "700" }}>{invite.eventTitle}</Text>
+              <Text style={{ color: "#1ecad3", fontSize: 12 }}>
+                {new Date(invite.eventDate).toLocaleString("pt-BR", {
+                  weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                })}
+              </Text>
+              {invite.eventLocation ? (
+                <Text style={{ color: "#b3c6e0", fontSize: 12 }}>📍 {invite.eventLocation}</Text>
+              ) : null}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
+                <Pressable
+                  onPress={() => void respondToInvite(invite.slotId, true)}
+                  style={({ pressed }) => ({
+                    flex: 1, backgroundColor: pressed ? "#1e4a2a" : "#0e2c1e",
+                    borderRadius: 10, padding: 10, alignItems: "center",
+                    borderWidth: 1, borderColor: "#7cf2a2",
+                  })}
+                >
+                  <Text style={{ color: "#7cf2a2", fontWeight: "700", fontSize: 13 }}>✓ Confirmar</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void respondToInvite(invite.slotId, false)}
+                  style={({ pressed }) => ({
+                    flex: 1, backgroundColor: pressed ? "#3a1a1a" : "#2a1010",
+                    borderRadius: 10, padding: 10, alignItems: "center",
+                    borderWidth: 1, borderColor: "#f28c8c",
+                  })}
+                >
+                  <Text style={{ color: "#f28c8c", fontWeight: "700", fontSize: 13 }}>✗ Recusar</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </>
       )}
 
       {/* Próximo Evento */}

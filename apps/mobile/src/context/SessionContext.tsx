@@ -12,6 +12,7 @@ import {
   fetchEventSetlist,
   fetchEvents,
   fetchMe,
+  fetchMyInvites,
   importSongTxt,
   isTokenExpiringSoon,
   previewSongTxt,
@@ -25,6 +26,7 @@ import {
   updateEvent,
   updateSetlistItem,
 } from "../lib/api";
+import type { MusicianInvite } from "../lib/api";
 import { TOKEN_KEY } from "../lib/config";
 import { registerForPushNotificationsAsync } from "../lib/notifications";
 import type {
@@ -82,6 +84,9 @@ export interface SessionContextValue {
   pendingInvite: { slotId: string; eventTitle: string; role: string } | null;
   setPendingInvite: (invite: { slotId: string; eventTitle: string; role: string } | null) => void;
   handleRespondInvite: (accept: boolean) => Promise<void>;
+  pendingInvites: MusicianInvite[];
+  loadMyInvites: () => Promise<void>;
+  respondToInvite: (slotId: string, accept: boolean) => Promise<void>;
 
   // Checklist
   templates: ChecklistTemplate[];
@@ -132,6 +137,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // Musician invite
   const [pendingInvite, setPendingInvite] = useState<{ slotId: string; eventTitle: string; role: string } | null>(null);
+  const [pendingInvites, setPendingInvites] = useState<MusicianInvite[]>([]);
 
   // Checklist
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
@@ -204,6 +210,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       void registerForPushNotificationsAsync(tokenToUse);
       await loadTemplates();
       await loadEventsList();
+      await loadMyInvites();
     } catch {
       await AsyncStorage.removeItem(TOKEN_KEY);
       setAccessToken(null);
@@ -242,6 +249,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         void registerForPushNotificationsAsync(body.accessToken);
         await loadTemplates();
         await loadEventsList();
+        await loadMyInvites();
         return;
       }
 
@@ -500,6 +508,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function loadMyInvites() {
+    try {
+      const result = await fetchMyInvites(accessTokenRef.current);
+      if (result.ok) setPendingInvites(result.invites);
+    } catch {
+      // silently ignore
+    }
+  }
+
+  async function respondToInvite(slotId: string, accept: boolean) {
+    setPendingInvites((prev) => prev.filter((i) => i.slotId !== slotId));
+    try {
+      await respondMusicianSlot(slotId, accept, accessTokenRef.current);
+    } catch {
+      // recarrega para restaurar estado real em caso de erro
+      void loadMyInvites();
+    }
+  }
+
   // ── Checklist ───────────────────────────────────────────────────────────────
 
   async function loadChecklist(eId: string) {
@@ -648,6 +675,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     pendingInvite,
     setPendingInvite,
     handleRespondInvite,
+    pendingInvites,
+    loadMyInvites,
+    respondToInvite,
     templates,
     eventId,
     setEventId,

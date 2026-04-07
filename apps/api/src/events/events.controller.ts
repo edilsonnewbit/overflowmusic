@@ -133,6 +133,13 @@ export class EventsController {
     return this.eventsService.respondMusician(musicianId, user.id, body.accept);
   }
 
+  @Get("my-invites")
+  async getMyInvites(@Headers("authorization") authorization: string | undefined) {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const { user } = await this.authService.getMe(token);
+    return this.eventsService.getMyInvites(user.id);
+  }
+
   @Post("slots/:slotId/respond")
   async respondMusicianSlot(
     @Headers("authorization") authorization: string | undefined,
