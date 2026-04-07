@@ -10,7 +10,6 @@ type ApiResult<T> = {
   message?: string;
 } & T;
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://music.overflowmvmt.com/api";
 
 async function parseJson<T>(response: Response): Promise<ApiResult<T>> {
   const body = (await response.json()) as ApiResult<T>;
@@ -204,19 +203,11 @@ export default function ChecklistsPage() {
     <main style={{ minHeight: "100vh", padding: "24px 24px 36px" }}>
       <section style={{ maxWidth: 1180, margin: "0 auto" }}>
         <AuthRequired>
-          <header style={headerStyle}>
-            <p style={tagStyle}>Operations</p>
-            <h1 style={{ margin: "8px 0 12px", fontSize: 36, lineHeight: 1.1 }}>Checklist Management</h1>
-            <p style={{ margin: 0, color: "#d6e5f8" }}>
-              API target: <code>{apiUrl}</code>
-            </p>
-            <p style={{ margin: "8px 0 0", color: "#1ecad3" }}>{status}</p>
-            <p style={{ margin: "10px 0 0" }}>
-              <Link href="/" style={linkStyle}>
-                Voltar ao Hub
-              </Link>
-            </p>
-          </header>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+            <Link href="/" style={{ color: "#7cf2a2", textDecoration: "none", fontSize: 14 }}>← Home</Link>
+            <h1 style={{ margin: 0, fontSize: 26 }}>Checklists</h1>
+            <span style={{ color: "#1ecad3", fontSize: 13, marginLeft: 4 }}>{status}</span>
+          </div>
 
           <section style={gridStyle}>
             <article style={cardStyle}>
@@ -320,13 +311,7 @@ export default function ChecklistsPage() {
   );
 }
 
-const headerStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #1b3756 0%, #122840 55%, #0f2137 100%)",
-  border: "1px solid #31557c",
-  borderRadius: 24,
-  padding: 24,
-  marginBottom: 20,
-};
+
 
 const gridStyle: CSSProperties = {
   display: "grid",
@@ -349,18 +334,7 @@ const innerCardStyle: CSSProperties = {
   padding: 12,
 };
 
-const tagStyle: CSSProperties = {
-  margin: 0,
-  letterSpacing: 2.4,
-  textTransform: "uppercase",
-  color: "#7cf2a2",
-  fontSize: 12,
-};
 
-const linkStyle: CSSProperties = {
-  color: "#7cf2a2",
-  textDecoration: "underline",
-};
 
 const inputStyle: CSSProperties = {
   background: "rgba(6, 18, 29, 0.85)",

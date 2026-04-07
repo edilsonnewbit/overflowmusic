@@ -147,38 +147,8 @@ export function HomeClient() {
   }
 
   return (
-    <section style={{ marginTop: 48 }}>
-      {/* ── Welcome ──────────────────────────────────────────────────── */}
-      <div style={welcomeBoxStyle}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <p style={{ margin: 0, fontSize: 12, letterSpacing: 2, textTransform: "uppercase", color: "#7cf2a2" }}>
-              Bem-vindo de volta
-            </p>
-            <h2 style={{ margin: "4px 0 0", fontSize: 24 }}>{user?.name ?? "—"}</h2>
-          </div>
-          {stats && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginLeft: "auto" }}>
-              {stats.pendingUsers > 0 && (
-                <Link href="/admin/users" style={badgeStyle("#7a2020", "#ff6b6b")}>
-                  ⚠ {stats.pendingUsers} pendente{stats.pendingUsers !== 1 ? "s" : ""}
-                </Link>
-              )}
-              <span style={badgeStyle("#1a3a5c", "#7cf2a2")}>
-                📅 {stats.upcomingEvents} próximo{stats.upcomingEvents !== 1 ? "s" : ""}
-              </span>
-              <span style={badgeStyle("#1a3a5c", "#b3c6e0")}>
-                🎵 {stats.totalSongs} músicas
-              </span>
-              <span style={badgeStyle("#1a3a5c", "#b3c6e0")}>
-                👥 {stats.totalUsers} membros
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Próximos Eventos (detalhado) ──────────────────────────────── */}
+    <section style={{ marginTop: 24 }}>
+      {/* ── Próximos Eventos (detalhado) ──────────────────────────────── */
       {upcomingEvents.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -369,14 +339,6 @@ export function HomeClient() {
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 
-const welcomeBoxStyle: React.CSSProperties = {
-  background: "linear-gradient(135deg, #1b3756 0%, #122840 55%, #0f2137 100%)",
-  border: "1px solid #31557c",
-  borderRadius: 20,
-  padding: "20px 24px",
-  marginBottom: 16,
-};
-
 const eventCardStyle: React.CSSProperties = {
   background: "#0d1f2e",
   border: "1px solid #1e3a52",
@@ -463,18 +425,3 @@ const dashDescStyle: React.CSSProperties = {
   fontSize: 13,
   lineHeight: 1.5,
 };
-
-function badgeStyle(bg: string, color: string): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    background: bg,
-    color,
-    borderRadius: 999,
-    padding: "4px 10px",
-    fontSize: 12,
-    fontWeight: 600,
-    textDecoration: "none",
-  };
-}

@@ -141,14 +141,15 @@ export default function RehearsalsPage() {
   }
 
   return (
-    <div style={page}>
-      <div style={header}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <Link href="/events" style={backLink}>← Eventos</Link>
+    <main style={{ minHeight: "100vh", padding: "24px 24px 40px" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <Link href="/" style={backLink}>← Home</Link>
           <h1 style={title}>Ensaios</h1>
+          <div style={{ marginLeft: "auto" }}>
+            <button style={primaryBtn} onClick={openCreate}>+ Novo ensaio</button>
+          </div>
         </div>
-        <button style={primaryBtn} onClick={openCreate}>+ Novo ensaio</button>
-      </div>
 
       {status && (
         <p style={{ color: status.includes("Erro") ? "#f87171" : "#7cf2a2", fontSize: 13, marginBottom: 12 }}>{status}</p>
@@ -251,30 +252,13 @@ export default function RehearsalsPage() {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </main>
   );
 }
 
-const page: CSSProperties = {
-  minHeight: "100vh",
-  background: "#080f1a",
-  color: "#e2f0ff",
-  padding: "32px 24px",
-  maxWidth: 860,
-  margin: "0 auto",
-};
-
-const header: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 28,
-  flexWrap: "wrap",
-  gap: 12,
-};
-
 const title: CSSProperties = {
-  margin: 0, fontSize: 24, fontWeight: 800, color: "#e8f2ff",
+  margin: 0, fontSize: 26, fontWeight: 800, color: "#e8f2ff",
 };
 
 const card: CSSProperties = {

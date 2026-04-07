@@ -95,35 +95,32 @@ function TeamContent() {
     <main style={{ minHeight: "100vh", padding: "24px 24px 48px" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         {/* Header */}
-        <div style={{ marginBottom: 20 }}>
-          <Link href="/" style={backLinkStyle}>
-            ← Início
-          </Link>
-          <h1 style={{ margin: "8px 0 4px", fontSize: 28 }}>Equipe</h1>
-          <p style={{ margin: 0, color: "#8fa9c8", fontSize: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <Link href="/" style={backLinkStyle}>← Home</Link>
+          <h1 style={{ margin: 0, fontSize: 26 }}>Equipe</h1>
+          <span style={{ color: "#8fa9c8", fontSize: 13, marginLeft: 4 }}>
             {loading ? "Carregando..." : `${members.length} membro${members.length !== 1 ? "s" : ""} aprovado${members.length !== 1 ? "s" : ""}`}
-          </p>
-        </div>
-
-        {/* Actions row */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 20, alignItems: "center" }}>
-          <input
-            style={searchStyle}
-            placeholder="Buscar por nome ou e-mail..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <Link
-            href="/admin/users"
-            style={{ color: "#7cf2a2", fontSize: 13, textDecoration: "none", whiteSpace: "nowrap" as const }}
-          >
-            Aprovar pendentes →
-          </Link>
+          </span>
+          <div style={{ marginLeft: "auto" }}>
+            <Link
+              href="/admin/users"
+              style={{ color: "#7cf2a2", fontSize: 13, textDecoration: "none", whiteSpace: "nowrap" as const }}
+            >
+              Aprovar pendentes →
+            </Link>
+          </div>
         </div>
 
         {error && (
           <p style={{ color: "#f87171", marginBottom: 16 }}>{error}</p>
         )}
+
+        <input
+          style={{ ...searchStyle, marginBottom: 20 }}
+          placeholder="Buscar por nome ou e-mail..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
         {loading ? (
           <p style={{ color: "#8fa9c8" }}>Carregando...</p>

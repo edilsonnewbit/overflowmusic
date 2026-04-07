@@ -48,10 +48,10 @@ function DashboardContent() {
   return (
     <main style={mainStyle}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
-        <h1 style={{ margin: "0 0 8px", fontSize: 26, color: "#e2f0ff" }}>Painel do Administrador</h1>
-        <p style={{ margin: "0 0 32px", color: "#7a94b0", fontSize: 14 }}>
-          Visão geral do sistema
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <Link href="/" style={{ color: "#7cf2a2", textDecoration: "none", fontSize: 14 }}>← Home</Link>
+          <h1 style={{ margin: 0, fontSize: 26, color: "#e2f0ff" }}>Painel do Administrador</h1>
+        </div>
 
         {loading && <p style={{ color: "#b3c6e0" }}>Carregando...</p>}
         {error && <p style={{ color: "#f87171" }}>{error}</p>}

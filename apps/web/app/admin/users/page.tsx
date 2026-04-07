@@ -111,18 +111,15 @@ export default function AdminUsersPage() {
     <AuthGate>
       <main style={{ minHeight: "100vh", padding: "24px 24px 48px" }}>
         <section style={{ maxWidth: 1180, margin: "0 auto" }}>
-          <header style={headerStyle}>
-            <Link href="/" style={{ color: "#7cf2a2", fontSize: 13, textDecoration: "none" }}>
-              ← Home
-            </Link>
-            <h1 style={{ margin: "10px 0 4px", fontSize: 28 }}>Aprovação de Usuários</h1>
-            <p style={{ margin: 0, color: "#b3c6e0", fontSize: 14 }}>{status}</p>
-          </header>
-
-          <div style={{ marginBottom: 14 }}>
-            <button style={refreshBtn} onClick={() => void loadPending()} disabled={loading}>
-              {loading ? "Atualizando..." : "↺ Atualizar"}
-            </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+            <Link href="/" style={{ color: "#7cf2a2", textDecoration: "none", fontSize: 14 }}>← Home</Link>
+            <h1 style={{ margin: 0, fontSize: 26 }}>Aprovação de Usuários</h1>
+            <span style={{ color: "#8fa9c8", fontSize: 13, marginLeft: 4 }}>{status}</span>
+            <div style={{ marginLeft: "auto" }}>
+              <button style={refreshBtn} onClick={() => void loadPending()} disabled={loading}>
+                {loading ? "Atualizando..." : "↺ Atualizar"}
+              </button>
+            </div>
           </div>
 
           {!loading && users.length === 0 ? (
@@ -186,13 +183,7 @@ export default function AdminUsersPage() {
   );
 }
 
-const headerStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #1b3756 0%, #122840 55%, #0f2137 100%)",
-  border: "1px solid #31557c",
-  borderRadius: 20,
-  padding: "20px 24px",
-  marginBottom: 20,
-};
+
 
 const cardStyle: CSSProperties = {
   background: "rgba(18, 40, 64, 0.85)",
