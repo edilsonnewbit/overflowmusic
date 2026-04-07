@@ -58,6 +58,12 @@ model User {
   role              UserRole   @default(MEMBER)
   status            UserStatus @default(PENDING_APPROVAL)
   instruments       String[]   @default([])
+  instagramProfile  String?
+  birthDate         DateTime?
+  church            String?
+  pastorName        String?
+  volunteerTermsVersion    String?
+  volunteerTermsAcceptedAt DateTime?
   createdAt         DateTime   @default(now())
   reviewedAt        DateTime?
   lastLoginAt       DateTime?

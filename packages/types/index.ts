@@ -18,6 +18,13 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   status: UserStatus;
+  instruments?: string[];
+  instagramProfile?: string | null;
+  birthDate?: string | null;
+  church?: string | null;
+  pastorName?: string | null;
+  volunteerTermsVersion?: string | null;
+  volunteerTermsAcceptedAt?: string | null;
 };
 
 export type LoginPayload = {

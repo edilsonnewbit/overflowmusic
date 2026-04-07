@@ -2,6 +2,22 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-10 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Perfil estendido (Instagram, data de nascimento, igreja, pastor) + Termo de Adesão Voluntária com validade jurídica no cadastro
+- Feito:
+  - `apps/api/prisma/schema.prisma`: 6 novos campos em `User` — `instagramProfile`, `birthDate`, `church`, `pastorName`, `volunteerTermsVersion`, `volunteerTermsAcceptedAt`
+  - `apps/api/src/auth/auth.types.ts`: `AuthUser` atualizado com os 6 novos campos
+  - `packages/types/index.ts`: `AuthUser` compartilhado atualizado
+  - `apps/api/src/auth/auth.service.ts`: `DbUserRecord`, `emailRegister` (valida `volunteerTermsAccepted`, grava versão `"1.0-2026"` e timestamp), `updateMe` e `toAuthUser` atualizados
+  - `apps/api/src/auth/auth.controller.ts`: body types de `emailRegister` e `updateMe` expandidos
+  - `apps/web/app/api/auth/me/route.ts`: PATCH BFF passa os 4 campos de perfil
+  - `apps/web/app/profile/page.tsx`: 4 novos inputs (Instagram, data de nascimento `<input type="date">`, Igreja, Pastor)
+  - `apps/mobile/app/register.tsx`: 4 novos campos opcionais + ScrollView com Termo de Adesão legal em 8 cláusulas; botão "Li e aceito" só ativa após rolar até o fim; cadastro bloqueado sem aceite
+- Base legal do Termo: Lei 9.608/1998, Código Civil (Lei 10.406/2002), LGPD (Lei 13.709/2018), MP 2.200-2/2001, Lei 14.063/2020
+- Status: 0 erros TS em todos os arquivos modificados
+- Pendência: `prisma migrate dev --name add-user-profile-fields` + `git push origin develop`
+- Próximo passo: rodar migration e deploy
+
 ### [2026-04-09 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: `eventType` nos formulários de evento (web + mobile) + fluxo completo de resposta a convite de músico no mobile
 - Feito:

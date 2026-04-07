@@ -74,11 +74,25 @@ export class AuthController {
 
   @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @Post("api/auth/register")
-  async emailRegister(@Body() body: { email: string; password: string; name: string }) {
+  async emailRegister(@Body() body: {
+    email: string;
+    password: string;
+    name: string;
+    instagramProfile?: string;
+    birthDate?: string;
+    church?: string;
+    pastorName?: string;
+    volunteerTermsAccepted?: boolean;
+  }) {
     return this.authService.emailRegister({
       email: body.email,
       password: body.password,
       name: body.name,
+      instagramProfile: body.instagramProfile,
+      birthDate: body.birthDate,
+      church: body.church,
+      pastorName: body.pastorName,
+      volunteerTermsAccepted: body.volunteerTermsAccepted,
     });
   }
 
@@ -141,14 +155,28 @@ export class AuthController {
   @Patch("api/auth/me")
   async updateMe(
     @Headers("authorization") authorization: string | undefined,
-    @Body() body: { name?: string; instruments?: string[] },
+    @Body() body: {
+      name?: string;
+      instruments?: string[];
+      instagramProfile?: string | null;
+      birthDate?: string | null;
+      church?: string | null;
+      pastorName?: string | null;
+    },
   ) {
     const token = (authorization || "").replace(/^Bearer\s+/i, "");
     if (!token) {
       throw new UnauthorizedException("missing bearer token");
     }
 
-    return this.authService.updateMe(token, { name: body.name, instruments: body.instruments });
+    return this.authService.updateMe(token, {
+      name: body.name,
+      instruments: body.instruments,
+      instagramProfile: body.instagramProfile,
+      birthDate: body.birthDate,
+      church: body.church,
+      pastorName: body.pastorName,
+    });
   }
 
   @Get("api/admin/users")

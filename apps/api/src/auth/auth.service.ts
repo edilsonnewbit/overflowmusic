@@ -24,6 +24,12 @@ type DbUserRecord = {
   role: string;
   status: string;
   instruments: string[];
+  instagramProfile: string | null;
+  birthDate: Date | null;
+  church: string | null;
+  pastorName: string | null;
+  volunteerTermsVersion: string | null;
+  volunteerTermsAcceptedAt: Date | null;
   createdAt: Date;
   reviewedAt: Date | null;
   lastLoginAt: Date | null;
@@ -118,6 +124,11 @@ export class AuthService implements OnModuleInit {
     email: string;
     password: string;
     name: string;
+    instagramProfile?: string;
+    birthDate?: string;
+    church?: string;
+    pastorName?: string;
+    volunteerTermsAccepted?: boolean;
   }): Promise<{ ok: true; user: AuthUser; message: string }> {
     const email = (input.email || "").trim().toLowerCase();
     const password = (input.password || "").trim();
@@ -131,6 +142,10 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException("password must be at least 8 characters");
     }
 
+    if (!input.volunteerTermsAccepted) {
+      throw new BadRequestException("É necessário aceitar o Termo de Adesão ao Serviço Voluntário para se cadastrar.");
+    }
+
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -139,6 +154,9 @@ export class AuthService implements OnModuleInit {
 
     // Hash password
     const passwordHash = await this.hashPassword(password);
+
+    const volunteerTermsAcceptedAt = new Date();
+    const VOLUNTEER_TERMS_VERSION = "1.0-2026";
 
     // Create user
     const user = await this.prisma.user.create({
@@ -149,6 +167,12 @@ export class AuthService implements OnModuleInit {
         emailVerified: false,
         role: "MEMBER",
         status: "PENDING_APPROVAL",
+        instagramProfile: (input.instagramProfile || "").trim() || null,
+        birthDate: input.birthDate ? new Date(input.birthDate) : null,
+        church: (input.church || "").trim() || null,
+        pastorName: (input.pastorName || "").trim() || null,
+        volunteerTermsVersion: VOLUNTEER_TERMS_VERSION,
+        volunteerTermsAcceptedAt,
       },
     });
 
@@ -448,7 +472,14 @@ export class AuthService implements OnModuleInit {
     return { ok: true, accessToken, user: this.toAuthUser(user) };
   }
 
-  async updateMe(accessToken: string, data: { name?: string; instruments?: string[] }): Promise<{ ok: true; user: AuthUser }> {
+  async updateMe(accessToken: string, data: {
+    name?: string;
+    instruments?: string[];
+    instagramProfile?: string | null;
+    birthDate?: string | null;
+    church?: string | null;
+    pastorName?: string | null;
+  }): Promise<{ ok: true; user: AuthUser }> {
     const payload = this.verifyToken(accessToken);
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || user.status !== "APPROVED") {
@@ -460,10 +491,20 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException("name is required");
     }
 
-    const updateData: { name: string; instruments?: string[] } = { name };
-    if (Array.isArray(data.instruments)) {
-      updateData.instruments = data.instruments;
-    }
+    const updateData: {
+      name: string;
+      instruments?: string[];
+      instagramProfile?: string | null;
+      birthDate?: Date | null;
+      church?: string | null;
+      pastorName?: string | null;
+    } = { name };
+
+    if (Array.isArray(data.instruments)) updateData.instruments = data.instruments;
+    if (data.instagramProfile !== undefined) updateData.instagramProfile = (data.instagramProfile || "").trim() || null;
+    if (data.birthDate !== undefined) updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
+    if (data.church !== undefined) updateData.church = (data.church || "").trim() || null;
+    if (data.pastorName !== undefined) updateData.pastorName = (data.pastorName || "").trim() || null;
 
     const updated = await this.prisma.user.update({
       where: { id: user.id },
@@ -640,6 +681,12 @@ export class AuthService implements OnModuleInit {
       role: user.role as UserRole,
       status: user.status as AuthUser["status"],
       instruments: user.instruments ?? [],
+      instagramProfile: user.instagramProfile ?? null,
+      birthDate: user.birthDate ? user.birthDate.toISOString().split("T")[0] : null,
+      church: user.church ?? null,
+      pastorName: user.pastorName ?? null,
+      volunteerTermsVersion: user.volunteerTermsVersion ?? null,
+      volunteerTermsAcceptedAt: user.volunteerTermsAcceptedAt ? user.volunteerTermsAcceptedAt.toISOString() : null,
       createdAt: user.createdAt.toISOString(),
       reviewedAt: user.reviewedAt ? user.reviewedAt.toISOString() : null,
     };

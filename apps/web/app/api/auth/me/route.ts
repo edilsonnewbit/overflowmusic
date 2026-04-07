@@ -9,18 +9,33 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ok: false, message: "not authenticated" }, { status: 401 });
     }
 
-    const body = (await request.json()) as { name?: string; instruments?: string[] };
-    if (!body.name && !body.instruments) {
-      return NextResponse.json({ ok: false, message: "name or instruments required" }, { status: 400 });
-    }
+    const body = (await request.json()) as {
+      name?: string;
+      instruments?: string[];
+      instagramProfile?: string | null;
+      birthDate?: string | null;
+      church?: string | null;
+      pastorName?: string | null;
+    };
 
-    const payload: { name?: string; instruments?: string[] } = {};
+    const payload: {
+      name?: string;
+      instruments?: string[];
+      instagramProfile?: string | null;
+      birthDate?: string | null;
+      church?: string | null;
+      pastorName?: string | null;
+    } = {};
     if (body.name && typeof body.name === "string" && body.name.trim()) {
       payload.name = body.name.trim();
     }
     if (Array.isArray(body.instruments)) {
       payload.instruments = body.instruments;
     }
+    if ("instagramProfile" in body) payload.instagramProfile = body.instagramProfile ?? null;
+    if ("birthDate" in body) payload.birthDate = body.birthDate ?? null;
+    if ("church" in body) payload.church = body.church ?? null;
+    if ("pastorName" in body) payload.pastorName = body.pastorName ?? null;
 
     const response = await serverApiFetch("auth/me", {
       method: "PATCH",
