@@ -48,6 +48,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="rehearsals"
+        options={{
+          title: "Ensaios",
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji={focused ? "🎸" : "🎸"} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="songs"
         options={{
           title: "Músicas",
