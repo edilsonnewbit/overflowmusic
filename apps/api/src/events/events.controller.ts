@@ -102,6 +102,16 @@ export class EventsController {
     return this.eventsService.upsertMusicianSlot(id, body);
   }
 
+  @Post(":id/musicians/reorder")
+  async reorderMusicians(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { items: { id: string; priority: number }[] },
+  ) {
+    await this.authService.assertAdminKeyOrContentManager(authorization);
+    return this.eventsService.reorderMusicianSlots(id, body.items);
+  }
+
   @Delete(":id/musicians/:musicianId")
   async removeMusician(
     @Headers("authorization") authorization: string | undefined,

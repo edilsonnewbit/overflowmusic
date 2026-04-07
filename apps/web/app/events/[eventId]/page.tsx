@@ -103,9 +103,9 @@ export default function EventDetailPage({ params }: PageProps) {
   const [musicUserId, setMusicUserId] = useState("");
 
   const eligibleUsers = teamUsers.filter((u) => u.instruments.includes(musicRole));
-  const [musicPriority, setMusicPriority] = useState(1);
   const [addingMusician, setAddingMusician] = useState(false);
   const [removingMusicianId, setRemovingMusicianId] = useState<string | null>(null);
+  const [reorderingMusicianId, setReorderingMusicianId] = useState<string | null>(null);
 
   // setlist form
   const [addSongTitle, setAddSongTitle] = useState("");
@@ -217,23 +217,55 @@ export default function EventDetailPage({ params }: PageProps) {
   async function addMusician(e: FormEvent) {
     e.preventDefault();
     if (!eventId || !musicUserId) return;
+    const nextPriority = (event?.musicians ?? []).filter((m) => m.instrumentRole === musicRole).length + 1;
     setAddingMusician(true);
     setStatus("Adicionando músico...");
     try {
       const response = await fetch(`/api/events/${eventId}/musicians`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instrumentRole: musicRole, userId: musicUserId, priority: musicPriority }),
+        body: JSON.stringify({ instrumentRole: musicRole, userId: musicUserId, priority: nextPriority }),
       });
       await parseJson<unknown>(response);
       setMusicUserId("");
-      setMusicPriority(1);
       setStatus("Músico adicionado.");
       await loadEvent(eventId);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Erro ao adicionar.");
     } finally {
       setAddingMusician(false);
+    }
+  }
+
+  async function moveMusicianSlot(role: string, musicianId: string, direction: "up" | "down") {
+    if (!eventId || !event) return;
+    const sorted = (event.musicians ?? [])
+      .filter((m) => m.instrumentRole === role)
+      .sort((a, b) => a.priority - b.priority);
+    const idx = sorted.findIndex((m) => m.id === musicianId);
+    if (idx === -1) return;
+    if (direction === "up" && idx === 0) return;
+    if (direction === "down" && idx === sorted.length - 1) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    const newOrder = sorted.map((m, i) => ({ id: m.id, priority: i + 1 }));
+    const temp = newOrder[idx].priority;
+    newOrder[idx].priority = newOrder[swapIdx].priority;
+    newOrder[swapIdx].priority = temp;
+    setReorderingMusicianId(musicianId);
+    setStatus("Reordenando...");
+    try {
+      const response = await fetch(`/api/events/${eventId}/musicians/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: newOrder }),
+      });
+      await parseJson<unknown>(response);
+      setStatus("OK");
+      await loadEvent(eventId);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao reordenar.");
+    } finally {
+      setReorderingMusicianId(null);
     }
   }
 
@@ -497,23 +529,41 @@ export default function EventDetailPage({ params }: PageProps) {
                   return (
                     <div key={role} style={{ marginBottom: 12 }}>
                       <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#b3c6e0", fontSize: 14 }}>{role}</p>
-                      {roleMusicians.map((m) => (
-                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(15,33,55,0.7)", borderRadius: 8, border: "1px solid #2d4b6d", marginBottom: 4 }}>
-                          <span style={{ color: "#8fa9c8", fontSize: 12, minWidth: 16 }}>#{m.priority}</span>
-                          <span style={{ flex: 1, fontSize: 13 }}>{m.user?.name ?? m.userId}</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: MUSICIAN_STATUS_COLOR[m.status] ?? "#8fa9c8", border: `1px solid ${MUSICIAN_STATUS_COLOR[m.status] ?? "#8fa9c8"}`, borderRadius: 5, padding: "1px 7px" }}>
-                            {m.status}
-                          </span>
-                          <button
-                            style={deleteBtn}
-                            disabled={removingMusicianId === m.id}
-                            onClick={() => void removeMusician(m.id)}
-                            title="Remover"
-                          >
-                            {removingMusicianId === m.id ? "..." : "✕"}
-                          </button>
-                        </div>
-                      ))}
+                      {roleMusicians.map((m, idx) => {
+                        const isFirst = idx === 0;
+                        const isLast = idx === roleMusicians.length - 1;
+                        const isMoving = reorderingMusicianId === m.id;
+                        return (
+                          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "rgba(15,33,55,0.7)", borderRadius: 8, border: "1px solid #2d4b6d", marginBottom: 4 }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              <button
+                                style={{ ...orderBtn, opacity: isFirst || isMoving ? 0.3 : 1 }}
+                                disabled={isFirst || Boolean(reorderingMusicianId)}
+                                onClick={() => void moveMusicianSlot(role, m.id, "up")}
+                                title="Mover para cima"
+                              >▲</button>
+                              <button
+                                style={{ ...orderBtn, opacity: isLast || isMoving ? 0.3 : 1 }}
+                                disabled={isLast || Boolean(reorderingMusicianId)}
+                                onClick={() => void moveMusicianSlot(role, m.id, "down")}
+                                title="Mover para baixo"
+                              >▼</button>
+                            </div>
+                            <span style={{ flex: 1, fontSize: 13 }}>{m.user?.name ?? m.userId}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: MUSICIAN_STATUS_COLOR[m.status] ?? "#8fa9c8", border: `1px solid ${MUSICIAN_STATUS_COLOR[m.status] ?? "#8fa9c8"}`, borderRadius: 5, padding: "1px 7px" }}>
+                              {m.status}
+                            </span>
+                            <button
+                              style={deleteBtn}
+                              disabled={removingMusicianId === m.id || Boolean(reorderingMusicianId)}
+                              onClick={() => void removeMusician(m.id)}
+                              title="Remover"
+                            >
+                              {removingMusicianId === m.id ? "..." : "✕"}
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
@@ -525,16 +575,13 @@ export default function EventDetailPage({ params }: PageProps) {
                 {/* Add musician form */}
                 <form onSubmit={(e) => void addMusician(e)} style={{ ...addFormStyle, marginTop: 12 }}>
                   <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#7cf2a2" }}>+ Adicionar músico</p>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     <select style={{ ...inputStyle, appearance: "none" as const }} value={musicRole} onChange={(e) => { setMusicRole(e.target.value); setMusicUserId(""); }} disabled={addingMusician}>
                       {INSTRUMENT_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
                     <select style={{ ...inputStyle, appearance: "none" as const }} value={musicUserId} onChange={(e) => setMusicUserId(e.target.value)} disabled={addingMusician || eligibleUsers.length === 0}>
                       <option value="">{eligibleUsers.length === 0 ? `Nenhum músico com ${musicRole}` : "Selecionar usuário"}</option>
                       {eligibleUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
-                    <select style={{ ...inputStyle, appearance: "none" as const }} value={musicPriority} onChange={(e) => setMusicPriority(Number(e.target.value))} disabled={addingMusician}>
-                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>#{n}</option>)}
                     </select>
                   </div>
                   <button type="submit" style={primaryBtn} disabled={addingMusician || !musicUserId}>

@@ -210,6 +210,17 @@ export class EventsService {
     return { ok: true, musician: slot };
   }
 
+  async reorderMusicianSlots(eventId: string, items: { id: string; priority: number }[]) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) throw new BadRequestException("event not found");
+    await Promise.all(
+      items.map((item) =>
+        this.prisma.eventMusician.update({ where: { id: item.id }, data: { priority: item.priority } }),
+      ),
+    );
+    return { ok: true };
+  }
+
   async removeMusicianSlot(eventId: string, musicianId: string) {
     const slot = await this.prisma.eventMusician.findFirst({ where: { id: musicianId, eventId } });
     if (!slot) throw new BadRequestException("musician slot not found");
