@@ -2,6 +2,18 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-14 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Corrigir `ThrottlerException: Too Many Requests` (429) em `GET /api/events/:id`
+- Causa raiz: limite global do ThrottlerModule era `100 req/min` — a página de evento faz múltiplas chamadas (evento, setlist, músicos, charts), estoura rapidamente por um único IP
+- Feito:
+  - `apps/api/src/app.module.ts`: limite global aumentado de 100 → 500 req/min
+  - `apps/api/src/events/events.controller.ts`: adicionado `@SkipThrottle()` + import de `SkipThrottle`
+  - `apps/api/src/songs/songs.controller.ts`: adicionado `@SkipThrottle()` + import
+  - `apps/api/src/setlist/setlist.controller.ts`: adicionado `@SkipThrottle()` + import
+  - `AuthController` mantém `@Throttle` por endpoint (login, register, etc.) — não alterado
+- Commit: `fix(api): corrige ThrottlerException 429 em rotas autenticadas` → `47da3e1` — pushed `origin/develop`
+- Status: ✅ concluído
+
 ### [2026-04-11 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Diagnosticar e corrigir erro 500 em `POST /api/auth/resend-verification` ("Failed to send verification email")
 - Causa raiz: variáveis `SMTP_USER`/`SMTP_PASS`/`SMTP_HOST` não estavam sendo validadas no startup nem no script de deploy — servidor de produção provavelmente não as tem configuradas

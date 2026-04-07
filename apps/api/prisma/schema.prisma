@@ -133,6 +133,7 @@ model Event {
   checklistRuns            ChecklistRun[]
   musicians                EventMusician[]
   instrumentConfigs        EventInstrumentConfig[]
+  rehearsals               EventRehearsal[]
 }
 
 model EventInstrumentConfig {
@@ -266,6 +267,34 @@ enum OrgRole {
   OWNER
   ADMIN
   MEMBER
+}
+
+model Rehearsal {
+  id              String    @id @default(uuid())
+  title           String
+  dateTime        DateTime
+  location        String?
+  address         String?
+  description     String?
+  notes           String?
+  durationMinutes Int?      @default(60)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  events          EventRehearsal[]
+
+  @@index([dateTime])
+}
+
+model EventRehearsal {
+  eventId      String
+  rehearsalId  String
+  addedAt      DateTime  @default(now())
+  event        Event      @relation(fields: [eventId],     references: [id], onDelete: Cascade)
+  rehearsal    Rehearsal  @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, rehearsalId])
+  @@index([eventId])
+  @@index([rehearsalId])
 }
 
 model Organization {
