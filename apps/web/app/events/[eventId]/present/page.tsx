@@ -12,6 +12,58 @@ const TABERNACLE_ZONES: Record<string, string> = {
   Z5: "Z5 — Santuário (Alegria)",
 };
 
+// ── Transposition ─────────────────────────────────────────────────────────────
+const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NOTES_FLAT  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const FLAT_PREFERRED = new Set(["F", "Bb", "Eb", "Ab", "Db", "Gb", "Cb"]);
+
+function noteToIndex(note: string): number {
+  const i = NOTES_SHARP.indexOf(note);
+  return i !== -1 ? i : NOTES_FLAT.indexOf(note);
+}
+
+function shiftNote(note: string, semitones: number): string {
+  const i = noteToIndex(note);
+  if (i === -1) return note;
+  const j = ((i + semitones) % 12 + 12) % 12;
+  const sharp = NOTES_SHARP[j];
+  return FLAT_PREFERRED.has(sharp) ? NOTES_FLAT[j] : sharp;
+}
+
+function transposeKey(key: string | null, semitones: number): string | null {
+  if (!key || semitones === 0) return key;
+  const m = key.match(/^([A-G][#b]?)(.*)$/);
+  if (!m) return key;
+  return shiftNote(m[1], semitones) + m[2];
+}
+
+function transposeToken(token: string, semitones: number): string {
+  const m = token.match(/^([A-G][#b]?)(.*?)$/);
+  if (!m) return token;
+  const root = m[1];
+  const rest = m[2];
+  // Handle slash bass note if present: e.g. Am7/G → the "/" in rest
+  const slashIdx = rest.indexOf("/");
+  if (slashIdx !== -1) {
+    const quality = rest.slice(0, slashIdx);
+    const bassStr = rest.slice(slashIdx + 1);
+    const bassMatch = bassStr.match(/^([A-G][#b]?)(.*)$/);
+    if (bassMatch) {
+      const newBass = shiftNote(bassMatch[1], semitones) + bassMatch[2];
+      return shiftNote(root, semitones) + quality + "/" + newBass;
+    }
+  }
+  return shiftNote(root, semitones) + rest;
+}
+
+function transposeChordLine(content: string, semitones: number): string {
+  if (semitones === 0) return content;
+  return content.replace(/\S+/g, (token) => {
+    if (!/^[A-G]/.test(token)) return token;
+    return transposeToken(token, semitones);
+  });
+}
+
 type Setlist = NonNullable<EventSetlist>;
 
 type Event = {
@@ -45,6 +97,7 @@ export default function PresentPage({ params }: PageProps) {
   const [cifraFullscreen, setCifraFullscreen] = useState(false);
   const [showCifraControls, setShowCifraControls] = useState(false);
   const cifraControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [transposeSemitones, setTransposeSemitones] = useState(0);
 
   useEffect(() => {
     void params.then(({ eventId: id }) => setEventId(id));
@@ -94,6 +147,7 @@ export default function PresentPage({ params }: PageProps) {
 
   useEffect(() => {
     setAutoScroll(false);
+    setTransposeSemitones(0);
     if (cifraScrollRef.current) cifraScrollRef.current.scrollTop = 0;
   }, [current]);
 
@@ -194,6 +248,7 @@ export default function PresentPage({ params }: PageProps) {
   const cacheKey = item.songTitle.toLowerCase();
   const activeChart = chartMap[cacheKey];
   const parsed = activeChart?.parsedJson ?? null;
+  const transposedKey = transposeKey(item.key, transposeSemitones);
 
   return (
     <div style={bgStyle} onClick={() => setShowNav((v) => !v)}>
@@ -337,7 +392,16 @@ export default function PresentPage({ params }: PageProps) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
                 <h2 style={{ margin: 0, fontSize: 18, color: "#e2f0ff" }}>{item.songTitle}</h2>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {item.key && <span style={chip("#7cf2a2", "#0f3020")}>🎵 {item.key}</span>}
+                  {item.key && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 2, background: "#0d1f2d", border: "1px solid #2d4b6d", borderRadius: 20, padding: "2px 4px 2px 10px" }}>
+                      <button onClick={(e) => { e.stopPropagation(); setTransposeSemitones((v) => v - 1); }} style={transposeBtn} title="Semitom abaixo">−</button>
+                      <span style={{ color: transposeSemitones !== 0 ? "#fbbf24" : "#7cf2a2", fontSize: 13, fontWeight: 700, minWidth: 36, textAlign: "center" }}>{transposedKey ?? item.key}</span>
+                      {transposeSemitones !== 0 && (
+                        <button onClick={(e) => { e.stopPropagation(); setTransposeSemitones(0); }} style={{ ...transposeBtn, color: "#8fa9c8", fontSize: 11 }} title="Resetar tom">×</button>
+                      )}
+                      <button onClick={(e) => { e.stopPropagation(); setTransposeSemitones((v) => v + 1); }} style={transposeBtn} title="Semitom acima">+</button>
+                    </div>
+                  )}
                   <button onClick={(e) => { e.stopPropagation(); setShowChords((v) => !v); }} style={{ ...closeCifraBtn, color: showChords ? "#7cf2a2" : "#8fa9c8" }}>
                     {showChords ? "♪ Sem acordes" : "♪ Com acordes"}
                   </button>
@@ -384,7 +448,7 @@ export default function PresentPage({ params }: PageProps) {
                 </button>
                 <h2 style={{ margin: 0, fontSize: 16, color: "#e2f0ff", flex: 1, textAlign: "center", fontFamily: "sans-serif" }}>
                   {item.songTitle}
-                  {item.key && <span style={{ marginLeft: 10, fontSize: 13, color: "#7cf2a2", fontWeight: 400 }}>🎵 {item.key}</span>}
+                  {item.key && <span style={{ marginLeft: 10, fontSize: 13, color: transposeSemitones !== 0 ? "#fbbf24" : "#7cf2a2", fontWeight: 400 }}>🎵 {transposedKey ?? item.key}</span>}
                 </h2>
                 <button
                   onClick={(e) => { e.stopPropagation(); setCifraFullscreen(false); }}
@@ -412,7 +476,9 @@ export default function PresentPage({ params }: PageProps) {
                   {section.lines
                     .filter((line) => showChords || line.type !== "chords")
                     .map((line, li) => (
-                      <pre key={li} style={lineStyle(line.type, fontSize)}>{line.content || " "}</pre>
+                      <pre key={li} style={lineStyle(line.type, fontSize)}>
+                        {line.type === "chords" ? (transposeChordLine(line.content, transposeSemitones) || " ") : (line.content || " ")}
+                      </pre>
                     ))}
                 </div>
               ))}
@@ -451,6 +517,20 @@ export default function PresentPage({ params }: PageProps) {
                 >
                   {showChords ? "♪ Acordes ON" : "♪ Acordes OFF"}
                 </button>
+                {item.key && (
+                  <>
+                    <div style={{ width: 1, height: 24, background: "#2d4b6d" }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ color: "#5a7a9a", fontSize: 12 }}>Tom</span>
+                      <button onClick={(e) => { e.stopPropagation(); setTransposeSemitones((v) => v - 1); showControlsTemporarily(); }} style={fsControlBtn}>−</button>
+                      <span style={{ color: transposeSemitones !== 0 ? "#fbbf24" : "#e2f0ff", fontSize: 14, fontWeight: 700, minWidth: 40, textAlign: "center" }}>{transposedKey ?? item.key}</span>
+                      {transposeSemitones !== 0 && (
+                        <button onClick={(e) => { e.stopPropagation(); setTransposeSemitones(0); showControlsTemporarily(); }} style={{ ...fsControlBtn, fontSize: 11 }}>×</button>
+                      )}
+                      <button onClick={(e) => { e.stopPropagation(); setTransposeSemitones((v) => v + 1); showControlsTemporarily(); }} style={fsControlBtn}>+</button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -613,4 +693,11 @@ const fsControlBtn: React.CSSProperties = {
   background: "rgba(255,255,255,0.08)", border: "1px solid #2d4b6d",
   color: "#b3c6e0", borderRadius: 8, padding: "6px 12px",
   fontSize: 13, cursor: "pointer", flexShrink: 0,
+};
+
+const transposeBtn: React.CSSProperties = {
+  background: "transparent", border: "none",
+  color: "#fbbf24", fontWeight: 700,
+  fontSize: 16, cursor: "pointer", lineHeight: 1,
+  padding: "2px 6px", borderRadius: 6,
 };
