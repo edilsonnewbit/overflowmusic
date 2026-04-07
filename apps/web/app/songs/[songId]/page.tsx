@@ -102,8 +102,8 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   const meta = parsed?.metadata;
 
   return (
-    <main style={{ minHeight: "100vh", padding: "24px 16px 48px" }}>
-      <div style={{ maxWidth: 780, margin: "0 auto" }}>
+    <main style={{ minHeight: "100vh", padding: "24px 24px 48px" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         {/* nav */}
         <Link href="/songs" style={backLinkStyle}>← Músicas</Link>
 

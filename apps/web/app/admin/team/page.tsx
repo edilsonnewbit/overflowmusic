@@ -92,8 +92,8 @@ function TeamContent() {
   const roleOrder: UserRole[] = ["SUPER_ADMIN", "ADMIN", "LEADER", "MEMBER"];
 
   return (
-    <main style={{ minHeight: "100vh", padding: "24px 16px 48px" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto" }}>
+    <main style={{ minHeight: "100vh", padding: "24px 24px 48px" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ marginBottom: 20 }}>
           <Link href="/" style={backLinkStyle}>

@@ -511,8 +511,8 @@ export default function EventDetailPage({ params }: PageProps) {
 
   return (
     <AuthGate>
-      <main style={{ minHeight: "100vh", padding: "24px 16px 48px" }}>
-        <section style={{ maxWidth: 840, margin: "0 auto" }}>
+      <main style={{ minHeight: "100vh", padding: "24px 24px 48px" }}>
+        <section style={{ maxWidth: 1180, margin: "0 auto" }}>
           {/* Header */}
           <header style={headerStyle}>
             <Link href="/events" style={{ color: "#7cf2a2", fontSize: 13, textDecoration: "none" }}>

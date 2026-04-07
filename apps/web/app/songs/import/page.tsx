@@ -178,8 +178,8 @@ export default function SongImportPage() {
   }
 
   return (
-    <main style={{ minHeight: "100vh", padding: "24px 16px 36px" }}>
-      <section style={{ maxWidth: 960, margin: "0 auto" }}>
+    <main style={{ minHeight: "100vh", padding: "24px 24px 36px" }}>
+      <section style={{ maxWidth: 1180, margin: "0 auto" }}>
         <AuthGate>
           <header style={headerStyle}>
             <p style={tagStyle}>Music</p>

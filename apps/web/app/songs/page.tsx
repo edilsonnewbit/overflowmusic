@@ -57,8 +57,8 @@ function SongsContent() {
   });
 
   return (
-    <main style={{ minHeight: "100vh", padding: "24px 16px 40px" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <main style={{ minHeight: "100vh", padding: "24px 24px 40px" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <Link href="/" style={backLinkStyle}>← Home</Link>

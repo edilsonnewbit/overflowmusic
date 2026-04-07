@@ -177,7 +177,7 @@ function EditChartContent({
 
 const mainStyle: CSSProperties = {
   minHeight: "100vh",
-  padding: "24px 16px 48px",
+  padding: "24px 24px 48px",
   background: "#071623",
   color: "#e2f0ff",
 };
