@@ -463,7 +463,7 @@ export default function PresentPage({ params }: PageProps) {
             </button>
           </div>
         </div>
-      }}
+      )}
 
       {/* Metronome floating pill */}
       {metroOn && (
