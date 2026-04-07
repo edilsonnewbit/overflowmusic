@@ -29,6 +29,12 @@ async function parseJson<T>(response: Response): Promise<ApiResult<T>> {
 }
 
 const ROLES: UserRole[] = ["MEMBER", "LEADER", "ADMIN", "SUPER_ADMIN"];
+const ROLE_LABEL: Record<UserRole, string> = {
+  MEMBER: "Membro",
+  LEADER: "Líder",
+  ADMIN: "Admin",
+  SUPER_ADMIN: "Super Admin",
+};
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<PendingUser[]>([]);
@@ -148,7 +154,7 @@ export default function AdminUsersPage() {
                       >
                         {ROLES.map((r) => (
                           <option key={r} value={r}>
-                            {r}
+                            {ROLE_LABEL[r]}
                           </option>
                         ))}
                       </select>
