@@ -148,7 +148,7 @@ export function HomeClient() {
 
   return (
     <section style={{ marginTop: 24 }}>
-      {/* ── Próximos Eventos (detalhado) ──────────────────────────────── */
+      {/* ── Próximos Eventos (detalhado) ──────────────────────────────── */}
       {upcomingEvents.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
