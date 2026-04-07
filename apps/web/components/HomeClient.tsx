@@ -14,18 +14,46 @@ type DashboardStats = {
   totalChecklists: number;
 };
 
-type Event = {
+type MusicianItem = { id: string; name: string; role: string };
+
+type UpcomingEvent = {
   id: string;
   title: string;
   dateTime: string;
   location: string | null;
+  eventType: string;
   status: string;
+  musicians: {
+    confirmed: MusicianItem[];
+    pending: MusicianItem[];
+    declined: MusicianItem[];
+  };
+  totalSlots: number;
+  confirmedCount: number;
+  pendingCount: number;
+  declinedCount: number;
 };
 
 type SessionState = "loading" | "guest" | "logged_in";
 
+const EVENT_TYPE_LABEL: Record<string, string> = {
+  CULTO: "Culto",
+  CONFERENCIA: "Conferência",
+  ENSAIO: "Ensaio",
+  OUTRO: "Outro",
+};
+
+const STATUS_LABEL: Record<string, { label: string; color: string; bg: string }> = {
+  DRAFT:     { label: "Rascunho",  color: "#8fa9c8", bg: "#1a2033" },
+  ACTIVE:    { label: "Ativo",     color: "#7cf2a2", bg: "#0f3020" },
+  PUBLISHED: { label: "Publicado", color: "#7cf2a2", bg: "#0f3020" },
+  FINISHED:  { label: "Finalizado",color: "#8fa9c8", bg: "#1a2033" },
+  CANCELLED: { label: "Cancelado", color: "#ff6b6b", bg: "#2a1b1b" },
+};
+
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("pt-BR", {
+  const d = new Date(iso);
+  return d.toLocaleString("pt-BR", {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -34,10 +62,19 @@ function formatDate(iso: string) {
   });
 }
 
+function daysUntil(iso: string) {
+  const diff = new Date(iso).getTime() - Date.now();
+  const days = Math.ceil(diff / 86_400_000);
+  if (days === 0) return "Hoje";
+  if (days === 1) return "Amanhã";
+  if (days < 0) return null;
+  return `Em ${days} dias`;
+}
+
 export function HomeClient() {
   const { loading: authLoading, user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [nextEvent, setNextEvent] = useState<Event | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
 
   const session: SessionState = authLoading ? "loading" : user ? "logged_in" : "guest";
 
@@ -48,7 +85,7 @@ export function HomeClient() {
     async function loadData() {
       const [statsRes, eventsRes] = await Promise.all([
         fetch("/api/dashboard/stats", { cache: "no-store" }),
-        fetch("/api/events/next", { cache: "no-store" }),
+        fetch("/api/events/upcoming", { cache: "no-store" }),
       ]);
 
       if (statsRes.ok && mounted) {
@@ -56,8 +93,8 @@ export function HomeClient() {
         setStats(s.stats ?? null);
       }
       if (eventsRes.ok && mounted) {
-        const e = (await eventsRes.json()) as { event?: Event };
-        setNextEvent(e.event ?? null);
+        const e = (await eventsRes.json()) as { events?: UpcomingEvent[] };
+        setUpcomingEvents(e.events ?? []);
       }
     }
 
@@ -111,7 +148,7 @@ export function HomeClient() {
 
   return (
     <section style={{ marginTop: 48 }}>
-      {/* Welcome */}
+      {/* ── Welcome ──────────────────────────────────────────────────── */}
       <div style={welcomeBoxStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <div>
@@ -141,21 +178,127 @@ export function HomeClient() {
         </div>
       </div>
 
-      {/* Próximo Evento */}
-      {nextEvent && (
-        <Link href="/events" style={nextEventStyle}>
-          <p style={{ margin: 0, letterSpacing: 2, textTransform: "uppercase", color: "#7cf2a2", fontSize: 11 }}>
-            Próximo Evento
-          </p>
-          <h3 style={{ margin: "6px 0 4px", fontSize: 20 }}>{nextEvent.title}</h3>
-          <p style={{ margin: 0, color: "#b3c6e0", fontSize: 14 }}>
-            {formatDate(nextEvent.dateTime)}
-            {nextEvent.location ? ` · ${nextEvent.location}` : ""}
-          </p>
-        </Link>
+      {/* ── Próximos Eventos (detalhado) ──────────────────────────────── */}
+      {upcomingEvents.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 15, letterSpacing: 2, textTransform: "uppercase", color: "#7cf2a2", fontWeight: 600 }}>
+              Próximos Eventos
+            </h3>
+            <Link href="/events" style={{ fontSize: 13, color: "#7a9dc0", textDecoration: "none" }}>
+              Ver todos →
+            </Link>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {upcomingEvents.map((ev) => {
+              const until = daysUntil(ev.dateTime);
+              const stMeta = STATUS_LABEL[ev.status] ?? STATUS_LABEL["DRAFT"];
+              const allConfirmed = ev.totalSlots > 0 && ev.confirmedCount === ev.totalSlots;
+              const hasDeclined = ev.declinedCount > 0;
+
+              return (
+                <Link key={ev.id} href={`/events/${ev.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <div style={eventCardStyle}>
+                    {/* Header row */}
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 99, background: stMeta.bg, color: stMeta.color }}>
+                            {stMeta.label}
+                          </span>
+                          <span style={{ fontSize: 11, color: "#5a7a96", fontWeight: 500 }}>
+                            {EVENT_TYPE_LABEL[ev.eventType] ?? ev.eventType}
+                          </span>
+                          {until && (
+                            <span style={{ fontSize: 11, fontWeight: 700, color: until === "Hoje" || until === "Amanhã" ? "#ffcc44" : "#7cf2a2" }}>
+                              {until}
+                            </span>
+                          )}
+                        </div>
+                        <h4 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#e0eaf5" }}>
+                          {ev.title}
+                        </h4>
+                        <p style={{ margin: "4px 0 0", fontSize: 13, color: "#7a9dc0" }}>
+                          {formatDate(ev.dateTime)}
+                          {ev.location ? ` · ${ev.location}` : ""}
+                        </p>
+                      </div>
+
+                      {/* Confirmation ring */}
+                      {ev.totalSlots > 0 && (
+                        <div style={ringBoxStyle(allConfirmed, hasDeclined)}>
+                          <span style={{ fontSize: 20, fontWeight: 800, color: allConfirmed ? "#7cf2a2" : hasDeclined ? "#ff6b6b" : "#ffcc44" }}>
+                            {ev.confirmedCount}/{ev.totalSlots}
+                          </span>
+                          <span style={{ fontSize: 10, color: "#7a9dc0", marginTop: 2 }}>confirmados</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Musician slots */}
+                    {ev.totalSlots > 0 && (
+                      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {/* Confirmed */}
+                        {ev.musicians.confirmed.length > 0 && (
+                          <div style={slotRowStyle}>
+                            <span style={slotLabelStyle("confirmed")}>✓ Confirmados</span>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {ev.musicians.confirmed.map((m) => (
+                                <span key={m.id} style={chipStyle("#0f3020", "#7cf2a2")}>
+                                  {m.name} <em style={{ opacity: 0.65, fontStyle: "normal" }}>· {m.role}</em>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Pending */}
+                        {ev.musicians.pending.length > 0 && (
+                          <div style={slotRowStyle}>
+                            <span style={slotLabelStyle("pending")}>⏳ Aguardando</span>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {ev.musicians.pending.map((m) => (
+                                <span key={m.id} style={chipStyle("#2a2010", "#ffcc44")}>
+                                  {m.name} <em style={{ opacity: 0.65, fontStyle: "normal" }}>· {m.role}</em>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Declined */}
+                        {ev.musicians.declined.length > 0 && (
+                          <div style={slotRowStyle}>
+                            <span style={slotLabelStyle("declined")}>✗ Recusados</span>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {ev.musicians.declined.map((m) => (
+                                <span key={m.id} style={chipStyle("#2a1b1b", "#ff6b6b")}>
+                                  {m.name} <em style={{ opacity: 0.65, fontStyle: "normal" }}>· {m.role}</em>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* No slots assigned */}
+                        {ev.totalSlots === 0 && (
+                          <p style={{ margin: 0, fontSize: 12, color: "#4a6278" }}>Nenhum músico escalado ainda.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {ev.totalSlots === 0 && (
+                      <p style={{ margin: "12px 0 0", fontSize: 12, color: "#4a6278" }}>
+                        Nenhum músico escalado ainda.
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       )}
 
-      {/* Dashboard nav cards */}
+      {/* ── Dashboard nav cards ───────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
         <Link href="/events" className="dash-card">
           <span style={dashIconStyle}>📅</span>
@@ -215,6 +358,8 @@ export function HomeClient() {
   );
 }
 
+// ── Styles ───────────────────────────────────────────────────────────────────
+
 const welcomeBoxStyle: React.CSSProperties = {
   background: "linear-gradient(135deg, #1b3756 0%, #122840 55%, #0f2137 100%)",
   border: "1px solid #31557c",
@@ -223,16 +368,65 @@ const welcomeBoxStyle: React.CSSProperties = {
   marginBottom: 16,
 };
 
-const nextEventStyle: React.CSSProperties = {
-  display: "block",
-  textDecoration: "none",
-  color: "inherit",
-  background: "linear-gradient(135deg, #0e2c1e 0%, #0b2015 100%)",
-  border: "1px solid #2a6644",
+const eventCardStyle: React.CSSProperties = {
+  background: "#0d1f2e",
+  border: "1px solid #1e3a52",
   borderRadius: 16,
-  padding: "16px 20px",
-  marginBottom: 16,
+  padding: "18px 20px",
+  transition: "border-color 0.15s",
+  cursor: "pointer",
 };
+
+function ringBoxStyle(allConfirmed: boolean, hasDeclined: boolean): React.CSSProperties {
+  return {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 64,
+    height: 64,
+    borderRadius: 12,
+    border: `2px solid ${allConfirmed ? "#2a6644" : hasDeclined ? "#6b2222" : "#5c4a10"}`,
+    background: allConfirmed ? "#0a2018" : hasDeclined ? "#1e0f0f" : "#1a1600",
+  };
+}
+
+const slotRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 10,
+  flexWrap: "wrap",
+};
+
+function slotLabelStyle(type: "confirmed" | "pending" | "declined"): React.CSSProperties {
+  const colors = {
+    confirmed: "#7cf2a2",
+    pending: "#ffcc44",
+    declined: "#ff6b6b",
+  };
+  return {
+    fontSize: 11,
+    fontWeight: 700,
+    color: colors[type],
+    whiteSpace: "nowrap" as const,
+    paddingTop: 3,
+    minWidth: 90,
+  };
+}
+
+function chipStyle(bg: string, color: string): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    background: bg,
+    color,
+    borderRadius: 99,
+    padding: "3px 10px",
+    fontSize: 12,
+    fontWeight: 500,
+  };
+}
 
 const dashIconStyle: React.CSSProperties = {
   fontSize: 28,
