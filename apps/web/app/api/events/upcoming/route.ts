@@ -80,9 +80,18 @@ export async function GET(request: NextRequest) {
     const events: UpcomingEvent[] = detailed
       .filter((e): e is EventRaw => e !== null)
       .map((e) => {
-        const slots = e.musicians ?? [];
-        // Only consider priority=1 slots (primary assignments)
-        const primary = slots.filter((s) => s.priority === 1);
+        const slots = (e.musicians ?? []).filter((s) => s.user != null);
+
+        // Deduplicate by role: for each instrumentRole, show only the lowest-priority slot.
+        // This correctly handles cascading invites (priority per role, not global).
+        const roleMap = new Map<string, MusicianSlot>();
+        for (const s of slots) {
+          const existing = roleMap.get(s.instrumentRole);
+          if (!existing || s.priority < existing.priority) {
+            roleMap.set(s.instrumentRole, s);
+          }
+        }
+        const primary = Array.from(roleMap.values());
         const confirmed = primary
           .filter((s) => s.status === "CONFIRMED")
           .map((s) => ({ id: s.user.id, name: s.user.name, role: s.instrumentRole }));
