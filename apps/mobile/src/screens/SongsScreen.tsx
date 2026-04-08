@@ -3,16 +3,42 @@ import * as FileSystem from "expo-file-system";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
+import WebView from "react-native-webview";
 import { fetchSongById, fetchSongs } from "../lib/api";
 import { CACHE_SONGS, getCache, setCache } from "../lib/cache";
 import { styles } from "../styles";
 import type { Song, SongImportResult, SongPreview, SongSection } from "../types";
+
+// ── Helpers para URLs de embed ────────────────────────────────────────────────
+
+function getYoutubeEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    let id: string | null = null;
+    if (u.hostname.includes("youtu.be")) {
+      id = u.pathname.slice(1).split("?")[0] ?? null;
+    } else if (u.hostname.includes("youtube.com")) {
+      id = u.searchParams.get("v") ?? u.pathname.split("/embed/")[1]?.split("?")[0] ?? null;
+    }
+    return id ? `https://www.youtube.com/embed/${id}?rel=0&playsinline=1` : null;
+  } catch { return null; }
+}
+
+function getSpotifyEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes("spotify.com")) return null;
+    const path = u.pathname.replace("/intl-pt/", "/");
+    return `https://open.spotify.com/embed${path}?utm_source=generator`;
+  } catch { return null; }
+}
 
 type Tab = "browse" | "import";
 
@@ -401,6 +427,73 @@ function SongDetail({ song, onBack }: { song: Song; onBack: () => void }) {
           </View>
         </View>
       )}
+
+      {/* ── Players de áudio ──────────────────────────────────────────── */}
+      {(song.youtubeUrl || song.spotifyUrl || song.driveUrl) && (
+        <View style={mediaContainerStyle}>
+          <Text style={mediaSectionLabel}>Players de Áudio</Text>
+
+          {/* YouTube embed */}
+          {song.youtubeUrl && (() => {
+            const embed = getYoutubeEmbedUrl(song.youtubeUrl!);
+            return embed ? (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={mediaLabelStyle}>YouTube</Text>
+                <WebView
+                  source={{ uri: embed }}
+                  style={webviewYoutubeStyle}
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  scrollEnabled={false}
+                />
+              </View>
+            ) : (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={mediaLabelStyle}>YouTube</Text>
+                <Pressable onPress={() => void Linking.openURL(song.youtubeUrl!)} style={openLinkBtnStyle}>
+                  <Text style={openLinkTextStyle}>▶ Abrir no YouTube</Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+
+          {/* Spotify embed */}
+          {song.spotifyUrl && (() => {
+            const embed = getSpotifyEmbedUrl(song.spotifyUrl!);
+            return embed ? (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={mediaLabelStyle}>Spotify</Text>
+                <WebView
+                  source={{ uri: embed }}
+                  style={webviewSpotifyStyle}
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  scrollEnabled={false}
+                />
+              </View>
+            ) : (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={mediaLabelStyle}>Spotify</Text>
+                <Pressable onPress={() => void Linking.openURL(song.spotifyUrl!)} style={openLinkBtnStyle}>
+                  <Text style={openLinkTextStyle}>▶ Abrir no Spotify</Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+
+          {/* Google Drive — abre externamente (requer login Google) */}
+          {song.driveUrl && (
+            <View style={{ marginBottom: 6 }}>
+              <Text style={mediaLabelStyle}>Google Drive (MP3)</Text>
+              <Pressable onPress={() => void Linking.openURL(song.driveUrl!)} style={openLinkBtnStyle}>
+                <Text style={openLinkTextStyle}>▶ Abrir no Drive</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      )}
+
+      <View style={{ height: 32 }} />
     </ScrollView>
   );
 }
@@ -691,5 +784,61 @@ const activeFilterChipStyle = {
   ...filterChipStyle,
   borderColor: "#7cf2a2",
   backgroundColor: "#1b3756",
+};
+
+// ── Media player styles ───────────────────────────────────────────────────────
+
+const mediaContainerStyle = {
+  marginHorizontal: 14,
+  marginBottom: 16,
+  padding: 14,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: "#1e3650",
+  backgroundColor: "#071623",
+};
+
+const mediaSectionLabel = {
+  color: "#7a94b0",
+  fontSize: 11,
+  fontWeight: "700" as const,
+  textTransform: "uppercase" as const,
+  letterSpacing: 1.5,
+  marginBottom: 14,
+};
+
+const mediaLabelStyle = {
+  color: "#b3c6e0",
+  fontSize: 12,
+  fontWeight: "600" as const,
+  marginBottom: 6,
+};
+
+const webviewYoutubeStyle = {
+  width: "100%" as const,
+  height: 200,
+  borderRadius: 8,
+  backgroundColor: "#000",
+};
+
+const webviewSpotifyStyle = {
+  width: "100%" as const,
+  height: 160,
+  borderRadius: 8,
+  backgroundColor: "#000",
+};
+
+const openLinkBtnStyle = {
+  backgroundColor: "#1b3756",
+  borderRadius: 8,
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  alignSelf: "flex-start" as const,
+};
+
+const openLinkTextStyle = {
+  color: "#7cf2a2",
+  fontSize: 13,
+  fontWeight: "700" as const,
 };
 

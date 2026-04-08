@@ -23,6 +23,9 @@ type CreateSongBody = {
   defaultKey?: string;
   zone?: string;
   tags?: string[];
+  youtubeUrl?: string;
+  spotifyUrl?: string;
+  driveUrl?: string;
 };
 
 type UpdateSongBody = Partial<CreateSongBody>;

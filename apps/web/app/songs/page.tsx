@@ -64,6 +64,7 @@ function SongsContent() {
           <Link href="/" style={backLinkStyle}>← Home</Link>
           <h1 style={{ margin: 0, fontSize: 26 }}>Biblioteca de Músicas</h1>
           <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+            <Link href="/songs/new" style={importBtnStyle}>+ Nova Música</Link>
             <Link href="/songs/import" style={importBtnStyle}>+ Importar .txt</Link>
           </div>
         </div>

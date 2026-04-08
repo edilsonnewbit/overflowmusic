@@ -158,6 +158,7 @@ model PushToken {
 model Event {
   id                       String      @id @default(uuid())
   title                    String
+  slug                     String?     @unique
   dateTime                 DateTime
   location                 String?
   address                  String?
@@ -174,6 +175,34 @@ model Event {
   musicians                EventMusician[]
   instrumentConfigs        EventInstrumentConfig[]
   rehearsals               EventRehearsal[]
+  decisions                EventDecision[]
+
+  @@index([slug])
+}
+
+enum DecisionType {
+  PRIMEIRA_VEZ
+  RECONSAGRACAO
+  BATISMO
+  OUTRO
+}
+
+model EventDecision {
+  id          String       @id @default(uuid())
+  eventId     String
+  name        String
+  whatsapp    String
+  city        String?
+  church      String?
+  decisionType DecisionType @default(PRIMEIRA_VEZ)
+  howDidYouHear String?
+  acceptsContact Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime     @default(now())
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([createdAt])
 }
 
 model EventInstrumentConfig {
