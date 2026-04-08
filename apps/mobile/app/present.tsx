@@ -237,6 +237,10 @@ export default function PresentScreen() {
     // Lazy-load the songs list to look up song IDs by title
     if (!songIdCache.current) {
       const res = await fetchSongs();
+      if (!res.ok || res.songs.length === 0) {
+        // Do NOT cache: allow retry on next attempt
+        return { parsed: null, rawText: null };
+      }
       const map = new Map<string, string>();
       for (const s of res.songs) {
         map.set(s.title.toLowerCase().trim(), s.id);
@@ -246,6 +250,7 @@ export default function PresentScreen() {
 
     const songId = songIdCache.current.get(key);
     if (!songId) {
+      // Song not in catalog — cache the miss so we don't re-fetch the list
       const empty = { parsed: null, rawText: null };
       chartCache.current.set(key, empty);
       return empty;
@@ -275,16 +280,22 @@ export default function PresentScreen() {
       const cached = chartCache.current.get(cacheKey)!;
       setCurrentChart(cached.parsed);
       setCurrentRawText(cached.rawText);
-      if (cached.parsed || cached.rawText) setShowCifra(true);
+      setShowCifra(true); // always open — cifra view handles "sem cifra"
       return;
     }
 
     setLoadingCifra(true);
-    const result = await loadChart(item.songTitle);
-    setLoadingCifra(false);
-    setCurrentChart(result.parsed);
-    setCurrentRawText(result.rawText);
-    if (result.parsed || result.rawText) setShowCifra(true);
+    try {
+      const result = await loadChart(item.songTitle);
+      setCurrentChart(result.parsed);
+      setCurrentRawText(result.rawText);
+    } catch {
+      setCurrentChart(null);
+      setCurrentRawText(null);
+    } finally {
+      setLoadingCifra(false);
+      setShowCifra(true); // always open after load attempt
+    }
   }
 
   // ── Empty setlist guard ───────────────────────────────────────────────────

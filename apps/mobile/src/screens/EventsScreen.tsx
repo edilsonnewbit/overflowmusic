@@ -24,7 +24,7 @@ type Props = {
   statusText: string;
   onCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
   creatingEvent: boolean;
-  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
+  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string }) => Promise<void>;
   onDeleteEvent: (id: string) => Promise<void>;
 };
 
@@ -353,9 +353,36 @@ export function EventsScreen({
                     <Text style={{ color: "#f28c8c", fontSize: 13 }}>🗑 Excluir</Text>
                   </Pressable>
                 </View>
+
+                {/* Status chips */}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                  {(["DRAFT", "ACTIVE", "PUBLISHED", "FINISHED"] as const).map((s) => {
+                    const isCurrent = (ev.computedStatus ?? ev.status) === s;
+                    const sc = STATUS_COLOR[s] ?? "#8fa9c8";
+                    return (
+                      <Pressable
+                        key={s}
+                        onPress={() => !isCurrent && void onUpdateEvent(ev.id, { status: s })}
+                        style={({ pressed }) => ([
+                          {
+                            paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+                            borderWidth: 1,
+                            borderColor: isCurrent ? sc : "#2a4a6a",
+                            backgroundColor: isCurrent ? sc + "22" : "transparent",
+                            opacity: pressed ? 0.7 : 1,
+                          },
+                        ])}
+                      >
+                        <Text style={{ color: isCurrent ? sc : "#8fa9c8", fontSize: 11, fontWeight: isCurrent ? "700" : "400" }}>
+                          {STATUS_LABEL[s]}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
 
-              {/* Formulário inline de edição */}
+              {/* Formulário inline de edição */
               {isEditing && (
                 <View style={{ marginTop: 4, gap: 6, padding: 8, backgroundColor: "#0e2233", borderRadius: 8 }}>
                   <TextInput
@@ -602,6 +629,55 @@ export function EventsScreen({
             )}
             </>
           )}
+          {/* Musicians section */}
+          {(() => {
+            const musicians = events.find((e) => e.id === activeEventId)?.musicians ?? [];
+            if (musicians.length === 0) return null;
+            const byRole: Record<string, typeof musicians> = {};
+            for (const m of musicians) {
+              if (!byRole[m.instrumentRole]) byRole[m.instrumentRole] = [];
+              byRole[m.instrumentRole].push(m);
+            }
+            const SLOT_COLOR: Record<string, string> = {
+              PENDING: "#f59e0b", CONFIRMED: "#7cf2a2", DECLINED: "#f28c8c", EXPIRED: "#94a3b8",
+            };
+            const SLOT_LABEL: Record<string, string> = {
+              PENDING: "Aguardando", CONFIRMED: "Confirmado", DECLINED: "Recusou", EXPIRED: "Expirado",
+            };
+            return (
+              <View style={{ marginTop: 16 }}>
+                <Text style={styles.cardTitle}>Músicos</Text>
+                {Object.entries(byRole).map(([role, slots]) => (
+                  <View key={role} style={{ marginTop: 8 }}>
+                    <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      {role}
+                    </Text>
+                    {slots.map((m) => {
+                      const sc = SLOT_COLOR[m.status] ?? "#8fa9c8";
+                      return (
+                        <View key={m.id} style={{
+                          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                          paddingVertical: 6, paddingHorizontal: 8,
+                          backgroundColor: "#0d1d2e", borderRadius: 6, marginBottom: 4,
+                          borderWidth: 1, borderColor: "#1e3a54",
+                        }}>
+                          <Text style={{ color: "#e8f2ff", fontSize: 13 }}>{m.user?.name ?? m.userId}</Text>
+                          <View style={{
+                            borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
+                            backgroundColor: sc + "22", borderWidth: 1, borderColor: sc,
+                          }}>
+                            <Text style={{ color: sc, fontSize: 10, fontWeight: "700" }}>
+                              {SLOT_LABEL[m.status] ?? m.status}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            );
+          })()}
         </View>
       )}
     </View>

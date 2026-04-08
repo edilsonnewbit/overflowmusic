@@ -326,7 +326,7 @@ export async function createEvent(
 
 export async function updateEvent(
   id: string,
-  input: { title?: string; dateTime?: string; location?: string; address?: string },
+  input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
   const bearerToken = (accessToken || "").trim();
