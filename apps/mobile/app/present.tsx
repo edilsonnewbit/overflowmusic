@@ -554,6 +554,60 @@ export default function PresentScreen() {
         </Pressable>
       </View>
 
+      {/* ── Floating metronome button (visible when cifra is hidden) ────── */}
+      {!showCifra && (
+        <View
+          pointerEvents="box-none"
+          style={{ position: "absolute", bottom: insets.bottom + 72, right: 16, alignItems: "flex-end", gap: 6, zIndex: 30 }}
+        >
+          {/* Beat dots */}
+          {metroOn && (
+            <View style={{ flexDirection: "row", gap: 5, backgroundColor: "rgba(8,16,30,0.85)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: "#a5c8ff33" }}>
+              {[0, 1, 2, 3].map((b) => (
+                <View
+                  key={b}
+                  style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: metroOn && metroBeat === b ? (b === 0 ? "#7cf2a2" : "#a5c8ff") : "#1e3650" }}
+                />
+              ))}
+            </View>
+          )}
+          {/* Toggle button */}
+          <Pressable
+            pointerEvents="auto"
+            onPress={() => setMetroOn((v) => !v)}
+            style={({ pressed }) => ({
+              backgroundColor: metroOn ? "rgba(15,48,32,0.95)" : "rgba(8,16,30,0.88)",
+              borderWidth: 1,
+              borderColor: metroOn ? "#7cf2a266" : "#2d4b6d",
+              borderRadius: 24,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              flexDirection: "row" as const,
+              alignItems: "center" as const,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ color: metroOn ? "#7cf2a2" : "#8fa9c8", fontSize: 13, fontWeight: "700" }}>
+              🥁 {metroBpm} BPM  {metroOn ? "⏹" : "▶"}
+            </Text>
+          </Pressable>
+          {/* BPM quick controls — show when active */}
+          {metroOn && (
+            <View pointerEvents="auto" style={{ flexDirection: "row", gap: 4 }}>
+              {([-5, -1, 1, 5] as const).map((delta) => (
+                <Pressable
+                  key={delta}
+                  onPress={() => setMetroBpm((v) => Math.max(20, Math.min(300, v + delta)))}
+                  style={{ backgroundColor: "rgba(8,16,30,0.88)", borderWidth: 1, borderColor: "#2d4b6d", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}
+                >
+                  <Text style={{ color: "#8fa9c8", fontSize: 12 }}>{delta > 0 ? `+${delta}` : String(delta)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
       {/* ── Bottom navigation (auto-hides) ─────────────────────────────── */}
       <View
         pointerEvents={showNav ? "auto" : "none"}
