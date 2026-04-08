@@ -332,7 +332,7 @@ export default function PresentScreen() {
       {/* ── Main content area (swipe + tap to toggle nav) ──────────────── */}
       <View style={styles.mainArea} {...panResponder.panHandlers}>
         <Pressable style={{ flex: 1 }} onPress={resetNavTimer}>
-          <View style={styles.centerContent}>
+            <View style={[styles.centerContent, showCifra && styles.centerContentCifra]}>
             {/* Position counter */}
             <Text style={styles.posText}>
               {current + 1} / {sortedItems.length}
@@ -622,6 +622,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 60,
   },
+  centerContentCifra: {
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
   posText: {
     color: "#3a5a6a",
     fontSize: 14,
@@ -676,8 +682,7 @@ const styles = StyleSheet.create({
   cifraToggleBtnText: { color: "#1ecad3", fontSize: 14 },
   // ── Chord chart ──────────────────────────────────────────────────────────
   cifraContainer: {
-    width: "100%",
-    maxHeight: "80%",
+    flex: 1,
     backgroundColor: "#0d1f2e",
     borderRadius: 12,
     padding: 16,

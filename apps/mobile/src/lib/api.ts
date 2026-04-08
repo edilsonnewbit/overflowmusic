@@ -599,6 +599,18 @@ export async function fetchRehearsals(): Promise<{ ok: boolean; rehearsals: Rehe
   return { ok: true, rehearsals: body.rehearsals as Rehearsal[] };
 }
 
+export async function fetchEventRehearsals(
+  eventId: string,
+): Promise<{ ok: boolean; rehearsals: Rehearsal[] }> {
+  const response = await fetch(
+    `${API_BASE}/events/${encodeURIComponent(eventId)}/rehearsals`,
+    { method: "GET" },
+  );
+  const body = await parseJson(response);
+  if (!response.ok || !Array.isArray(body.rehearsals)) return { ok: false, rehearsals: [] };
+  return { ok: true, rehearsals: body.rehearsals as Rehearsal[] };
+}
+
 export async function createRehearsal(
   input: { title: string; dateTime: string; location?: string; address?: string; description?: string; notes?: string; durationMinutes?: number },
   accessToken?: string | null,

@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { EventSetlist, MusicEvent, SetlistItem } from "../types";
 import { styles } from "../styles";
+import { fetchEventRehearsals, type Rehearsal } from "../lib/api";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Rascunho", ACTIVE: "Ativo", PUBLISHED: "Publicado", FINISHED: "Encerrado", ARCHIVED: "Arquivado",
@@ -167,6 +168,18 @@ export function EventsScreen({
   const displayedEvents = focusMode && activeEventId
     ? events.filter((e) => e.id === activeEventId)
     : events;
+
+  const [eventRehearsals, setEventRehearsals] = useState<Rehearsal[]>([]);
+  const [loadingRehearsals, setLoadingRehearsals] = useState(false);
+
+  useEffect(() => {
+    if (!activeEventId) { setEventRehearsals([]); return; }
+    setLoadingRehearsals(true);
+    void fetchEventRehearsals(activeEventId).then(({ rehearsals }) => {
+      setEventRehearsals(rehearsals);
+      setLoadingRehearsals(false);
+    });
+  }, [activeEventId]);
 
   return (
     <View style={styles.card}>
@@ -629,7 +642,12 @@ export function EventsScreen({
                 })}
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
                   <Pressable
-                    style={[styles.primaryButton, { flex: 1, backgroundColor: "#1a3a5a" }]}
+                    style={({ pressed }) => ({
+                      flex: 1, borderRadius: 12, paddingVertical: 14,
+                      alignItems: "center" as const, justifyContent: "center" as const,
+                      borderWidth: 1.5, borderColor: "#60a5fa",
+                      backgroundColor: pressed ? "#60a5fa22" : "transparent",
+                    })}
                     onPress={() => {
                       const activeEvent = events.find((e) => e.id === activeEventId);
                       const lines = sortedItems.map(
@@ -643,10 +661,12 @@ export function EventsScreen({
                       });
                     }}
                   >
-                    <Text style={styles.primaryButtonText}>Compartilhar</Text>
+                    <Text style={{ color: "#60a5fa", fontWeight: "700", fontSize: 15, letterSpacing: 0.5 }}>
+                      Compartilhar
+                    </Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.primaryButton, { flex: 1, backgroundColor: "#1a4a3a" }]}
+                    style={[styles.primaryButton, { flex: 1 }]}
                     onPress={() => router.push("/present")}
                     accessibilityLabel="Iniciar modo apresentação"
                   >
@@ -657,55 +677,86 @@ export function EventsScreen({
             )}
             </>
           )}
-          {/* Musicians section */}
-          {(() => {
-            const musicians = events.find((e) => e.id === activeEventId)?.musicians ?? [];
-            if (musicians.length === 0) return null;
-            const byRole: Record<string, typeof musicians> = {};
-            for (const m of musicians) {
-              if (!byRole[m.instrumentRole]) byRole[m.instrumentRole] = [];
-              byRole[m.instrumentRole].push(m);
-            }
-            const SLOT_COLOR: Record<string, string> = {
-              PENDING: "#f59e0b", CONFIRMED: "#7cf2a2", DECLINED: "#f28c8c", EXPIRED: "#94a3b8",
-            };
-            const SLOT_LABEL: Record<string, string> = {
-              PENDING: "Aguardando", CONFIRMED: "Confirmado", DECLINED: "Recusou", EXPIRED: "Expirado",
-            };
-            return (
-              <View style={{ marginTop: 16 }}>
-                <Text style={styles.cardTitle}>Músicos</Text>
-                {Object.entries(byRole).map(([role, slots]) => (
-                  <View key={role} style={{ marginTop: 8 }}>
-                    <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                      {role}
-                    </Text>
-                    {slots.map((m) => {
-                      const sc = SLOT_COLOR[m.status] ?? "#8fa9c8";
-                      return (
-                        <View key={m.id} style={{
-                          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-                          paddingVertical: 6, paddingHorizontal: 8,
-                          backgroundColor: "#0d1d2e", borderRadius: 6, marginBottom: 4,
-                          borderWidth: 1, borderColor: "#1e3a54",
-                        }}>
-                          <Text style={{ color: "#e8f2ff", fontSize: 13 }}>{m.user?.name ?? m.userId}</Text>
-                          <View style={{
-                            borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
-                            backgroundColor: sc + "22", borderWidth: 1, borderColor: sc,
+          {/* Equipe de Músicos */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.cardTitle}>Equipe de Músicos</Text>
+            {(() => {
+              const musicians = events.find((e) => e.id === activeEventId)?.musicians ?? [];
+              if (musicians.length === 0) {
+                return <Text style={[styles.helper, { marginTop: 4 }]}>Nenhum músico escalado.</Text>;
+              }
+              const byRole: Record<string, typeof musicians> = {};
+              for (const m of musicians) {
+                if (!byRole[m.instrumentRole]) byRole[m.instrumentRole] = [];
+                byRole[m.instrumentRole].push(m);
+              }
+              const SLOT_COLOR: Record<string, string> = {
+                PENDING: "#f59e0b", CONFIRMED: "#7cf2a2", DECLINED: "#f28c8c", EXPIRED: "#94a3b8",
+              };
+              const SLOT_LABEL: Record<string, string> = {
+                PENDING: "Aguardando", CONFIRMED: "Confirmado", DECLINED: "Recusou", EXPIRED: "Expirado",
+              };
+              return (
+                <>
+                  {Object.entries(byRole).map(([role, slots]) => (
+                    <View key={role} style={{ marginTop: 8 }}>
+                      <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        {role}
+                      </Text>
+                      {slots.map((m) => {
+                        const sc = SLOT_COLOR[m.status] ?? "#8fa9c8";
+                        return (
+                          <View key={m.id} style={{
+                            flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                            paddingVertical: 6, paddingHorizontal: 8,
+                            backgroundColor: "#0d1d2e", borderRadius: 6, marginBottom: 4,
+                            borderWidth: 1, borderColor: "#1e3a54",
                           }}>
-                            <Text style={{ color: sc, fontSize: 10, fontWeight: "700" }}>
-                              {SLOT_LABEL[m.status] ?? m.status}
-                            </Text>
+                            <Text style={{ color: "#e8f2ff", fontSize: 13 }}>{m.user?.name ?? m.userId}</Text>
+                            <View style={{
+                              borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
+                              backgroundColor: sc + "22", borderWidth: 1, borderColor: sc,
+                            }}>
+                              <Text style={{ color: sc, fontSize: 10, fontWeight: "700" }}>
+                                {SLOT_LABEL[m.status] ?? m.status}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                ))}
-              </View>
-            );
-          })()}
+                        );
+                      })}
+                    </View>
+                  ))}
+                </>
+              );
+            })()}
+          </View>
+
+          {/* Ensaios */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.cardTitle}>Ensaios</Text>
+            {loadingRehearsals ? (
+              <ActivityIndicator color="#7cf2a2" style={{ marginTop: 8 }} />
+            ) : eventRehearsals.length === 0 ? (
+              <Text style={[styles.helper, { marginTop: 4 }]}>Nenhum ensaio vinculado.</Text>
+            ) : (
+              eventRehearsals.map((r) => (
+                <View key={r.id} style={{
+                  marginTop: 8, padding: 10,
+                  backgroundColor: "#0d1d2e", borderRadius: 8,
+                  borderWidth: 1, borderColor: "#1e3a54",
+                }}>
+                  <Text style={{ color: "#e8f2ff", fontSize: 13, fontWeight: "600" }}>{r.title}</Text>
+                  <Text style={[styles.helper, { marginTop: 2 }]}>
+                    {new Date(r.dateTime).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                    {r.location ? `  —  ${r.location}` : ""}
+                  </Text>
+                  {r.durationMinutes ? (
+                    <Text style={[styles.helper, { marginTop: 1 }]}>⏱ {r.durationMinutes} min</Text>
+                  ) : null}
+                </View>
+              ))
+            )}
+          </View>
         </View>
       )}
     </View>
