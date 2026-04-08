@@ -382,7 +382,7 @@ export function EventsScreen({
                 </View>
               </View>
 
-              {/* Formulário inline de edição */
+              {/* Formulário inline de edição */}
               {isEditing && (
                 <View style={{ marginTop: 4, gap: 6, padding: 8, backgroundColor: "#0e2233", borderRadius: 8 }}>
                   <TextInput
