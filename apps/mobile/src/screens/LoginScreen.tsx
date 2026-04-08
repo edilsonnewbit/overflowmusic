@@ -130,7 +130,7 @@ export function LoginScreen({ onSubmit, statusText }: Props) {
           showsVerticalScrollIndicator={false}
         >
           {/* ── LOGO SECTION ─────────────────────────────────── */}
-          <View style={{ alignItems: "center", paddingTop: 72, paddingBottom: 44 }}>
+          <View style={{ alignItems: "center", paddingTop: 110, paddingBottom: 44 }}>
             <Image
               source={require("../../assets/logo.png")}
               style={{ width: 160, height: 160, marginBottom: 16 }}
