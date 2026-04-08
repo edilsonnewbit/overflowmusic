@@ -505,63 +505,72 @@ export function EventsScreen({
                         padding: 10,
                       }}
                     >
-                      {/* Title + controles em linha */}
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={{ flex: 1, color: "#e8f2ff", fontSize: 14, fontWeight: "600" }}>
-                          {idx + 1}. {item.songTitle}
-                        </Text>
-                        <Pressable
-                          disabled={isBusy || isFirst}
-                          onPress={() => void onMoveItem(item, "up", sortedItems)}
-                          style={[orderBtnStyle, (isBusy || isFirst) && { opacity: 0.25 }]}
-                        >
-                          <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▲</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={isBusy || isLast}
-                          onPress={() => void onMoveItem(item, "down", sortedItems)}
-                          style={[orderBtnStyle, (isBusy || isLast) && { opacity: 0.25 }]}
-                        >
-                          <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▼</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={isBusy}
-                          onPress={() => void onRemoveItem(item.id)}
-                          style={[orderBtnStyle, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
-                          accessibilityLabel={`Remover ${item.songTitle} do setlist`}
-                        >
-                          <Text style={{ color: "#f28c8c", fontSize: 11, lineHeight: 14 }}>✕</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() =>
-                            editingItemId === item.id
-                              ? setEditingItemId(null)
-                              : startItemEdit(item)
-                          }
-                          style={[orderBtnStyle, { borderColor: editingItemId === item.id ? "#f28c8c" : "#2d4b6d" }]}
-                          accessibilityLabel="Editar item do setlist"
-                        >
-                          <Text style={{ color: editingItemId === item.id ? "#f28c8c" : "#7cf2a2", fontSize: 11, lineHeight: 14 }}>
-                            {editingItemId === item.id ? "✕" : "✏"}
-                          </Text>
-                        </Pressable>
-                      </View>
+                      {/* Layout principal: [▲/▼] | [conteúdo] | [✕ ✏] */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        {/* Botões de ordem empilhados à esquerda */}
+                        <View style={{ gap: 2 }}>
+                          <Pressable
+                            disabled={isBusy || isFirst}
+                            onPress={() => void onMoveItem(item, "up", sortedItems)}
+                            style={[orderBtnStyle, (isBusy || isFirst) && { opacity: 0.25 }]}
+                          >
+                            <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▲</Text>
+                          </Pressable>
+                          <Pressable
+                            disabled={isBusy || isLast}
+                            onPress={() => void onMoveItem(item, "down", sortedItems)}
+                            style={[orderBtnStyle, (isBusy || isLast) && { opacity: 0.25 }]}
+                          >
+                            <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▼</Text>
+                          </Pressable>
+                        </View>
 
-                      {/* Info */}
-                      <Text style={[styles.helper, { marginTop: 3 }]}>
-                        {[
-                          item.key && `Tom: ${item.key}`,
-                          item.leaderName && `Líder: ${item.leaderName}`,
-                          item.zone && `Zona: ${item.zone}`,
-                        ]
-                          .filter(Boolean)
-                          .join("  ·  ")}
-                      </Text>
-                      {item.transitionNotes ? (
-                        <Text style={[styles.helper, { fontStyle: "italic" }]}>
-                          {item.transitionNotes}
-                        </Text>
-                      ) : null}
+                        {/* Conteúdo central: título + info */}
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: "#e8f2ff", fontSize: 14, fontWeight: "600" }}>
+                            {idx + 1}. {item.songTitle}
+                          </Text>
+                          <Text style={[styles.helper, { marginTop: 2 }]}>
+                            {[
+                              item.key && `Tom: ${item.key}`,
+                              item.leaderName && `Líder: ${item.leaderName}`,
+                              item.zone && `Zona: ${item.zone}`,
+                            ]
+                              .filter(Boolean)
+                              .join("  ·  ")}
+                          </Text>
+                          {item.transitionNotes ? (
+                            <Text style={[styles.helper, { fontStyle: "italic" }]}>
+                              {item.transitionNotes}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        {/* Ações à direita: remover + editar */}
+                        <View style={{ gap: 4 }}>
+                          <Pressable
+                            disabled={isBusy}
+                            onPress={() => void onRemoveItem(item.id)}
+                            style={[orderBtnStyle, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
+                            accessibilityLabel={`Remover ${item.songTitle} do setlist`}
+                          >
+                            <Text style={{ color: "#f28c8c", fontSize: 11, lineHeight: 14 }}>✕</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() =>
+                              editingItemId === item.id
+                                ? setEditingItemId(null)
+                                : startItemEdit(item)
+                            }
+                            style={[orderBtnStyle, { borderColor: editingItemId === item.id ? "#f28c8c" : "#2d4b6d" }]}
+                            accessibilityLabel="Editar item do setlist"
+                          >
+                            <Text style={{ color: editingItemId === item.id ? "#f28c8c" : "#7cf2a2", fontSize: 11, lineHeight: 14 }}>
+                              {editingItemId === item.id ? "✕" : "✏"}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
 
                       {editingItemId === item.id && (
                           <View style={{ marginTop: 8, gap: 6 }}>
