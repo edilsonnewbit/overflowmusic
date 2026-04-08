@@ -142,6 +142,19 @@ export function HomeScreen() {
             <Text style={shortcutSub}>Palco</Text>
           </Pressable>
         )}
+
+        <Pressable
+          style={({ pressed }) => [
+            shortcutCard,
+            { backgroundColor: "#1a1230", borderColor: "#3a2660" },
+            pressed && { opacity: 0.75 },
+          ]}
+          onPress={() => router.push("/audicao")}
+        >
+          <Text style={{ fontSize: 28 }}>🎤</Text>
+          <Text style={[shortcutLabel, { color: "#c084fc" }]}>Audição</Text>
+          <Text style={shortcutSub}>Inscreva-se</Text>
+        </Pressable>
       </View>
 
       {/* Prox eventos — lista */}

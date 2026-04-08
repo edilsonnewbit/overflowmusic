@@ -4,6 +4,9 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { APP_GUARD } from "@nestjs/core";
 import { AppController } from "./app.controller";
 import { AuditService } from "./audit/audit.service";
+import { AuditionsController } from "./auditions/auditions.controller";
+import { AuditionsService } from "./auditions/auditions.service";
+import { DriveService } from "./drive/drive.service";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
 import { ChecklistRunsController } from "./checklist/checklist-runs.controller";
@@ -38,6 +41,7 @@ import { SongsService } from "./songs/songs.service";
   ],
   controllers: [
     AppController,
+    AuditionsController,
     AuthController,
     EventsController,
     NotificationsController,
@@ -51,6 +55,8 @@ import { SongsService } from "./songs/songs.service";
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     AuditService,
+    AuditionsService,
+    DriveService,
     AuthService,
     EmailService,
     EventsCronService,

@@ -47,6 +47,42 @@ enum ChordChartSourceType {
   MANUAL
 }
 
+enum AuditionStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model Audition {
+  id               String        @id @default(uuid())
+  name             String
+  email            String
+  whatsapp         String
+  birthDate        String?
+  city             String?
+  church           String?
+  pastorName       String?
+  instagramProfile String?
+  volunteerArea    String
+  skills           String[]      @default([])
+  availability     String[]      @default([])
+  hasTransport     Boolean       @default(false)
+  motivation       String?
+  driveFileId      String?
+  driveFileUrl     String?
+  status           AuditionStatus @default(PENDING)
+  adminNotes       String?
+  reviewedAt       DateTime?
+  reviewedBy       String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([status])
+  @@index([email])
+  @@index([volunteerArea])
+}
+
 model User {
   id                String     @id @default(uuid())
   name              String
