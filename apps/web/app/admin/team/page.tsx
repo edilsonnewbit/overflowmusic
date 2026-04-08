@@ -6,6 +6,18 @@ import { AuthGate } from "@/components/AuthGate";
 
 type UserRole = "SUPER_ADMIN" | "ADMIN" | "LEADER" | "MEMBER";
 
+type VolunteerArea = "MUSICA" | "MIDIA" | "DANCA" | "INTERCESSAO" | "SUPORTE";
+
+const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: string; skills: string[] }> = {
+  MUSICA: { label: "Música", icon: "🎵", skills: ["Vocal", "Violão", "Guitarra", "Baixo", "Bateria", "Teclado", "Piano", "Trompete", "Saxofone", "Violino", "Flauta", "Percussão", "Gaita", "Contrabaixo"] },
+  MIDIA: { label: "Mídia", icon: "🎬", skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides/ProPresenter", "Iluminação", "Som/PA"] },
+  DANCA: { label: "Dança", icon: "💃", skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"] },
+  INTERCESSAO: { label: "Intercessão", icon: "🙏", skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"] },
+  SUPORTE: { label: "Suporte", icon: "🤝", skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"] },
+};
+
+const AREA_KEYS = Object.keys(VOLUNTEER_AREAS) as VolunteerArea[];
+
 type TeamMember = {
   id: string;
   name: string;
@@ -13,6 +25,7 @@ type TeamMember = {
   role: UserRole;
   status: string;
   instruments: string[];
+  volunteerArea?: string | null;
 };
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -172,15 +185,16 @@ function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () =
   const roleColor = ROLE_COLOR[member.role];
   const [editing, setEditing] = useState(false);
   const [editRole, setEditRole] = useState<UserRole>(member.role);
-  const [editInstruments, setEditInstruments] = useState<string[]>(member.instruments ?? []);
+  const [editArea, setEditArea] = useState<VolunteerArea | null>((member.volunteerArea as VolunteerArea | null) ?? null);
+  const [editSkills, setEditSkills] = useState<string[]>(member.instruments ?? []);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  const INSTRUMENT_OPTIONS = [
-    "Vocal", "Viol\u00e3o", "Guitarra", "Baixo", "Bateria",
-    "Teclado", "Piano", "Trompete", "Saxofone",
-    "Violino", "Flauta", "Percuss\u00e3o", "Gaita", "Contrabaixo",
-  ];
+  function handleAreaChange(area: VolunteerArea) {
+    if (editArea === area) return;
+    setEditArea(area);
+    setEditSkills([]);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -189,7 +203,7 @@ function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () =
       const res = await fetch(`/api/admin/users/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: editRole, instruments: editInstruments }),
+        body: JSON.stringify({ role: editRole, instruments: editSkills, volunteerArea: editArea }),
       });
       if (!res.ok) {
         const body = (await res.json()) as { message?: string };
@@ -205,24 +219,19 @@ function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () =
     }
   }
 
+  const areaInfo = member.volunteerArea ? VOLUNTEER_AREAS[member.volunteerArea as VolunteerArea] : null;
+  const currentSkills = editArea ? VOLUNTEER_AREAS[editArea].skills : [];
+
   return (
     <div style={{ ...cardStyle, flexDirection: "column", alignItems: "stretch" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {/* Avatar */}
         <div
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: "50%",
-            backgroundColor: "#0f2137",
-            border: `1.5px solid ${roleColor}55`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            fontSize: 14,
-            fontWeight: 700,
-            color: roleColor,
+            width: 42, height: 42, borderRadius: "50%",
+            backgroundColor: "#0f2137", border: `1.5px solid ${roleColor}55`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0, fontSize: 14, fontWeight: 700, color: roleColor,
           }}
         >
           {initials}
@@ -235,15 +244,24 @@ function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () =
           <p style={{ margin: 0, color: "#5a7a9a", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {member.email}
           </p>
-          {!editing && member.instruments && member.instruments.length > 0 && (
-            <p style={{ margin: "3px 0 0", fontSize: 11, color: roleColor }}>
-              {member.instruments.join(" · ")}
-            </p>
+          {!editing && (
+            <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+              {areaInfo && (
+                <span style={{ fontSize: 11, color: "#a5c8ff", background: "#0f2040", borderRadius: 10, padding: "1px 7px" }}>
+                  {areaInfo.icon} {areaInfo.label}
+                </span>
+              )}
+              {member.instruments && member.instruments.length > 0 && (
+                <span style={{ fontSize: 11, color: roleColor }}>
+                  {member.instruments.join(" · ")}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
         <button
-          onClick={() => { setEditing((v) => !v); setSaveError(""); setEditRole(member.role); setEditInstruments(member.instruments ?? []); }}
+          onClick={() => { setEditing((v) => !v); setSaveError(""); setEditRole(member.role); setEditArea((member.volunteerArea as VolunteerArea | null) ?? null); setEditSkills(member.instruments ?? []); }}
           style={{ background: "none", border: "1px solid #2d4b6d", borderRadius: 8, color: "#7cf2a2", fontSize: 12, padding: "4px 10px", cursor: "pointer" }}
         >
           {editing ? "Cancelar" : "Editar"}
@@ -251,10 +269,10 @@ function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () =
       </div>
 
       {editing && (
-        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Role selector */}
           <div>
-            <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>Fun\u00e7\u00e3o</p>
+            <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>Função</p>
             <select
               value={editRole}
               onChange={(e) => setEditRole(e.target.value as UserRole)}
@@ -266,37 +284,43 @@ function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () =
             </select>
           </div>
 
-          {/* Instruments multi-select */}
+          {/* Area selector */}
           <div>
-            <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>Instrumentos / Vocal</p>
+            <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>Área de voluntariado</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {INSTRUMENT_OPTIONS.map((inst) => {
-                const selected = editInstruments.includes(inst);
+              {AREA_KEYS.map((area) => {
+                const { label, icon } = VOLUNTEER_AREAS[area];
+                const selected = editArea === area;
                 return (
-                  <button
-                    key={inst}
-                    type="button"
-                    onClick={() =>
-                      setEditInstruments((prev) =>
-                        selected ? prev.filter((i) => i !== inst) : [...prev, inst]
-                      )
-                    }
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 16,
-                      border: selected ? "1px solid #7cf2a2" : "1px solid #2d4b6d",
-                      background: selected ? "#0f3020" : "#0b1d31",
-                      color: selected ? "#7cf2a2" : "#8fa9c8",
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {inst}
+                  <button key={area} type="button" onClick={() => handleAreaChange(area)}
+                    style={{ padding: "4px 10px", borderRadius: 16, border: selected ? "1px solid #7cf2a2" : "1px solid #2d4b6d", background: selected ? "#0f3020" : "#0b1d31", color: selected ? "#7cf2a2" : "#8fa9c8", fontSize: 12, cursor: "pointer", fontWeight: selected ? 700 : 400 }}>
+                    {icon} {label}
                   </button>
                 );
               })}
             </div>
           </div>
+
+          {/* Skills multi-select */}
+          {editArea && (
+            <div>
+              <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>
+                {editArea === "MUSICA" ? "Instrumentos / Vocal" : "Habilidades"}
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {currentSkills.map((skill) => {
+                  const selected = editSkills.includes(skill);
+                  return (
+                    <button key={skill} type="button"
+                      onClick={() => setEditSkills((prev) => selected ? prev.filter((s) => s !== skill) : [...prev, skill])}
+                      style={{ padding: "4px 10px", borderRadius: 16, border: selected ? "1px solid #7cf2a2" : "1px solid #2d4b6d", background: selected ? "#0f3020" : "#0b1d31", color: selected ? "#7cf2a2" : "#8fa9c8", fontSize: 12, cursor: "pointer" }}>
+                      {skill}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {saveError && <p style={{ margin: 0, color: "#f87171", fontSize: 12 }}>{saveError}</p>}
 

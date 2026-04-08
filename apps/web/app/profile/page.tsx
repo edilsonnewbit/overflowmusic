@@ -5,6 +5,52 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthUser } from "@/lib/types";
 
+// ─── Volunteer areas ──────────────────────────────────────────────────────────
+
+type VolunteerArea = "MUSICA" | "MIDIA" | "DANCA" | "INTERCESSAO" | "SUPORTE";
+
+const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: string; skills: string[] }> = {
+  MUSICA: {
+    label: "Música",
+    icon: "🎵",
+    skills: ["Vocal", "Violão", "Guitarra", "Baixo", "Bateria", "Teclado", "Piano", "Trompete", "Saxofone", "Violino", "Flauta", "Percussão", "Gaita", "Contrabaixo"],
+  },
+  MIDIA: {
+    label: "Mídia",
+    icon: "🎬",
+    skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides/ProPresenter", "Iluminação", "Som/PA"],
+  },
+  DANCA: {
+    label: "Dança",
+    icon: "💃",
+    skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"],
+  },
+  INTERCESSAO: {
+    label: "Intercessão",
+    icon: "🙏",
+    skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"],
+  },
+  SUPORTE: {
+    label: "Suporte",
+    icon: "🤝",
+    skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"],
+  },
+};
+
+const AREA_KEYS = Object.keys(VOLUNTEER_AREAS) as VolunteerArea[];
+
+function skillsLabel(area: VolunteerArea | null): string {
+  if (!area) return "Habilidades";
+  const labels: Record<VolunteerArea, string> = {
+    MUSICA: "Instrumentos / Vocal",
+    MIDIA: "Habilidades em Mídia",
+    DANCA: "Habilidades em Dança",
+    INTERCESSAO: "Área de atuação",
+    SUPORTE: "Área de atuação",
+  };
+  return labels[area];
+}
+
 // ─── Profile Page ─────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
@@ -13,6 +59,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [volunteerArea, setVolunteerArea] = useState<VolunteerArea | null>(null);
   const [instruments, setInstruments] = useState<string[]>([]);
   const [instagramProfile, setInstagramProfile] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -31,24 +78,20 @@ export default function ProfilePage() {
     async function load() {
       try {
         const res = await fetch("/api/auth/me", { cache: "no-store" });
-        if (!res.ok) {
-          router.replace("/login");
-          return;
-        }
+        if (!res.ok) { router.replace("/login"); return; }
         const body = (await res.json()) as { user?: AuthUser };
-        if (!body.user) {
-          router.replace("/login");
-          return;
-        }
-        setUser(body.user);
-        setName(body.user.name ?? "");
-        setInstruments(body.user.instruments ?? []);
-        setInstagramProfile(body.user.instagramProfile ?? "");
-        setBirthDate(body.user.birthDate ?? "");
-        setChurch(body.user.church ?? "");
-        setPastorName(body.user.pastorName ?? "");
-        setWhatsapp(body.user.whatsapp ?? "");
-        setAddress(body.user.address ?? "");
+        if (!body.user) { router.replace("/login"); return; }
+        const u = body.user;
+        setUser(u);
+        setName(u.name ?? "");
+        setVolunteerArea((u.volunteerArea as VolunteerArea | null) ?? null);
+        setInstruments(u.instruments ?? []);
+        setInstagramProfile(u.instagramProfile ?? "");
+        setBirthDate(u.birthDate ?? "");
+        setChurch(u.church ?? "");
+        setPastorName(u.pastorName ?? "");
+        setWhatsapp(u.whatsapp ?? "");
+        setAddress(u.address ?? "");
       } catch {
         router.replace("/login");
       } finally {
@@ -58,38 +101,29 @@ export default function ProfilePage() {
     void load();
   }, [router]);
 
-  // ── Handle name + instruments update ───────────────────────────────────
+  function handleAreaChange(area: VolunteerArea) {
+    if (volunteerArea === area) return;
+    setVolunteerArea(area);
+    setInstruments([]);
+  }
+
+  function toggleSkill(skill: string) {
+    setInstruments((prev) =>
+      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
+    );
+  }
+
+  // ── Handle save ─────────────────────────────────────────────────────────
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) {
-      setErrorMsg("O nome não pode estar vazio.");
-      return;
-    }
-    if (!instagramProfile.trim()) {
-      setErrorMsg("Instagram é obrigatório.");
-      return;
-    }
-    if (!birthDate.trim()) {
-      setErrorMsg("Data de nascimento é obrigatória.");
-      return;
-    }
-    if (!church.trim()) {
-      setErrorMsg("Igreja que faz parte é obrigatória.");
-      return;
-    }
-    if (!pastorName.trim()) {
-      setErrorMsg("Nome do pastor é obrigatório.");
-      return;
-    }
-    if (!whatsapp.trim()) {
-      setErrorMsg("WhatsApp é obrigatório.");
-      return;
-    }
-    if (!address.trim()) {
-      setErrorMsg("Endereço é obrigatório.");
-      return;
-    }
+    if (!trimmed) { setErrorMsg("O nome não pode estar vazio."); return; }
+    if (!instagramProfile.trim()) { setErrorMsg("Instagram é obrigatório."); return; }
+    if (!birthDate.trim()) { setErrorMsg("Data de nascimento é obrigatória."); return; }
+    if (!church.trim()) { setErrorMsg("Igreja que faz parte é obrigatória."); return; }
+    if (!pastorName.trim()) { setErrorMsg("Nome do pastor é obrigatório."); return; }
+    if (!whatsapp.trim()) { setErrorMsg("WhatsApp é obrigatório."); return; }
+    if (!address.trim()) { setErrorMsg("Endereço é obrigatório."); return; }
     setErrorMsg("");
     setSaving(true);
     try {
@@ -98,6 +132,7 @@ export default function ProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: trimmed,
+          volunteerArea: volunteerArea ?? null,
           instruments,
           instagramProfile: instagramProfile.trim(),
           birthDate: birthDate.trim(),
@@ -108,13 +143,11 @@ export default function ProfilePage() {
         }),
       });
       const body = (await res.json()) as { ok?: boolean; user?: AuthUser; message?: string };
-      if (!res.ok) {
-        setErrorMsg(body.message ?? "Erro ao salvar.");
-        return;
-      }
+      if (!res.ok) { setErrorMsg(body.message ?? "Erro ao salvar."); return; }
       if (body.user) {
         setUser(body.user);
         setName(body.user.name ?? trimmed);
+        setVolunteerArea((body.user.volunteerArea as VolunteerArea | null) ?? null);
         setInstruments(body.user.instruments ?? []);
         setInstagramProfile(body.user.instagramProfile ?? "");
         setBirthDate(body.user.birthDate ?? "");
@@ -143,11 +176,13 @@ export default function ProfilePage() {
   if (!user) return null;
 
   const roleLabel: Record<string, string> = {
+    SUPER_ADMIN: "Super Admin",
     ADMIN: "Administrador",
     LEADER: "Líder",
     MEMBER: "Membro",
-    VIEWER: "Visitante",
   };
+
+  const currentSkills = volunteerArea ? VOLUNTEER_AREAS[volunteerArea].skills : [];
 
   return (
     <main style={layoutStyle}>
@@ -158,11 +193,11 @@ export default function ProfilePage() {
       <div style={cardStyle}>
 
         {/* ── Avatar ────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-          {(user as typeof user & { photoUrl?: string | null }).photoUrl ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 4 }}>
+          {user.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={(user as typeof user & { photoUrl?: string | null }).photoUrl!}
+              src={user.photoUrl}
               alt={user.name}
               style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", border: "2px solid #1e3a5a" }}
             />
@@ -185,10 +220,6 @@ export default function ProfilePage() {
         {/* ── Read-only info ─────────────────────────────────────────── */}
         <div style={infoGridStyle}>
           <div style={infoRowStyle}>
-            <span style={labelStyle}>E-mail</span>
-            <span style={valueStyle}>{user.email}</span>
-          </div>
-          <div style={infoRowStyle}>
             <span style={labelStyle}>Função</span>
             <span style={{ ...valueStyle, ...roleBadgeStyle(user.role) }}>
               {roleLabel[user.role] ?? user.role}
@@ -196,11 +227,9 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ── Editable name ─────────────────────────────────────────── */}
+        {/* ── Form ──────────────────────────────────────────────────── */}
         <form onSubmit={(e) => void handleSave(e)} style={formStyle}>
-          <label style={labelStyle} htmlFor="profile-name">
-            Nome de exibição
-          </label>
+          <label style={labelStyle} htmlFor="profile-name">Nome de exibição</label>
           <input
             id="profile-name"
             type="text"
@@ -212,9 +241,7 @@ export default function ProfilePage() {
             autoComplete="name"
           />
 
-          <label style={labelStyle} htmlFor="profile-instagram">
-            Instagram *
-          </label>
+          <label style={labelStyle} htmlFor="profile-instagram">Instagram *</label>
           <input
             id="profile-instagram"
             type="text"
@@ -226,9 +253,7 @@ export default function ProfilePage() {
             style={inputStyle}
           />
 
-          <label style={labelStyle} htmlFor="profile-birthdate">
-            Data de nascimento *
-          </label>
+          <label style={labelStyle} htmlFor="profile-birthdate">Data de nascimento *</label>
           <input
             id="profile-birthdate"
             type="date"
@@ -238,9 +263,7 @@ export default function ProfilePage() {
             style={inputStyle}
           />
 
-          <label style={labelStyle} htmlFor="profile-church">
-            Igreja que faz parte *
-          </label>
+          <label style={labelStyle} htmlFor="profile-church">Igreja que faz parte *</label>
           <input
             id="profile-church"
             type="text"
@@ -251,23 +274,18 @@ export default function ProfilePage() {
             style={inputStyle}
           />
 
-          <label style={labelStyle} htmlFor="profile-pastor">
-            Nome do pastor *
-          </label>
+          <label style={labelStyle} htmlFor="profile-pastor">Nome do pastor *</label>
           <input
             id="profile-pastor"
             type="text"
             value={pastorName}
             onChange={(e) => setPastorName(e.target.value)}
             maxLength={120}
-            required
             disabled={saving}
             style={inputStyle}
           />
 
-          <label style={labelStyle} htmlFor="profile-whatsapp">
-            WhatsApp *
-          </label>
+          <label style={labelStyle} htmlFor="profile-whatsapp">WhatsApp *</label>
           <input
             id="profile-whatsapp"
             type="tel"
@@ -275,14 +293,11 @@ export default function ProfilePage() {
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
             maxLength={20}
-            required
             disabled={saving}
             style={inputStyle}
           />
 
-          <label style={labelStyle} htmlFor="profile-address">
-            Endereço *
-          </label>
+          <label style={labelStyle} htmlFor="profile-address">Endereço *</label>
           <input
             id="profile-address"
             type="text"
@@ -290,37 +305,58 @@ export default function ProfilePage() {
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             maxLength={200}
-            required
             disabled={saving}
             style={inputStyle}
           />
 
-          {errorMsg && <p style={errorStyle}>{errorMsg}</p>}
-          {successMsg && <p style={successStyle}>{successMsg}</p>}
-          {/* ── Instruments multi-select ────────────────────────── */}
-          <div style={{ marginTop: 4 }}>
-            <p style={{ ...labelStyle, marginBottom: 8 }}>Instrumentos / Vocal</p>
-            <div style={instrumentGridStyle}>
-              {INSTRUMENT_OPTIONS.map((inst) => {
-                const selected = instruments.includes(inst);
+          {/* ── Área de voluntariado ─────────────────────────────────── */}
+          <div style={{ marginTop: 8 }}>
+            <p style={{ ...labelStyle, marginBottom: 8 }}>Área de voluntariado</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {AREA_KEYS.map((area) => {
+                const { label, icon } = VOLUNTEER_AREAS[area];
+                const selected = volunteerArea === area;
                 return (
                   <button
-                    key={inst}
+                    key={area}
                     type="button"
                     disabled={saving}
-                    onClick={() =>
-                      setInstruments((prev) =>
-                        selected ? prev.filter((i) => i !== inst) : [...prev, inst]
-                      )
-                    }
-                    style={selected ? chipSelectedStyle : chipStyle}
+                    onClick={() => handleAreaChange(area)}
+                    style={selected ? areaChipSelectedStyle : areaChipStyle}
                   >
-                    {inst}
+                    {icon} {label}
                   </button>
                 );
               })}
             </div>
           </div>
+
+          {/* ── Habilidades dinâmicas ────────────────────────────────── */}
+          {volunteerArea && (
+            <div style={{ marginTop: 4 }}>
+              <p style={{ ...labelStyle, marginBottom: 8 }}>{skillsLabel(volunteerArea)}</p>
+              <div style={skillGridStyle}>
+                {currentSkills.map((skill) => {
+                  const selected = instruments.includes(skill);
+                  return (
+                    <button
+                      key={skill}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => toggleSkill(skill)}
+                      style={selected ? chipSelectedStyle : chipStyle}
+                    >
+                      {skill}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {errorMsg && <p style={errorStyle}>{errorMsg}</p>}
+          {successMsg && <p style={successStyle}>{successMsg}</p>}
+
           <button type="submit" disabled={saving} style={saving ? btnDisabledStyle : btnStyle}>
             {saving ? "Salvando..." : "Salvar alterações"}
           </button>
@@ -330,7 +366,7 @@ export default function ProfilePage() {
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────
+// ── Styles ───────────────────────────────────────────────────────────────────
 
 const layoutStyle: React.CSSProperties = {
   maxWidth: 540,
@@ -384,12 +420,12 @@ const valueStyle: React.CSSProperties = {
 
 function roleBadgeStyle(role: string): React.CSSProperties {
   const colors: Record<string, { bg: string; color: string }> = {
+    SUPER_ADMIN: { bg: "#2a1b3d", color: "#e879f9" },
     ADMIN: { bg: "#2a1b3d", color: "#c084fc" },
     LEADER: { bg: "#0f3020", color: "#7cf2a2" },
     MEMBER: { bg: "#0f2040", color: "#a5c8ff" },
-    VIEWER: { bg: "#1a2033", color: "#8fa9c8" },
   };
-  const c = colors[role] ?? colors["VIEWER"];
+  const c = colors[role] ?? colors["MEMBER"];
   return {
     fontSize: 12,
     fontWeight: 600,
@@ -430,37 +466,32 @@ const btnStyle: React.CSSProperties = {
   alignSelf: "flex-start",
 };
 
-const btnDisabledStyle: React.CSSProperties = {
-  ...btnStyle,
-  opacity: 0.5,
-  cursor: "not-allowed",
-};
+const btnDisabledStyle: React.CSSProperties = { ...btnStyle, opacity: 0.5, cursor: "not-allowed" };
 
-const errorStyle: React.CSSProperties = {
-  color: "var(--danger)",
+const errorStyle: React.CSSProperties = { color: "var(--danger)", fontSize: 13, margin: 0 };
+const successStyle: React.CSSProperties = { color: "var(--accent-2)", fontSize: 13, margin: 0 };
+const mutedStyle: React.CSSProperties = { color: "var(--muted)", textAlign: "center", marginTop: 60 };
+
+const areaChipStyle: React.CSSProperties = {
+  padding: "7px 14px",
+  borderRadius: 20,
+  border: "1px solid #2d4b6d",
+  background: "#0d1f2e",
+  color: "#8fa9c8",
   fontSize: 13,
-  margin: 0,
+  cursor: "pointer",
+  fontWeight: 500,
 };
 
-const successStyle: React.CSSProperties = {
-  color: "var(--accent-2)",
-  fontSize: 13,
-  margin: 0,
+const areaChipSelectedStyle: React.CSSProperties = {
+  ...areaChipStyle,
+  background: "#0d2535",
+  border: "1px solid #7cf2a2",
+  color: "#7cf2a2",
+  fontWeight: 700,
 };
 
-const mutedStyle: React.CSSProperties = {
-  color: "var(--muted)",
-  textAlign: "center",
-  marginTop: 60,
-};
-
-const INSTRUMENT_OPTIONS = [
-  "Vocal", "Viol\u00e3o", "Guitarra", "Baixo", "Bateria",
-  "Teclado", "Piano", "Trompete", "Saxofone",
-  "Violino", "Flauta", "Percuss\u00e3o", "Gaita", "Contrabaixo",
-];
-
-const instrumentGridStyle: React.CSSProperties = {
+const skillGridStyle: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: 8,

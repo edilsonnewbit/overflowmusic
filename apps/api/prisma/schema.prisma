@@ -58,6 +58,7 @@ model User {
   role              UserRole   @default(MEMBER)
   status            UserStatus @default(PENDING_APPROVAL)
   instruments       String[]   @default([])
+  volunteerArea     String?
   instagramProfile  String?
   birthDate         DateTime?
   church            String?
@@ -205,6 +206,9 @@ model Song {
   defaultKey  String?
   zone        String?
   tags        Json?
+  youtubeUrl  String?
+  spotifyUrl  String?
+  driveUrl    String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   chordCharts ChordChart[]

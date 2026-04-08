@@ -553,6 +553,7 @@ export async function updateProfile(
   accessToken: string,
   data: {
     name: string;
+    volunteerArea?: string | null;
     instruments?: string[];
     instagramProfile?: string | null;
     birthDate?: string | null;

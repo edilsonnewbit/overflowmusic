@@ -12,7 +12,21 @@ import {
 import { router } from "expo-router";
 import { styles, colors } from "../src/styles";
 
-// ─── Termo de Adesão ao Serviço Voluntário ─────────────────────────────────────
+// ─── Volunteer areas ──────────────────────────────────────────────────────────
+
+type VolunteerArea = "MUSICA" | "MIDIA" | "DANCA" | "INTERCESSAO" | "SUPORTE";
+
+const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: string; skills: string[] }> = {
+  MUSICA: { label: "Música", icon: "🎵", skills: ["Vocal", "Violão", "Guitarra", "Baixo", "Bateria", "Teclado", "Piano", "Trompete", "Saxofone", "Violino", "Flauta", "Percussão", "Gaita", "Contrabaixo"] },
+  MIDIA: { label: "Mídia", icon: "🎬", skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides/ProPresenter", "Iluminação", "Som/PA"] },
+  DANCA: { label: "Dança", icon: "💃", skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"] },
+  INTERCESSAO: { label: "Intercessão", icon: "🙏", skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"] },
+  SUPORTE: { label: "Suporte", icon: "🤝", skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"] },
+};
+
+const AREA_KEYS = Object.keys(VOLUNTEER_AREAS) as VolunteerArea[];
+
+// ─── Termo de Adesão ao Serviço Voluntário ────────────────────────────────────
 const VOLUNTEER_TERMS_VERSION = "1.0-2026";
 
 const VOLUNTEER_TERMS_TEXT = `TERMO DE ADESÃO AO SERVIÇO VOLUNTÁRIO
@@ -120,6 +134,8 @@ export default function RegisterScreen() {
   const [pastorName, setPastorName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [address, setAddress] = useState("");
+  const [volunteerArea, setVolunteerArea] = useState<VolunteerArea | null>(null);
+  const [skills, setSkills] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   // ─── Terms state ────────────────────────────────────────────────────────────
@@ -196,6 +212,8 @@ export default function RegisterScreen() {
         password,
         name: name.trim(),
         volunteerTermsAccepted: true,
+        volunteerArea: volunteerArea ?? undefined,
+        instruments: skills.length > 0 ? skills : undefined,
         instagramProfile: instagramProfile.trim(),
         birthDate: isoDate,
         church: church.trim(),
@@ -372,6 +390,64 @@ export default function RegisterScreen() {
                 autoCapitalize="words"
               />
             </View>
+
+            {/* ── Área de voluntariado ── */}
+            <View>
+              <Text style={labelStyle}>Área de voluntariado <Text style={{ color: colors.textMuted, fontWeight: "400" }}>(opcional)</Text></Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                {AREA_KEYS.map((area) => {
+                  const { label, icon } = VOLUNTEER_AREAS[area];
+                  const selected = volunteerArea === area;
+                  return (
+                    <Pressable
+                      key={area}
+                      onPress={() => { setVolunteerArea(selected ? null : area); setSkills([]); }}
+                      style={{
+                        paddingHorizontal: 13, paddingVertical: 7,
+                        borderRadius: 20, borderWidth: 1,
+                        borderColor: selected ? "#1ecad3" : "#2d4b6d",
+                        backgroundColor: selected ? "rgba(30,202,211,0.1)" : "#0d1f2e",
+                      }}
+                    >
+                      <Text style={{ color: selected ? "#1ecad3" : "#8fa9c8", fontSize: 13, fontWeight: selected ? "700" : "400" }}>
+                        {icon} {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* ── Habilidades dinâmicas ── */}
+            {volunteerArea && (
+              <View>
+                <Text style={labelStyle}>
+                  {volunteerArea === "MUSICA" ? "Instrumentos / Vocal" : "Habilidades"}
+                  {" "}<Text style={{ color: colors.textMuted, fontWeight: "400" }}>(opcional)</Text>
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                  {VOLUNTEER_AREAS[volunteerArea].skills.map((skill) => {
+                    const selected = skills.includes(skill);
+                    return (
+                      <Pressable
+                        key={skill}
+                        onPress={() => setSkills((prev) => selected ? prev.filter((s) => s !== skill) : [...prev, skill])}
+                        style={{
+                          paddingHorizontal: 10, paddingVertical: 5,
+                          borderRadius: 20, borderWidth: 1,
+                          borderColor: selected ? "#7cf2a2" : "#2d4b6d",
+                          backgroundColor: selected ? "#0f3020" : "#0d1f2e",
+                        }}
+                      >
+                        <Text style={{ color: selected ? "#7cf2a2" : "#8fa9c8", fontSize: 12, fontWeight: selected ? "600" : "400" }}>
+                          {skill}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             {/* ── Termo de Adesão Voluntária ── */}
             <View style={termsSectionStyle}>

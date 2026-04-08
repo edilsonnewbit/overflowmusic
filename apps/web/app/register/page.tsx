@@ -6,6 +6,18 @@ import Link from "next/link";
 
 const VOLUNTEER_TERMS_VERSION = "1.0-2026";
 
+type VolunteerArea = "MUSICA" | "MIDIA" | "DANCA" | "INTERCESSAO" | "SUPORTE";
+
+const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: string; skills: string[] }> = {
+  MUSICA: { label: "Música", icon: "🎵", skills: ["Vocal", "Violão", "Guitarra", "Baixo", "Bateria", "Teclado", "Piano", "Trompete", "Saxofone", "Violino", "Flauta", "Percussão", "Gaita", "Contrabaixo"] },
+  MIDIA: { label: "Mídia", icon: "🎬", skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides/ProPresenter", "Iluminação", "Som/PA"] },
+  DANCA: { label: "Dança", icon: "💃", skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"] },
+  INTERCESSAO: { label: "Intercessão", icon: "🙏", skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"] },
+  SUPORTE: { label: "Suporte", icon: "🤝", skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"] },
+};
+
+const AREA_KEYS = Object.keys(VOLUNTEER_AREAS) as VolunteerArea[];
+
 const VOLUNTEER_TERMS_TEXT = `TERMO DE ADESÃO AO SERVIÇO VOLUNTÁRIO
 Banda Overflow Music – Overflow Movement
 
@@ -66,6 +78,8 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [volunteerArea, setVolunteerArea] = useState<VolunteerArea | null>(null);
+  const [skills, setSkills] = useState<string[]>([]);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -94,7 +108,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, volunteerTermsAccepted: true }),
+        body: JSON.stringify({ name, email, password, volunteerTermsAccepted: true, volunteerArea: volunteerArea ?? undefined, instruments: skills.length > 0 ? skills : undefined }),
       });
       const data = (await res.json()) as RegisterResponse;
 
@@ -203,6 +217,69 @@ export default function RegisterPage() {
               onBlur={(e) => { e.currentTarget.style.borderColor = "#2d4b6d"; }}
             />
           </div>
+
+          {/* Área de voluntariado */}
+          <div>
+            <label style={labelStyle}>Área de voluntariado <span style={{ color: "#5a7a9a", fontWeight: 400 }}>(opcional)</span></label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              {AREA_KEYS.map((area) => {
+                const { label, icon } = VOLUNTEER_AREAS[area];
+                const selected = volunteerArea === area;
+                return (
+                  <button
+                    key={area}
+                    type="button"
+                    onClick={() => { setVolunteerArea(selected ? null : area); setSkills([]); }}
+                    style={{
+                      padding: "6px 13px",
+                      borderRadius: 20,
+                      border: selected ? "1px solid #1ecad3" : "1px solid #2d4b6d",
+                      background: selected ? "rgba(30,202,211,0.12)" : "rgba(6,20,35,0.7)",
+                      color: selected ? "#1ecad3" : "#8fa9c8",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      fontWeight: selected ? 700 : 400,
+                    }}
+                  >
+                    {icon} {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Habilidades dinâmicas */}
+          {volunteerArea && (
+            <div>
+              <label style={labelStyle}>
+                {volunteerArea === "MUSICA" ? "Instrumentos / Vocal" : "Habilidades"}
+                {" "}<span style={{ color: "#5a7a9a", fontWeight: 400 }}>(opcional)</span>
+              </label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {VOLUNTEER_AREAS[volunteerArea].skills.map((skill) => {
+                  const selected = skills.includes(skill);
+                  return (
+                    <button
+                      key={skill}
+                      type="button"
+                      onClick={() => setSkills((prev) => selected ? prev.filter((s) => s !== skill) : [...prev, skill])}
+                      style={{
+                        padding: "5px 11px",
+                        borderRadius: 16,
+                        border: selected ? "1px solid #7cf2a2" : "1px solid #2d4b6d",
+                        background: selected ? "rgba(124,242,162,0.1)" : "rgba(6,20,35,0.7)",
+                        color: selected ? "#7cf2a2" : "#8fa9c8",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {skill}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {error && (
             <div style={errorBannerStyle}>
