@@ -137,15 +137,7 @@ export function LoginScreen({ onSubmit, statusText }: Props) {
               resizeMode="contain"
             />
 
-            {/* Tagline */}
-            <Text style={{
-              marginTop: 4,
-              fontSize: 13,
-              color: "#4a6a8a",
-              letterSpacing: 0.5,
-            }}>
-              Sua música, sua missão.
-            </Text>
+
           </View>
 
           {/* ── ACTIONS SECTION ──────────────────────────────── */}

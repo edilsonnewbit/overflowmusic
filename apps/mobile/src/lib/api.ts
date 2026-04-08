@@ -3,6 +3,7 @@ import type {
   AuthUser,
   ChecklistRun,
   ChecklistTemplate,
+  EventMusician,
   EventSetlist,
   LoginPayload,
   LoginResponse,
@@ -597,6 +598,18 @@ export async function fetchRehearsals(): Promise<{ ok: boolean; rehearsals: Rehe
   const body = await parseJson(response);
   if (!response.ok || !Array.isArray(body.rehearsals)) return { ok: false, rehearsals: [] };
   return { ok: true, rehearsals: body.rehearsals as Rehearsal[] };
+}
+
+export async function fetchEventMusicians(
+  eventId: string,
+): Promise<{ ok: boolean; musicians: EventMusician[] }> {
+  const response = await fetch(
+    `${API_BASE}/events/${encodeURIComponent(eventId)}/musicians`,
+    { method: "GET" },
+  );
+  const body = await parseJson(response);
+  if (!response.ok || !Array.isArray(body.musicians)) return { ok: false, musicians: [] };
+  return { ok: true, musicians: body.musicians as EventMusician[] };
 }
 
 export async function fetchEventRehearsals(

@@ -16,6 +16,7 @@ export type {
   SongPreview,
   SongImportResult,
   MusicEvent,
+  EventMusician,
   SetlistItem,
   EventSetlist,
   ChecklistTemplate,

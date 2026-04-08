@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import type { EventSetlist, MusicEvent, SetlistItem } from "../types";
+import type { EventMusician, EventSetlist, MusicEvent, SetlistItem } from "../types";
 import { styles } from "../styles";
-import { fetchEventRehearsals, type Rehearsal } from "../lib/api";
+import { fetchEventMusicians, fetchEventRehearsals, type Rehearsal } from "../lib/api";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Rascunho", ACTIVE: "Ativo", PUBLISHED: "Publicado", FINISHED: "Encerrado", ARCHIVED: "Arquivado",
 };
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: "#8fa9c8", ACTIVE: "#60a5fa", PUBLISHED: "#7cf2a2", FINISHED: "#94a3b8", ARCHIVED: "#4b5563",
+};
+const INSTRUMENT_ROLES = ["Bateria", "Baixo", "Guitarra", "Teclado", "Violão", "Vocal", "Trompete", "Saxofone", "Outro"];
+const SLOT_COLOR: Record<string, string> = {
+  PENDING: "#fbbf24", CONFIRMED: "#7cf2a2", DECLINED: "#f87171", EXPIRED: "#94a3b8",
+};
+const SLOT_LABEL: Record<string, string> = {
+  PENDING: "Aguardando", CONFIRMED: "Confirmado", DECLINED: "Recusou", EXPIRED: "Expirado",
 };
 type Props = {
   events: MusicEvent[];
@@ -169,11 +176,18 @@ export function EventsScreen({
     ? events.filter((e) => e.id === activeEventId)
     : events;
 
+  const [eventMusicians, setEventMusicians] = useState<EventMusician[]>([]);
+  const [loadingMusicians, setLoadingMusicians] = useState(false);
   const [eventRehearsals, setEventRehearsals] = useState<Rehearsal[]>([]);
   const [loadingRehearsals, setLoadingRehearsals] = useState(false);
 
   useEffect(() => {
-    if (!activeEventId) { setEventRehearsals([]); return; }
+    if (!activeEventId) { setEventMusicians([]); setEventRehearsals([]); return; }
+    setLoadingMusicians(true);
+    void fetchEventMusicians(activeEventId).then(({ musicians }) => {
+      setEventMusicians(musicians);
+      setLoadingMusicians(false);
+    });
     setLoadingRehearsals(true);
     void fetchEventRehearsals(activeEventId).then(({ rehearsals }) => {
       setEventRehearsals(rehearsals);
@@ -680,41 +694,48 @@ export function EventsScreen({
           {/* Equipe de Músicos */}
           <View style={{ marginTop: 16 }}>
             <Text style={styles.cardTitle}>Equipe de Músicos</Text>
-            {(() => {
-              const musicians = events.find((e) => e.id === activeEventId)?.musicians ?? [];
-              if (musicians.length === 0) {
-                return <Text style={[styles.helper, { marginTop: 4 }]}>Nenhum músico escalado.</Text>;
-              }
-              const byRole: Record<string, typeof musicians> = {};
-              for (const m of musicians) {
-                if (!byRole[m.instrumentRole]) byRole[m.instrumentRole] = [];
-                byRole[m.instrumentRole].push(m);
-              }
-              const SLOT_COLOR: Record<string, string> = {
-                PENDING: "#f59e0b", CONFIRMED: "#7cf2a2", DECLINED: "#f28c8c", EXPIRED: "#94a3b8",
-              };
-              const SLOT_LABEL: Record<string, string> = {
-                PENDING: "Aguardando", CONFIRMED: "Confirmado", DECLINED: "Recusou", EXPIRED: "Expirado",
-              };
-              return (
-                <>
-                  {Object.entries(byRole).map(([role, slots]) => (
-                    <View key={role} style={{ marginTop: 8 }}>
-                      <Text style={{ color: "#60a5fa", fontSize: 11, fontWeight: "700", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                        {role}
-                      </Text>
+            {loadingMusicians ? (
+              <ActivityIndicator color="#7cf2a2" style={{ marginTop: 8 }} />
+            ) : eventMusicians.length === 0 ? (
+              <Text style={[styles.helper, { marginTop: 4 }]}>Nenhum músico escalado.</Text>
+            ) : (
+              <>
+                {INSTRUMENT_ROLES.filter((role) =>
+                  eventMusicians.some((m) => m.instrumentRole === role)
+                ).map((role) => {
+                  const slots = eventMusicians
+                    .filter((m) => m.instrumentRole === role)
+                    .sort((a, b) => a.priority - b.priority);
+                  const confirmed = slots.filter((m) => m.status === "CONFIRMED").length;
+                  const badgeColor = confirmed >= slots.length ? "#7cf2a2" : "#fbbf24";
+                  return (
+                    <View key={role} style={{ marginBottom: 12 }}>
+                      {/* Role header */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <Text style={{ color: "#b3c6e0", fontSize: 14, fontWeight: "700" }}>{role}</Text>
+                        <View style={{
+                          borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1,
+                          borderWidth: 1, borderColor: badgeColor,
+                        }}>
+                          <Text style={{ color: badgeColor, fontSize: 11, fontWeight: "600" }}>
+                            {confirmed}/{slots.length} vaga{slots.length !== 1 ? "s" : ""}
+                          </Text>
+                        </View>
+                      </View>
+                      {/* Musician rows */}
                       {slots.map((m) => {
                         const sc = SLOT_COLOR[m.status] ?? "#8fa9c8";
                         return (
                           <View key={m.id} style={{
-                            flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-                            paddingVertical: 6, paddingHorizontal: 8,
-                            backgroundColor: "#0d1d2e", borderRadius: 6, marginBottom: 4,
-                            borderWidth: 1, borderColor: "#1e3a54",
+                            flexDirection: "row", alignItems: "center", gap: 6,
+                            padding: 8, backgroundColor: "rgba(15,33,55,0.7)",
+                            borderRadius: 8, borderWidth: 1, borderColor: "#2d4b6d", marginBottom: 4,
                           }}>
-                            <Text style={{ color: "#e8f2ff", fontSize: 13 }}>{m.user?.name ?? m.userId}</Text>
+                            <Text style={{ flex: 1, color: "#e8f2ff", fontSize: 13 }}>
+                              {m.user?.name ?? m.userId}
+                            </Text>
                             <View style={{
-                              borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
+                              borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2,
                               backgroundColor: sc + "22", borderWidth: 1, borderColor: sc,
                             }}>
                               <Text style={{ color: sc, fontSize: 10, fontWeight: "700" }}>
@@ -725,10 +746,10 @@ export function EventsScreen({
                         );
                       })}
                     </View>
-                  ))}
-                </>
-              );
-            })()}
+                  );
+                })}
+              </>
+            )}
           </View>
 
           {/* Ensaios */}
