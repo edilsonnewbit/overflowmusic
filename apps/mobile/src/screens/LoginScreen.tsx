@@ -131,27 +131,11 @@ export function LoginScreen({ onSubmit, statusText }: Props) {
         >
           {/* ── LOGO SECTION ─────────────────────────────────── */}
           <View style={{ alignItems: "center", paddingTop: 72, paddingBottom: 44 }}>
-            {/* Logo container — branco arredondado para a logo com fundo branco */}
-            <View style={{
-              width: 140,
-              height: 140,
-              borderRadius: 32,
-              backgroundColor: "#ffffff",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 24,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.4,
-              shadowRadius: 20,
-              elevation: 16,
-            }}>
-              <Image
-                source={require("../../assets/logo.png")}
-                style={{ width: 120, height: 120 }}
-                resizeMode="contain"
-              />
-            </View>
+            <Image
+              source={require("../../assets/logo.png")}
+              style={{ width: 160, height: 160, marginBottom: 16 }}
+              resizeMode="contain"
+            />
 
             {/* Tagline */}
             <Text style={{
@@ -162,13 +146,6 @@ export function LoginScreen({ onSubmit, statusText }: Props) {
             }}>
               Sua música, sua missão.
             </Text>
-
-            {/* Status text */}
-            {Boolean(statusText) && (
-              <Text style={{ marginTop: 12, fontSize: 13, color: "#1ecad3", textAlign: "center" }}>
-                {statusText}
-              </Text>
-            )}
           </View>
 
           {/* ── ACTIONS SECTION ──────────────────────────────── */}

@@ -26,6 +26,8 @@ type Props = {
   creatingEvent: boolean;
   onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string }) => Promise<void>;
   onDeleteEvent: (id: string) => Promise<void>;
+  focusMode?: boolean;
+  onExitFocusMode?: () => void;
 };
 
 function formatDate(iso: string) {
@@ -48,6 +50,8 @@ export function EventsScreen({
   creatingEvent,
   onUpdateEvent,
   onDeleteEvent,
+  focusMode = false,
+  onExitFocusMode,
 }: Props) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -160,41 +164,56 @@ export function EventsScreen({
   }
 
   const isBusy = reorderingId !== null || loadingSetlist;
+  const displayedEvents = focusMode && activeEventId
+    ? events.filter((e) => e.id === activeEventId)
+    : events;
 
   return (
     <View style={styles.card}>
       {/* ── Header row */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <Text style={styles.cardTitle}>Eventos</Text>
-        <Pressable
-          style={({ pressed }) => ([
-            {
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: showForm ? "#f28c8c" : "#2a6644",
-              backgroundColor: showForm ? "#2a1010" : "#0e2c1e",
-              opacity: pressed ? 0.75 : 1,
-            },
-          ])}
-          onPress={() => { setShowForm((v) => !v); setFormError(""); }}
-        >
-          <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 16, lineHeight: 20 }}>
-            {showForm ? "✕" : "+"}
-          </Text>
-          <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 13, fontWeight: "700" }}>
-            {showForm ? "Cancelar" : "Novo Evento"}
-          </Text>
-        </Pressable>
+        {focusMode ? (
+          <Pressable
+            onPress={onExitFocusMode}
+            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}
+          >
+            <Text style={{ color: "#1ecad3", fontSize: 18, lineHeight: 22 }}>←</Text>
+            <Text style={{ color: "#1ecad3", fontSize: 13, fontWeight: "600" }}>Todos os eventos</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.cardTitle}>Eventos</Text>
+        )}
+        {!focusMode && (
+          <Pressable
+            style={({ pressed }) => ([
+              {
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: showForm ? "#f28c8c" : "#2a6644",
+                backgroundColor: showForm ? "#2a1010" : "#0e2c1e",
+                opacity: pressed ? 0.75 : 1,
+              },
+            ])}
+            onPress={() => { setShowForm((v) => !v); setFormError(""); }}
+          >
+            <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 16, lineHeight: 20 }}>
+              {showForm ? "✕" : "+"}
+            </Text>
+            <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 13, fontWeight: "700" }}>
+              {showForm ? "Cancelar" : "Novo Evento"}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
-      <Text style={[styles.helper, { marginBottom: 8 }]}>{statusText}</Text>
+      {!focusMode && <Text style={[styles.helper, { marginBottom: 8 }]}>{statusText}</Text>}
 
-      {showForm && (
+      {!focusMode && showForm && (
         <View style={{ marginBottom: 12, gap: 6 }}>
           <TextInput
             style={formInputStyle}
@@ -264,10 +283,10 @@ export function EventsScreen({
 
       {loading ? (
         <ActivityIndicator color="#7cf2a2" style={{ marginTop: 12 }} />
-      ) : events.length === 0 ? (
+      ) : displayedEvents.length === 0 ? (
         <Text style={[styles.listItem, { textAlign: "center", color: "#4a6278", marginTop: 8 }]}>Nenhum evento encontrado.</Text>
       ) : (
-        events.map((ev) => {
+        displayedEvents.map((ev) => {
           const isActive = ev.id === activeEventId;
           const isEditing = editingEventId === ev.id;
           const statusColor = STATUS_COLOR[ev.computedStatus ?? ev.status] ?? "#8fa9c8";

@@ -56,7 +56,7 @@ export function HomeScreen() {
             },
           ]}
           onPress={() => {
-            void selectEvent(nextEvent.id).then(() => router.push("/(tabs)/events"));
+            void selectEvent(nextEvent.id).then(() => router.push({ pathname: "/(tabs)/events", params: { focus: "1" } }));
           }}
         >
           <Text style={styles.kicker}>Próximo Evento</Text>
@@ -160,7 +160,7 @@ export function HomeScreen() {
                   pressed && { opacity: 0.75 },
                 ]}
                 onPress={() => {
-                  void selectEvent(ev.id).then(() => router.push("/(tabs)/events"));
+                  void selectEvent(ev.id).then(() => router.push({ pathname: "/(tabs)/events", params: { focus: "1" } }));
                 }}
               >
                 <View style={{ flex: 1, gap: 2 }}>

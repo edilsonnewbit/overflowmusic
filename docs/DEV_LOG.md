@@ -2,6 +2,18 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-21 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Fix "ver cifra" no modo apresentação + paridade de eventos mobile vs web (status chips + músicos)
+- Feito:
+  - `apps/mobile/app/present.tsx`: `loadChart` não cria cache vazio quando fetchSongs falha (permite retry); `handleToggleCifra` com try/catch/finally — sempre abre o painel após tentativa
+  - `apps/mobile/src/lib/api.ts`: `updateEvent` recebe `status?: string` e `eventType?: string` no tipo de input
+  - `apps/mobile/src/context/SessionContext.tsx`: `handleUpdateEvent` e sua interface recebem `status?: string`
+  - `apps/mobile/src/screens/EventsScreen.tsx`: prop `onUpdateEvent` recebe `status?`; chips de status (DRAFT/ACTIVE/PUBLISHED/FINISHED) clicáveis no card de evento; seção "Músicos" agrupada por `instrumentRole` com badge de status (PENDING/CONFIRMED/DECLINED/EXPIRED)
+- Commits: `7c61d75`, `2c8d9e4`
+- APK: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` (EXIT:0)
+- Status: ✅ 0 erros TS, build OK
+- Próximo passo: subir Docker local e rodar `prisma db push` para aplicar coluna `photoUrl`
+
 ### [2026-04-20 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: (1) Todos os campos no perfil mobile; (2) Foto do Google exibida no web e mobile
 - Feito:

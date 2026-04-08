@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { SafeAreaView, ScrollView, Text, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import { EventsScreen } from "../../src/screens/EventsScreen";
 import { useSession } from "../../src/context/SessionContext";
 import { styles } from "../../src/styles";
@@ -22,6 +24,15 @@ export default function EventsTab() {
     handleUpdateEvent,
     handleDeleteEvent,
   } = useSession();
+
+  const { focus } = useLocalSearchParams<{ focus?: string }>();
+  const [focusMode, setFocusMode] = useState(false);
+
+  useEffect(() => {
+    if (focus === "1") {
+      setFocusMode(true);
+    }
+  }, [focus]);
 
   return (
     <SafeAreaView style={styles.root}>
@@ -58,6 +69,8 @@ export default function EventsTab() {
           creatingEvent={creatingEvent}
           onUpdateEvent={handleUpdateEvent}
           onDeleteEvent={handleDeleteEvent}
+          focusMode={focusMode}
+          onExitFocusMode={() => setFocusMode(false)}
         />
       </ScrollView>
     </SafeAreaView>
