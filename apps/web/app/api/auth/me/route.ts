@@ -16,6 +16,8 @@ export async function PATCH(request: NextRequest) {
       birthDate?: string | null;
       church?: string | null;
       pastorName?: string | null;
+      whatsapp?: string | null;
+      address?: string | null;
     };
 
     const payload: {
@@ -25,6 +27,8 @@ export async function PATCH(request: NextRequest) {
       birthDate?: string | null;
       church?: string | null;
       pastorName?: string | null;
+      whatsapp?: string | null;
+      address?: string | null;
     } = {};
     if (body.name && typeof body.name === "string" && body.name.trim()) {
       payload.name = body.name.trim();
@@ -36,6 +40,8 @@ export async function PATCH(request: NextRequest) {
     if ("birthDate" in body) payload.birthDate = body.birthDate ?? null;
     if ("church" in body) payload.church = body.church ?? null;
     if ("pastorName" in body) payload.pastorName = body.pastorName ?? null;
+    if ("whatsapp" in body) payload.whatsapp = body.whatsapp ?? null;
+    if ("address" in body) payload.address = body.address ?? null;
 
     const response = await serverApiFetch("auth/me", {
       method: "PATCH",

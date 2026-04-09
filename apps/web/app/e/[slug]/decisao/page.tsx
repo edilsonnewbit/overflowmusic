@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { maskPhone } from "@/lib/phone-mask";
 
 type DecisionType = "PRIMEIRA_VEZ" | "RECONSAGRACAO" | "BATISMO" | "OUTRO";
 type ChurchHelp = "WANTS_CHURCH" | "HAS_CHURCH" | "UNDECIDED";
@@ -224,7 +225,7 @@ export default function DecisaoPage({ params }: PageProps) {
             </div>
             <div>
               <label style={labelStyle}>WhatsApp *</label>
-              <input style={inputStyle} type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(11) 99999-9999" required />
+              <input style={inputStyle} type="tel" value={whatsapp} onChange={(e) => setWhatsapp(maskPhone(e.target.value))} placeholder="(11) 99999-9999" maxLength={16} required />
             </div>
             <div>
               <label style={labelStyle}>Cidade *</label>

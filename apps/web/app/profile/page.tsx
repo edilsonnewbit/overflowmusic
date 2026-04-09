@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthUser } from "@/lib/types";
+import { maskPhone } from "@/lib/phone-mask";
 
 // ─── Volunteer areas ──────────────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ export default function ProfilePage() {
         setBirthDate(u.birthDate ?? "");
         setChurch(u.church ?? "");
         setPastorName(u.pastorName ?? "");
-        setWhatsapp(u.whatsapp ?? "");
+        setWhatsapp(maskPhone(u.whatsapp ?? ""));
         setAddress(u.address ?? "");
       } catch {
         router.replace("/login");
@@ -291,8 +292,8 @@ export default function ProfilePage() {
             type="tel"
             placeholder="(11) 99999-9999"
             value={whatsapp}
-            onChange={(e) => setWhatsapp(e.target.value)}
-            maxLength={20}
+            onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
+            maxLength={16}
             disabled={saving}
             style={inputStyle}
           />
