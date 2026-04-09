@@ -29,7 +29,7 @@ type CreateEventInput = {
   responseWindowHours?: number;
 };
 
-type UpdateEventInput = Partial<CreateEventInput>;
+type UpdateEventInput = Partial<CreateEventInput> & { generateSlug?: boolean };
 
 type MusicianSlotInput = {
   instrumentRole: string;
@@ -183,6 +183,12 @@ export class EventsService {
       data.confirmationDeadline = input.confirmationDeadline ? new Date(input.confirmationDeadline) : null;
     } else if (input.confirmationDeadline === null) {
       data.confirmationDeadline = null;
+    }
+
+    // Gera slug se solicitado explicitamente e evento ainda não tem slug
+    if (input.generateSlug && !existing.slug) {
+      const titleForSlug = (data.title as string | undefined) ?? existing.title;
+      (data as Record<string, unknown>).slug = generateSlug(titleForSlug);
     }
 
     const event = await this.prisma.event.update({ where: { id }, data });
@@ -434,5 +440,35 @@ export class EventsService {
 
       await this.notifications.sendMusicianReminder(slot.userId, slot.event.title, slot.instrumentRole, slot.id);
     }
+  }
+
+  // ── Volunteers ──────────────────────────────────────────────────────────────
+
+  async listVolunteers(eventId: string) {
+    const volunteers = await this.prisma.eventVolunteer.findMany({
+      where: { eventId },
+      include: { user: { select: { id: true, name: true, volunteerArea: true } } },
+      orderBy: [{ volunteerArea: "asc" }, { createdAt: "asc" }],
+    });
+    return { ok: true, volunteers };
+  }
+
+  async addVolunteer(eventId: string, input: { userId: string; volunteerArea: string; role?: string }) {
+    const existing = await this.prisma.eventVolunteer.findFirst({
+      where: { eventId, userId: input.userId, volunteerArea: input.volunteerArea },
+    });
+    if (existing) {
+      throw new BadRequestException("Voluntário já escalado nesta área para este evento.");
+    }
+    const volunteer = await this.prisma.eventVolunteer.create({
+      data: { eventId, userId: input.userId, volunteerArea: input.volunteerArea, role: input.role ?? null },
+      include: { user: { select: { id: true, name: true, volunteerArea: true } } },
+    });
+    return { ok: true, volunteer };
+  }
+
+  async removeVolunteer(volunteerId: string) {
+    await this.prisma.eventVolunteer.delete({ where: { id: volunteerId } });
+    return { ok: true };
   }
 }

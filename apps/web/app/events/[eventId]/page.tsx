@@ -113,6 +113,8 @@ export default function EventDetailPage({ params }: PageProps) {
   const [editDescription, setEditDescription] = useState("");
   const [editConfirmationDeadline, setEditConfirmationDeadline] = useState("");
   const [saving, setSaving] = useState(false);
+  const [generatingSlug, setGeneratingSlug] = useState(false);
+  const [activeTab, setActiveTab] = useState<"setlist" | "musicos" | "voluntarios" | "ensaios" | "decisoes" | "chat">("setlist");
 
   // songs catalog
   const [songs, setSongs] = useState<SongOption[]>([]);
@@ -656,7 +658,17 @@ export default function EventDetailPage({ params }: PageProps) {
 
           {!loading && event && (
             <>
-              {/* Musician Team Section */}
+              {/* Navegação por Abas */}
+              <nav style={tabNavStyle}>
+                {(["setlist", "musicos", "voluntarios", "ensaios", "decisoes", "chat"] as const).map((tab) => (
+                  <button key={tab} style={activeTab === tab ? activeTabBtnStyle : tabBtnStyle} onClick={() => setActiveTab(tab)}>
+                    {({ setlist: "🎵 Setlist", musicos: "🎸 Músicos", voluntarios: "👥 Voluntários", ensaios: "📝 Ensaios", decisoes: "📋 Decisões", chat: "💬 Chat" } as Record<string, string>)[tab]}
+                  </button>
+                ))}
+              </nav>
+
+              {/* Aba: Músicos */}
+              {activeTab === "musicos" && (
               <section style={{ ...sectionStyle, marginBottom: 16 }}>
                 <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>Equipe de Músicos</h2>
 
@@ -752,8 +764,13 @@ export default function EventDetailPage({ params }: PageProps) {
                   </button>
                 </form>
               </section>
+              )} {/* /musicos */}
 
-              {/* Setlist */}
+              {/* Aba: Voluntários */}
+              {activeTab === "voluntarios" && eventId && <VolunteersSection eventId={eventId} teamUsers={teamUsers} />}
+
+              {/* Aba: Setlist */}
+              {activeTab === "setlist" && (<>
               <section style={sectionStyle}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <h2 style={{ margin: 0, fontSize: 18, color: "#7cf2a2" }}>
@@ -1034,52 +1051,84 @@ export default function EventDetailPage({ params }: PageProps) {
                   → Ver Checklists do evento
                 </Link>
               </section>
+              </>)} {/* /setlist */}
 
-              {/* Ensaios */}
-              {eventId && <RehearsalsSection eventId={eventId} />}
+              {/* Aba: Ensaios */}
+              {activeTab === "ensaios" && eventId && <RehearsalsSection eventId={eventId} />}
 
-              {/* QR Code — Formulário de Decisões */}
-              {event.slug && (() => {
-                const decisaoUrl = typeof window !== "undefined"
-                  ? `${window.location.origin}/e/${event.slug}/decisao`
-                  : `https://music.overflowmvmt.com/e/${event.slug}/decisao`;
-                return (
-                  <section style={{ ...sectionStyle, marginTop: 16 }}>
-                    <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>📋 Formulário de Decisões</h2>
-                    <p style={{ color: "#8fa9c8", fontSize: 13, margin: "0 0 16px", lineHeight: 1.5 }}>
-                      Apresente este QR Code durante o evento para registrar decisões de fé dos presentes.
+              {/* Aba: Decisões */}
+              {activeTab === "decisoes" && (
+              <section style={{ ...sectionStyle, marginTop: 16 }}>
+                <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>📋 Formulário de Decisões</h2>
+                {event.slug ? (() => {
+                  const decisaoUrl = typeof window !== "undefined"
+                    ? `${window.location.origin}/e/${event.slug}/decisao`
+                    : `https://music.overflowmvmt.com/e/${event.slug}/decisao`;
+                  return (
+                    <>
+                      <p style={{ color: "#8fa9c8", fontSize: 13, margin: "0 0 16px", lineHeight: 1.5 }}>
+                        Apresente este QR Code durante o evento para registrar decisões de fé dos presentes.
+                      </p>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
+                        <div style={{ background: "#ffffff", padding: 12, borderRadius: 12, display: "inline-block" }}>
+                          <QRCodeCanvas url={decisaoUrl} size={180} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                          <p style={{ color: "#b3c6e0", fontSize: 12, margin: "0 0 8px", wordBreak: "break-all" }}>
+                            🔗 {decisaoUrl}
+                          </p>
+                          <a
+                            href={decisaoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 12, color: "#60a5fa", textDecoration: "none", border: "1px solid #60a5fa", borderRadius: 6, padding: "4px 12px", display: "inline-block", marginBottom: 8 }}
+                          >
+                            Abrir formulário ↗
+                          </a>
+                          <br />
+                          <Link
+                            href={`/admin/decisoes?eventId=${eventId}`}
+                            style={{ fontSize: 12, color: "#7cf2a2", textDecoration: "none", border: "1px solid #7cf2a2", borderRadius: 6, padding: "4px 12px", display: "inline-block" }}
+                          >
+                            Ver respostas →
+                          </Link>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })() : (
+                  <>
+                    <p style={{ color: "#8fa9c8", fontSize: 13, margin: "0 0 12px", lineHeight: 1.5 }}>
+                      Este evento ainda não tem um link de decisões gerado. Clique abaixo para criar o QR Code.
                     </p>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
-                      <div style={{ background: "#ffffff", padding: 12, borderRadius: 12, display: "inline-block" }}>
-                        <QRCodeCanvas url={decisaoUrl} size={180} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 200 }}>
-                        <p style={{ color: "#b3c6e0", fontSize: 12, margin: "0 0 8px", wordBreak: "break-all" }}>
-                          🔗 {decisaoUrl}
-                        </p>
-                        <a
-                          href={decisaoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ fontSize: 12, color: "#60a5fa", textDecoration: "none", border: "1px solid #60a5fa", borderRadius: 6, padding: "4px 12px", display: "inline-block", marginBottom: 8 }}
-                        >
-                          Abrir formulário ↗
-                        </a>
-                        <br />
-                        <Link
-                          href={`/admin/decisoes?eventId=${eventId}`}
-                          style={{ fontSize: 12, color: "#7cf2a2", textDecoration: "none", border: "1px solid #7cf2a2", borderRadius: 6, padding: "4px 12px", display: "inline-block" }}
-                        >
-                          Ver respostas →
-                        </Link>
-                      </div>
-                    </div>
-                  </section>
-                );
-              })()}
+                    <button
+                      style={smallBtn("#7cf2a2")}
+                      disabled={generatingSlug}
+                      onClick={async () => {
+                        if (!eventId) return;
+                        setGeneratingSlug(true);
+                        try {
+                          await fetch(`/api/events/${eventId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ generateSlug: true }),
+                          });
+                          await loadEvent(eventId);
+                        } finally {
+                          setGeneratingSlug(false);
+                        }
+                      }}
+                    >
+                      {generatingSlug ? "Gerando..." : "🔗 Gerar QR Code"}
+                    </button>
+                  </>
+                )}
+              </section>
 
-              {/* Chat do Evento */}
-              {eventId && authUser && (
+              )} {/* /decisoes */}
+
+              {/* Aba: Chat */}
+              {activeTab === "chat" && eventId && authUser && (
                 <section style={{ ...sectionStyle, marginTop: 16 }}>
                   <EventChat
                     eventId={eventId}
@@ -1097,6 +1146,39 @@ export default function EventDetailPage({ params }: PageProps) {
     </AuthGate>
   );
 }
+
+const tabNavStyle: CSSProperties = {
+  display: "flex",
+  gap: 4,
+  marginBottom: 16,
+  background: "rgba(10, 22, 38, 0.6)",
+  borderRadius: 12,
+  padding: "6px",
+  border: "1px solid #2d4b6d",
+  flexWrap: "wrap",
+};
+
+const tabBtnStyle: CSSProperties = {
+  background: "transparent",
+  border: "none",
+  color: "#8fa9c8",
+  borderRadius: 8,
+  padding: "7px 16px",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const activeTabBtnStyle: CSSProperties = {
+  background: "#1b3756",
+  border: "1px solid #2d4b6d",
+  color: "#7cf2a2",
+  borderRadius: 8,
+  padding: "7px 16px",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+};
 
 const headerStyle: CSSProperties = {
   background: "linear-gradient(135deg, #1b3756 0%, #122840 55%, #0f2137 100%)",
@@ -1227,7 +1309,159 @@ function smallBtn(color: string): CSSProperties {
   };
 }
 
-// ── Rehearsals Section ────────────────────────────────────────────────────────
+// ── Volunteers Section ──────────────────────────────────────────────────────
+
+const VOLUNTEER_AREAS_WEB: Record<string, { label: string; skills: string[] }> = {
+  MIDIA:       { label: "Mídia",       skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides", "Iluminação", "Som/PA"] },
+  DANCA:       { label: "Dança",       skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"] },
+  INTERCESSAO: { label: "Intercessão", skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"] },
+  SUPORTE:     { label: "Suporte",     skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"] },
+};
+
+type VolunteerItem = {
+  id: string;
+  volunteerArea: string;
+  role: string | null;
+  status: string;
+  user: { id: string; name: string; volunteerArea: string | null };
+};
+
+function VolunteersSection({ eventId, teamUsers }: { eventId: string; teamUsers: { id: string; name: string; role: string; instruments: string[] }[] }) {
+  const [volunteers, setVolunteers] = useState<VolunteerItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [selArea, setSelArea] = useState(Object.keys(VOLUNTEER_AREAS_WEB)[0]);
+  const [selUserId, setSelUserId] = useState("");
+  const [selRole, setSelRole] = useState("");
+
+  useEffect(() => { void load(); }, [eventId]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/volunteers`);
+      const body = (await res.json()) as { ok: boolean; volunteers?: VolunteerItem[] };
+      setVolunteers(body.volunteers ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selUserId) return;
+    setAdding(true);
+    setStatus("");
+    try {
+      const res = await fetch(`/api/events/${eventId}/volunteers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: selUserId, volunteerArea: selArea, role: selRole.trim() || undefined }),
+      });
+      const body = (await res.json()) as { ok: boolean; message?: string };
+      if (!body.ok) throw new Error(body.message);
+      setSelUserId("");
+      setSelRole("");
+      await load();
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao adicionar.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function remove(id: string) {
+    setRemovingId(id);
+    try {
+      await fetch(`/api/events/${eventId}/volunteers/${id}`, { method: "DELETE" });
+      setVolunteers((prev) => prev.filter((v) => v.id !== id));
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  // Group by area
+  const grouped = Object.entries(VOLUNTEER_AREAS_WEB).map(([key, cfg]) => ({
+    key, label: cfg.label,
+    items: volunteers.filter((v) => v.volunteerArea === key),
+  })).filter((g) => g.items.length > 0);
+
+  const areaSkills = VOLUNTEER_AREAS_WEB[selArea]?.skills ?? [];
+
+  return (
+    <section style={{ ...sectionStyle, marginTop: 0 }}>
+      <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>Voluntários</h2>
+
+      {loading ? (
+        <p style={{ color: "#5a7a9a", fontSize: 13 }}>Carregando...</p>
+      ) : grouped.length === 0 ? (
+        <p style={{ color: "#5a7a9a", fontSize: 13 }}>Nenhum voluntário escalado ainda.</p>
+      ) : (
+        grouped.map((g) => (
+          <div key={g.key} style={{ marginBottom: 16 }}>
+            <p style={{ margin: "0 0 8px", fontWeight: 700, color: "#b3c6e0", fontSize: 14 }}>{g.label}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {g.items.map((v) => (
+                <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", background: "rgba(15,33,55,0.7)", borderRadius: 8, border: "1px solid #2d4b6d" }}>
+                  <span style={{ flex: 1, fontSize: 13 }}>{v.user.name}</span>
+                  {v.role && <span style={{ fontSize: 11, color: "#8fa9c8", border: "1px solid #2d4b6d", borderRadius: 5, padding: "1px 7px" }}>{v.role}</span>}
+                  <button style={deleteBtn} disabled={removingId === v.id} onClick={() => void remove(v.id)}>
+                    {removingId === v.id ? "..." : "✕"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+
+      {/* Formulário de adição */}
+      <form onSubmit={(e) => void add(e)} style={{ ...addFormStyle, marginTop: 16 }}>
+        <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#7cf2a2" }}>+ Adicionar voluntário</p>
+        {status && <p style={{ color: "#f87171", fontSize: 12, margin: "0 0 4px" }}>{status}</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <select
+            style={{ ...inputStyle, appearance: "none" as const }}
+            value={selArea}
+            onChange={(e) => { setSelArea(e.target.value); setSelRole(""); setSelUserId(""); }}
+            disabled={adding}
+          >
+            {Object.entries(VOLUNTEER_AREAS_WEB).map(([key, cfg]) => (
+              <option key={key} value={key}>{cfg.label}</option>
+            ))}
+          </select>
+          <select
+            style={{ ...inputStyle, appearance: "none" as const }}
+            value={selUserId}
+            onChange={(e) => setSelUserId(e.target.value)}
+            disabled={adding}
+          >
+            <option value="">Selecionar membro</option>
+            {teamUsers.map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+          <select
+            style={{ ...inputStyle, appearance: "none" as const }}
+            value={selRole}
+            onChange={(e) => setSelRole(e.target.value)}
+            disabled={adding}
+          >
+            <option value="">Função (opcional)</option>
+            {areaSkills.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <button type="submit" style={primaryBtn} disabled={adding || !selUserId}>
+          {adding ? "Adicionando..." : "Adicionar"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+// ── Rehearsals Section ──────────────────────────────────────────────────────
 
 type RehearsalItem = {
   id: string;

@@ -18,7 +18,7 @@ const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: string; skil
   MIDIA: {
     label: "Mídia",
     icon: "🎬",
-    skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides/ProPresenter", "Iluminação", "Som/PA"],
+    skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides", "Iluminação", "Som/PA"],
   },
   DANCA: {
     label: "Dança",
