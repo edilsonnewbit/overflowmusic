@@ -5,23 +5,84 @@ const API_INTERNAL =
   process.env.NEXT_PUBLIC_API_URL ||
   "https://music.overflowmvmt.com/api";
 
+// ─── Rate limiter simples por IP ──────────────────────────────────────────────
+// Funciona bem para instância única em Docker. Limite: 3 envios por IP por hora.
+
+const RATE_LIMIT = 3;
+const WINDOW_MS = 60 * 60 * 1000; // 1 hora
+
+const submissionMap = new Map<string, { count: number; resetAt: number }>();
+
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; retryAfterSeconds?: number } {
+  const now = Date.now();
+  const entry = submissionMap.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    submissionMap.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return { allowed: true };
+  }
+
+  if (entry.count >= RATE_LIMIT) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.ceil((entry.resetAt - now) / 1000),
+    };
+  }
+
+  entry.count++;
+  return { allowed: true };
+}
+
+// Limpa entradas expiradas periodicamente para não acumular memória
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of submissionMap.entries()) {
+    if (now > entry.resetAt) submissionMap.delete(ip);
+  }
+}, WINDOW_MS);
+
+// ─── Route handler ────────────────────────────────────────────────────────────
+
 /**
  * POST /api/audicao
  * Proxy público para POST /api/auditions no backend.
- * Repassa o multipart/form-data sem modificação.
+ * Aplica rate limiting por IP antes de repassar.
  */
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const { allowed, retryAfterSeconds } = checkRateLimit(ip);
+
+  if (!allowed) {
+    return NextResponse.json(
+      { ok: false, message: "Muitas tentativas. Tente novamente em alguns minutos." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfterSeconds) },
+      }
+    );
+  }
+
   try {
-    const formData = await request.formData();
-
     const target = `${API_INTERNAL.replace(/\/$/, "")}/auditions`;
+    const contentType = request.headers.get("content-type") ?? "";
 
-    const response = await fetch(target, {
+    // Repassa o stream diretamente — evita carregar o vídeo inteiro em memória
+    const fetchOptions: RequestInit & { duplex?: string } = {
       method: "POST",
-      body: formData,
-      // Não setar Content-Type manualmente — o browser/node define o boundary correto
-    });
+      body: request.body,
+      headers: { "content-type": contentType },
+      duplex: "half",
+    };
 
+    const response = await fetch(target, fetchOptions);
     const body = await response.json();
     return NextResponse.json(body, { status: response.status });
   } catch (error) {
