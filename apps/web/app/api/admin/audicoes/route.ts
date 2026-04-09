@@ -1,0 +1,13 @@
+import { NextRequest, NextResponse } from "next/server";
+import { serverApiFetch } from "@/lib/server-api";
+
+export async function GET(_request: NextRequest) {
+  try {
+    const response = await serverApiFetch("auditions", { method: "GET", authMode: "admin" });
+    const body = await response.json();
+    return NextResponse.json(body, { status: response.status });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "internal error";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
+}

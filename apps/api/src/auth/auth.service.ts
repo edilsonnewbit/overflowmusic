@@ -3,7 +3,7 @@ import { createHmac, randomBytes, scrypt } from "node:crypto";
 import { promisify } from "node:util";
 import { EmailService } from "../email/email.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { AuthUser, AccessTokenPayload, UserRole } from "./auth.types";
+import { AuthUser, AccessTokenPayload, UserRole, VOLUNTEER_AREAS } from "./auth.types";
 
 const scryptAsync = promisify(scrypt);
 
@@ -34,6 +34,7 @@ type DbUserRecord = {
   role: string;
   status: string;
   instruments: string[];
+  volunteerArea: string | null;
   instagramProfile: string | null;
   birthDate: Date | null;
   church: string | null;
@@ -178,6 +179,8 @@ export class AuthService implements OnModuleInit {
     email: string;
     password: string;
     name: string;
+    volunteerArea?: string;
+    instruments?: string[];
     instagramProfile?: string;
     birthDate?: string;
     church?: string;
@@ -214,6 +217,11 @@ export class AuthService implements OnModuleInit {
     const volunteerTermsAcceptedAt = new Date();
     const VOLUNTEER_TERMS_VERSION = "1.0-2026";
 
+    const volunteerArea = (input.volunteerArea || "").trim() || null;
+    if (volunteerArea && !(volunteerArea in VOLUNTEER_AREAS)) {
+      throw new BadRequestException("Invalid volunteerArea");
+    }
+
     // Create user
     const user = await this.prisma.user.create({
       data: {
@@ -223,6 +231,8 @@ export class AuthService implements OnModuleInit {
         emailVerified: false,
         role: "MEMBER",
         status: "PENDING_APPROVAL",
+        volunteerArea,
+        instruments: Array.isArray(input.instruments) ? input.instruments : [],
         instagramProfile: (input.instagramProfile || "").trim() || null,
         birthDate: input.birthDate ? new Date(input.birthDate) : null,
         church: (input.church || "").trim() || null,
@@ -533,6 +543,7 @@ export class AuthService implements OnModuleInit {
   async updateMe(accessToken: string, data: {
     name?: string;
     instruments?: string[];
+    volunteerArea?: string | null;
     instagramProfile?: string | null;
     birthDate?: string | null;
     church?: string | null;
@@ -554,6 +565,7 @@ export class AuthService implements OnModuleInit {
     const updateData: {
       name: string;
       instruments?: string[];
+      volunteerArea?: string | null;
       instagramProfile?: string | null;
       birthDate?: Date | null;
       church?: string | null;
@@ -563,6 +575,13 @@ export class AuthService implements OnModuleInit {
     } = { name };
 
     if (Array.isArray(data.instruments)) updateData.instruments = data.instruments;
+    if (data.volunteerArea !== undefined) {
+      const area = (data.volunteerArea || "").trim() || null;
+      if (area && !(area in VOLUNTEER_AREAS)) {
+        throw new BadRequestException("Invalid volunteerArea");
+      }
+      updateData.volunteerArea = area;
+    }
     if (data.instagramProfile !== undefined) updateData.instagramProfile = (data.instagramProfile || "").trim() || null;
     if (data.birthDate !== undefined) updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     if (data.church !== undefined) updateData.church = (data.church || "").trim() || null;
@@ -580,16 +599,23 @@ export class AuthService implements OnModuleInit {
 
   async adminUpdateUser(
     userId: string,
-    data: { role?: UserRole; instruments?: string[] },
+    data: { role?: UserRole; instruments?: string[]; volunteerArea?: string | null },
   ): Promise<{ ok: true; user: AuthUser }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new BadRequestException("user not found");
     }
 
-    const updateData: { role?: UserRole; instruments?: string[] } = {};
+    const updateData: { role?: UserRole; instruments?: string[]; volunteerArea?: string | null } = {};
     if (data.role) updateData.role = data.role;
     if (Array.isArray(data.instruments)) updateData.instruments = data.instruments;
+    if (data.volunteerArea !== undefined) {
+      const area = (data.volunteerArea || "").trim() || null;
+      if (area && !(area in VOLUNTEER_AREAS)) {
+        throw new BadRequestException("Invalid volunteerArea");
+      }
+      updateData.volunteerArea = area;
+    }
 
     const updated = await this.prisma.user.update({
       where: { id: userId },
@@ -745,6 +771,7 @@ export class AuthService implements OnModuleInit {
       role: user.role as UserRole,
       status: user.status as AuthUser["status"],
       instruments: user.instruments ?? [],
+      volunteerArea: user.volunteerArea ?? null,
       instagramProfile: user.instagramProfile ?? null,
       birthDate: user.birthDate ? user.birthDate.toISOString().split("T")[0] : null,
       church: user.church ?? null,

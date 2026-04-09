@@ -81,6 +81,9 @@ export type Song = {
   defaultKey: string | null;
   zone: string | null;
   tags: string[] | null;
+  youtubeUrl: string | null;
+  spotifyUrl: string | null;
+  driveUrl: string | null;
   chordCharts: SongChordChart[];
 };
 

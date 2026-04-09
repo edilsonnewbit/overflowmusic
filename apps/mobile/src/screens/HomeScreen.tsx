@@ -56,7 +56,7 @@ export function HomeScreen() {
             },
           ]}
           onPress={() => {
-            void selectEvent(nextEvent.id).then(() => router.push("/(tabs)/events"));
+            void selectEvent(nextEvent.id).then(() => router.push({ pathname: "/(tabs)/events", params: { focus: "1" } }));
           }}
         >
           <Text style={styles.kicker}>Próximo Evento</Text>
@@ -142,6 +142,19 @@ export function HomeScreen() {
             <Text style={shortcutSub}>Palco</Text>
           </Pressable>
         )}
+
+        <Pressable
+          style={({ pressed }) => [
+            shortcutCard,
+            { backgroundColor: "#1a1230", borderColor: "#3a2660" },
+            pressed && { opacity: 0.75 },
+          ]}
+          onPress={() => router.push("/audicao")}
+        >
+          <Text style={{ fontSize: 28 }}>🎤</Text>
+          <Text style={[shortcutLabel, { color: "#c084fc" }]}>Audição</Text>
+          <Text style={shortcutSub}>Inscreva-se</Text>
+        </Pressable>
       </View>
 
       {/* Prox eventos — lista */}
@@ -160,7 +173,7 @@ export function HomeScreen() {
                   pressed && { opacity: 0.75 },
                 ]}
                 onPress={() => {
-                  void selectEvent(ev.id).then(() => router.push("/(tabs)/events"));
+                  void selectEvent(ev.id).then(() => router.push({ pathname: "/(tabs)/events", params: { focus: "1" } }));
                 }}
               >
                 <View style={{ flex: 1, gap: 2 }}>

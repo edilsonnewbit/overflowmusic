@@ -13,6 +13,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
+import { Audio } from "expo-av";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "../src/context/SessionContext";
@@ -100,6 +101,13 @@ export default function PresentScreen() {
   const [metroBeat, setMetroBeat] = useState(-1);
   const metroIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const metroBeatCountRef = useRef(0);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  // Fullscreen cifra
+  const [cifraFullscreen, setCifraFullscreen] = useState(false);
+  const [showChords, setShowChords] = useState(true);
+  const [showCifraControls, setShowCifraControls] = useState(true);
+  const cifraControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Stable refs to avoid stale closures in PanResponder
   const currentRef = useRef(current);
@@ -153,6 +161,14 @@ export default function PresentScreen() {
     setCurrentRawText(null);
   }, [current]);
 
+  // ── Click sound player ────────────────────────────────────────────────────
+  const playClick = useCallback((accent: boolean) => {
+    Vibration.vibrate(accent ? 25 : 10);
+    if (soundRef.current) {
+      void soundRef.current.setPositionAsync(0).then(() => soundRef.current?.playAsync());
+    }
+  }, []);
+
   // ── Metronome engine ──────────────────────────────────────────────────────
   useEffect(() => {
     if (metroIntervalRef.current) {
@@ -166,17 +182,43 @@ export default function PresentScreen() {
     const intervalMs = Math.round(60000 / metroBpm);
     metroBeatCountRef.current = 0;
     setMetroBeat(0);
-    Vibration.vibrate(40);
+    playClick(true);
     metroIntervalRef.current = setInterval(() => {
       metroBeatCountRef.current += 1;
       const beat = metroBeatCountRef.current % 4;
       setMetroBeat(beat);
-      Vibration.vibrate(beat === 0 ? 60 : 30);
+      playClick(beat === 0);
     }, intervalMs);
     return () => {
       if (metroIntervalRef.current) clearInterval(metroIntervalRef.current);
     };
-  }, [metroOn, metroBpm]);
+  }, [metroOn, metroBpm, playClick]);
+
+  // ── Metronome sound loading ───────────────────────────────────────────────
+  useEffect(() => {
+    void (async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { sound } = await Audio.Sound.createAsync(require("../../assets/click.wav"));
+        soundRef.current = sound;
+      } catch {
+        // Vibration-only fallback if audio unavailable
+      }
+    })();
+    return () => { void soundRef.current?.unloadAsync(); };
+  }, []);
+
+  // ── Fullscreen controls visibility ───────────────────────────────────────
+  const showControlsTemporarily = useCallback(() => {
+    setShowCifraControls(true);
+    if (cifraControlsTimerRef.current) clearTimeout(cifraControlsTimerRef.current);
+    cifraControlsTimerRef.current = setTimeout(() => setShowCifraControls(false), 3000);
+  }, []);
 
   // ── Auto-hide nav ─────────────────────────────────────────────────────────
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -237,6 +279,10 @@ export default function PresentScreen() {
     // Lazy-load the songs list to look up song IDs by title
     if (!songIdCache.current) {
       const res = await fetchSongs();
+      if (!res.ok || res.songs.length === 0) {
+        // Do NOT cache: allow retry on next attempt
+        return { parsed: null, rawText: null };
+      }
       const map = new Map<string, string>();
       for (const s of res.songs) {
         map.set(s.title.toLowerCase().trim(), s.id);
@@ -246,6 +292,7 @@ export default function PresentScreen() {
 
     const songId = songIdCache.current.get(key);
     if (!songId) {
+      // Song not in catalog — cache the miss so we don't re-fetch the list
       const empty = { parsed: null, rawText: null };
       chartCache.current.set(key, empty);
       return empty;
@@ -275,16 +322,22 @@ export default function PresentScreen() {
       const cached = chartCache.current.get(cacheKey)!;
       setCurrentChart(cached.parsed);
       setCurrentRawText(cached.rawText);
-      if (cached.parsed || cached.rawText) setShowCifra(true);
+      setShowCifra(true); // always open — cifra view handles "sem cifra"
       return;
     }
 
     setLoadingCifra(true);
-    const result = await loadChart(item.songTitle);
-    setLoadingCifra(false);
-    setCurrentChart(result.parsed);
-    setCurrentRawText(result.rawText);
-    if (result.parsed || result.rawText) setShowCifra(true);
+    try {
+      const result = await loadChart(item.songTitle);
+      setCurrentChart(result.parsed);
+      setCurrentRawText(result.rawText);
+    } catch {
+      setCurrentChart(null);
+      setCurrentRawText(null);
+    } finally {
+      setLoadingCifra(false);
+      setShowCifra(true); // always open after load attempt
+    }
   }
 
   // ── Empty setlist guard ───────────────────────────────────────────────────
@@ -321,7 +374,7 @@ export default function PresentScreen() {
       {/* ── Main content area (swipe + tap to toggle nav) ──────────────── */}
       <View style={styles.mainArea} {...panResponder.panHandlers}>
         <Pressable style={{ flex: 1 }} onPress={resetNavTimer}>
-          <View style={styles.centerContent}>
+            <View style={[styles.centerContent, showCifra && styles.centerContentCifra]}>
             {/* Position counter */}
             <Text style={styles.posText}>
               {current + 1} / {sortedItems.length}
@@ -370,9 +423,10 @@ export default function PresentScreen() {
                   )}
                 </Pressable>
               </>
-            ) : (
-              /* ── Chord chart view ───────────────────────────────────── */
+            ) : cifraFullscreen ? null : (
+              /* ── Chord chart view (non-fullscreen) ─────────────────── */
               <View style={styles.cifraContainer}>
+                {/* Header */}
                 <View style={styles.cifraHeader}>
                   <Text style={styles.cifraTitleText} numberOfLines={1}>
                     {item.songTitle}
@@ -382,100 +436,73 @@ export default function PresentScreen() {
                   </Pressable>
                 </View>
 
-                {/* ── Controls toolbar ─────────────────────────────────── */}
+                {/* ── Toolbar row 1: font / vel / play / fullscreen / accordes ── */}
                 <View style={styles.cifraToolbar}>
-                  {/* Font size */}
                   <View style={styles.toolbarGroup}>
-                    <Pressable
-                      style={styles.toolBtn}
-                      onPress={() => setFontSize((s) => Math.max(10, s - 2))}
-                    >
+                    <Pressable style={styles.toolBtn} onPress={() => setFontSize((s) => Math.max(10, s - 2))}>
                       <Text style={styles.toolBtnText}>A-</Text>
                     </Pressable>
                     <Text style={styles.toolLabel}>{fontSize}px</Text>
-                    <Pressable
-                      style={styles.toolBtn}
-                      onPress={() => setFontSize((s) => Math.min(28, s + 2))}
-                    >
+                    <Pressable style={styles.toolBtn} onPress={() => setFontSize((s) => Math.min(28, s + 2))}>
                       <Text style={styles.toolBtnText}>A+</Text>
                     </Pressable>
                   </View>
-
-                  {/* Scroll speed */}
                   <View style={styles.toolbarGroup}>
-                    <Pressable
-                      style={styles.toolBtn}
-                      onPress={() => setScrollSpeed((s) => Math.max(1, s - 1))}
-                    >
+                    <Pressable style={styles.toolBtn} onPress={() => setScrollSpeed((s) => Math.max(1, s - 1))}>
                       <Text style={styles.toolBtnText}>▼</Text>
                     </Pressable>
                     <Text style={styles.toolLabel}>vel {scrollSpeed}</Text>
-                    <Pressable
-                      style={styles.toolBtn}
-                      onPress={() => setScrollSpeed((s) => Math.min(10, s + 1))}
-                    >
+                    <Pressable style={styles.toolBtn} onPress={() => setScrollSpeed((s) => Math.min(10, s + 1))}>
                       <Text style={styles.toolBtnText}>▲</Text>
                     </Pressable>
                   </View>
-
-                  {/* Play/stop */}
                   <Pressable
                     style={[styles.toolBtn, autoScrolling && styles.toolBtnActive]}
                     onPress={() => (autoScrolling ? stopAutoScroll() : startAutoScroll())}
                   >
                     <Text style={styles.toolBtnText}>{autoScrolling ? "⏹" : "▶"}</Text>
                   </Pressable>
+                  {/* Fullscreen */}
+                  <Pressable
+                    style={styles.toolBtn}
+                    onPress={() => { setCifraFullscreen(true); showControlsTemporarily(); }}
+                  >
+                    <Text style={styles.toolBtnText}>⛶</Text>
+                  </Pressable>
+                  {/* Sem acordes */}
+                  <Pressable
+                    style={[styles.toolBtn, !showChords && styles.toolBtnActive]}
+                    onPress={() => setShowChords((v) => !v)}
+                  >
+                    <Text style={styles.toolBtnText}>♪</Text>
+                  </Pressable>
                 </View>
 
-                {/* ── Row 2: Transpose + Metronome ─────────────────────── */}
+                {/* ── Toolbar row 2: Transpose + Metronome ─────────────── */}
                 <View style={styles.cifraToolbar2}>
-                  {/* Transpose */}
                   <View style={styles.toolbarGroup}>
-                    <Pressable
-                      style={styles.toolBtn}
-                      onPress={() => setTransposeSemitones((s) => s - 1)}
-                    >
+                    <Pressable style={styles.toolBtn} onPress={() => setTransposeSemitones((s) => s - 1)}>
                       <Text style={styles.toolBtnText}>−</Text>
                     </Pressable>
-                    <Pressable
-                      style={styles.toolBtnNeutral}
-                      onPress={() => setTransposeSemitones(0)}
-                    >
+                    <Pressable style={styles.toolBtnNeutral} onPress={() => setTransposeSemitones(0)}>
                       <Text style={styles.toolLabelAccent}>
-                        {transposeSemitones === 0
-                          ? "Tom ×"
-                          : `${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}`}
+                        {transposeSemitones === 0 ? "Tom ×" : `${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}`}
                       </Text>
                     </Pressable>
-                    <Pressable
-                      style={styles.toolBtn}
-                      onPress={() => setTransposeSemitones((s) => s + 1)}
-                    >
+                    <Pressable style={styles.toolBtn} onPress={() => setTransposeSemitones((s) => s + 1)}>
                       <Text style={styles.toolBtnText}>+</Text>
                     </Pressable>
                   </View>
-
-                  {/* Metronome */}
                   <View style={styles.toolbarGroup}>
-                    <Pressable
-                      style={styles.toolBtn}
-                      onPress={() => setMetroBpm((b) => Math.max(40, b - 5))}
-                    >
+                    <Pressable style={styles.toolBtn} onPress={() => setMetroBpm((b) => Math.max(40, b - 5))}>
                       <Text style={styles.toolBtnText}>−</Text>
                     </Pressable>
-                    <Pressable
-                      style={[styles.toolBtn, metroOn && styles.toolBtnActive]}
-                      onPress={() => setMetroOn((v) => !v)}
-                    >
+                    <Pressable style={[styles.toolBtn, metroOn && styles.toolBtnActive]} onPress={() => setMetroOn((v) => !v)}>
                       <Text style={styles.toolBtnText}>♩{metroBpm}</Text>
                     </Pressable>
-                    <Pressable
-                      style={styles.toolBtn}
-                      onPress={() => setMetroBpm((b) => Math.min(240, b + 5))}
-                    >
+                    <Pressable style={styles.toolBtn} onPress={() => setMetroBpm((b) => Math.min(240, b + 5))}>
                       <Text style={styles.toolBtnText}>+</Text>
                     </Pressable>
-                    {/* Beat dots */}
                     <View style={styles.beatDots}>
                       {[0, 1, 2, 3].map((i) => (
                         <View
@@ -490,6 +517,7 @@ export default function PresentScreen() {
                   </View>
                 </View>
 
+                {/* ── Cifra ScrollView ─────────────────────────────────── */}
                 <ScrollView
                   ref={scrollViewRef}
                   style={styles.cifraScroll}
@@ -505,36 +533,31 @@ export default function PresentScreen() {
                   {currentChart?.sections.map((section, si) => (
                     <View key={si} style={styles.cifraSection}>
                       <Text style={styles.cifraSectionName}>[{section.name}]</Text>
-                      {section.lines.map((line, li) => (
-                        <Text
-                          key={li}
-                          style={[
-                            line.type === "chords" ? styles.chordLine : styles.lyricLine,
-                            { fontSize },
-                            { lineHeight: fontSize * 1.55 },
-                          ]}
-                        >
-                          {line.type === "chords"
-                            ? transposeChordLine(line.content || " ", transposeSemitones)
-                            : (line.content || " ")}
-                        </Text>
-                      ))}
+                      {section.lines.map((line, li) =>
+                        !showChords && line.type === "chords" ? null : (
+                          <Text
+                            key={li}
+                            style={[
+                              line.type === "chords" ? styles.chordLine : styles.lyricLine,
+                              { fontSize },
+                              { lineHeight: fontSize * 1.55 },
+                            ]}
+                          >
+                            {line.type === "chords"
+                              ? transposeChordLine(line.content || " ", transposeSemitones)
+                              : (line.content || " ")}
+                          </Text>
+                        )
+                      )}
                     </View>
                   ))}
                   {!currentChart && currentRawText ? (
-                    <Text
-                      style={[
-                        styles.lyricLine,
-                        { fontSize, lineHeight: fontSize * 1.55 },
-                      ]}
-                    >
+                    <Text style={[styles.lyricLine, { fontSize, lineHeight: fontSize * 1.55 }]}>
                       {currentRawText}
                     </Text>
                   ) : null}
                   {!currentChart && !currentRawText ? (
-                    <Text style={[styles.lyricLine, { fontSize }]}>
-                      Nenhuma cifra disponível.
-                    </Text>
+                    <Text style={[styles.lyricLine, { fontSize }]}>Nenhuma cifra disponível.</Text>
                   ) : null}
                 </ScrollView>
               </View>
@@ -542,6 +565,200 @@ export default function PresentScreen() {
           </View>
         </Pressable>
       </View>
+
+      {/* ── Fullscreen cifra overlay ────────────────────────────────────── */}
+      {showCifra && cifraFullscreen && (
+        <Pressable style={styles.cifraContainerFullscreen} onPress={showControlsTemporarily}>
+          {/* ScrollView takes full screen */}
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.cifraScroll}
+            contentContainerStyle={{ paddingTop: 180, paddingHorizontal: 16, paddingBottom: 60 }}
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              scrollYRef.current = e.nativeEvent.contentOffset.y;
+            }}
+            onContentSizeChange={(_w, h) => { scrollHeightRef.current = h; }}
+            onLayout={(e) => { scrollContainerRef.current = e.nativeEvent.layout.height; }}
+          >
+            {currentChart?.sections.map((section, si) => (
+              <View key={si} style={styles.cifraSection}>
+                <Text style={styles.cifraSectionName}>[{section.name}]</Text>
+                {section.lines.map((line, li) =>
+                  !showChords && line.type === "chords" ? null : (
+                    <Text
+                      key={li}
+                      style={[
+                        line.type === "chords" ? styles.chordLine : styles.lyricLine,
+                        { fontSize },
+                        { lineHeight: fontSize * 1.55 },
+                      ]}
+                    >
+                      {line.type === "chords"
+                        ? transposeChordLine(line.content || " ", transposeSemitones)
+                        : (line.content || " ")}
+                    </Text>
+                  )
+                )}
+              </View>
+            ))}
+            {!currentChart && currentRawText ? (
+              <Text style={[styles.lyricLine, { fontSize, lineHeight: fontSize * 1.55 }]}>
+                {currentRawText}
+              </Text>
+            ) : null}
+            {!currentChart && !currentRawText ? (
+              <Text style={[styles.lyricLine, { fontSize }]}>Nenhuma cifra disponível.</Text>
+            ) : null}
+          </ScrollView>
+
+          {/* Controls overlay — shown on tap, auto-hides after 3s */}
+          {showCifraControls && (
+            <View style={styles.fullscreenControlsOverlay} pointerEvents="box-none">
+              {/* Header */}
+              <View style={[styles.cifraHeader, styles.fullscreenHeader, { paddingTop: insets.top + 8 }]}>
+                <Text style={styles.cifraTitleText} numberOfLines={1}>{item.songTitle}</Text>
+                <Pressable onPress={() => { setCifraFullscreen(false); setShowCifraControls(true); }} hitSlop={8}>
+                  <Text style={styles.cifraCloseText}>⤩ Sair</Text>
+                </Pressable>
+              </View>
+              {/* Toolbar 1 */}
+              <View style={[styles.cifraToolbar, styles.fullscreenToolbar]}>
+                <View style={styles.toolbarGroup}>
+                  <Pressable style={styles.toolBtn} onPress={() => setFontSize((s) => Math.max(10, s - 2))}>
+                    <Text style={styles.toolBtnText}>A-</Text>
+                  </Pressable>
+                  <Text style={styles.toolLabel}>{fontSize}px</Text>
+                  <Pressable style={styles.toolBtn} onPress={() => setFontSize((s) => Math.min(28, s + 2))}>
+                    <Text style={styles.toolBtnText}>A+</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.toolbarGroup}>
+                  <Pressable style={styles.toolBtn} onPress={() => setScrollSpeed((s) => Math.max(1, s - 1))}>
+                    <Text style={styles.toolBtnText}>▼</Text>
+                  </Pressable>
+                  <Text style={styles.toolLabel}>vel {scrollSpeed}</Text>
+                  <Pressable style={styles.toolBtn} onPress={() => setScrollSpeed((s) => Math.min(10, s + 1))}>
+                    <Text style={styles.toolBtnText}>▲</Text>
+                  </Pressable>
+                </View>
+                <Pressable
+                  style={[styles.toolBtn, autoScrolling && styles.toolBtnActive]}
+                  onPress={() => (autoScrolling ? stopAutoScroll() : startAutoScroll())}
+                >
+                  <Text style={styles.toolBtnText}>{autoScrolling ? "⏹" : "▶"}</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.toolBtn, !showChords && styles.toolBtnActive]}
+                  onPress={() => setShowChords((v) => !v)}
+                >
+                  <Text style={styles.toolBtnText}>♪</Text>
+                </Pressable>
+              </View>
+              {/* Toolbar 2 */}
+              <View style={[styles.cifraToolbar2, styles.fullscreenToolbar]}>
+                <View style={styles.toolbarGroup}>
+                  <Pressable style={styles.toolBtn} onPress={() => setTransposeSemitones((s) => s - 1)}>
+                    <Text style={styles.toolBtnText}>−</Text>
+                  </Pressable>
+                  <Pressable style={styles.toolBtnNeutral} onPress={() => setTransposeSemitones(0)}>
+                    <Text style={styles.toolLabelAccent}>
+                      {transposeSemitones === 0 ? "Tom ×" : `${transposeSemitones > 0 ? "+" : ""}${transposeSemitones}`}
+                    </Text>
+                  </Pressable>
+                  <Pressable style={styles.toolBtn} onPress={() => setTransposeSemitones((s) => s + 1)}>
+                    <Text style={styles.toolBtnText}>+</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.toolbarGroup}>
+                  <Pressable style={styles.toolBtn} onPress={() => setMetroBpm((b) => Math.max(40, b - 5))}>
+                    <Text style={styles.toolBtnText}>−</Text>
+                  </Pressable>
+                  <Pressable style={[styles.toolBtn, metroOn && styles.toolBtnActive]} onPress={() => setMetroOn((v) => !v)}>
+                    <Text style={styles.toolBtnText}>♩{metroBpm}</Text>
+                  </Pressable>
+                  <Pressable style={styles.toolBtn} onPress={() => setMetroBpm((b) => Math.min(240, b + 5))}>
+                    <Text style={styles.toolBtnText}>+</Text>
+                  </Pressable>
+                  <View style={styles.beatDots}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.beatDot,
+                          metroOn && metroBeat === i && (i === 0 ? styles.beatDotAccent : styles.beatDotOn),
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* ▼ Hint to re-show controls when auto-hidden */}
+          {!showCifraControls && (
+            <Pressable style={styles.controlsHintBtn} onPress={showControlsTemporarily}>
+              <Text style={styles.controlsHintText}>▼</Text>
+            </Pressable>
+          )}
+        </Pressable>
+      )}
+
+      {/* ── Floating metronome button (visible when cifra is hidden) ────── */}
+      {!showCifra && (
+        <View
+          pointerEvents="box-none"
+          style={{ position: "absolute", bottom: insets.bottom + 72, right: 16, alignItems: "flex-end", gap: 6, zIndex: 30 }}
+        >
+          {/* Beat dots */}
+          {metroOn && (
+            <View style={{ flexDirection: "row", gap: 5, backgroundColor: "rgba(8,16,30,0.85)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: "#a5c8ff33" }}>
+              {[0, 1, 2, 3].map((b) => (
+                <View
+                  key={b}
+                  style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: metroOn && metroBeat === b ? (b === 0 ? "#7cf2a2" : "#a5c8ff") : "#1e3650" }}
+                />
+              ))}
+            </View>
+          )}
+          {/* Toggle button */}
+          <Pressable
+            pointerEvents="auto"
+            onPress={() => setMetroOn((v) => !v)}
+            style={({ pressed }) => ({
+              backgroundColor: metroOn ? "rgba(15,48,32,0.95)" : "rgba(8,16,30,0.88)",
+              borderWidth: 1,
+              borderColor: metroOn ? "#7cf2a266" : "#2d4b6d",
+              borderRadius: 24,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              flexDirection: "row" as const,
+              alignItems: "center" as const,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ color: metroOn ? "#7cf2a2" : "#8fa9c8", fontSize: 13, fontWeight: "700" }}>
+              🥁 {metroBpm} BPM  {metroOn ? "⏹" : "▶"}
+            </Text>
+          </Pressable>
+          {/* BPM quick controls — show when active */}
+          {metroOn && (
+            <View pointerEvents="auto" style={{ flexDirection: "row", gap: 4 }}>
+              {([-5, -1, 1, 5] as const).map((delta) => (
+                <Pressable
+                  key={delta}
+                  onPress={() => setMetroBpm((v) => Math.max(20, Math.min(300, v + delta)))}
+                  style={{ backgroundColor: "rgba(8,16,30,0.88)", borderWidth: 1, borderColor: "#2d4b6d", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}
+                >
+                  <Text style={{ color: "#8fa9c8", fontSize: 12 }}>{delta > 0 ? `+${delta}` : String(delta)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* ── Bottom navigation (auto-hides) ─────────────────────────────── */}
       <View
@@ -611,6 +828,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 60,
   },
+  centerContentCifra: {
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
   posText: {
     color: "#3a5a6a",
     fontSize: 14,
@@ -665,8 +888,7 @@ const styles = StyleSheet.create({
   cifraToggleBtnText: { color: "#1ecad3", fontSize: 14 },
   // ── Chord chart ──────────────────────────────────────────────────────────
   cifraContainer: {
-    width: "100%",
-    maxHeight: "80%",
+    flex: 1,
     backgroundColor: "#0d1f2e",
     borderRadius: 12,
     padding: 16,
@@ -844,4 +1066,42 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: "#7cf2a2" },
   pillText: { color: "#8fa9c8", fontSize: 12 },
   pillTextActive: { color: "#0f2137", fontWeight: "700" },
+  // ── Fullscreen cifra ──────────────────────────────────────
+  cifraContainerFullscreen: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#0d1f2e",
+    zIndex: 40,
+  },
+  fullscreenHeader: {
+    backgroundColor: "rgba(13,31,46,0.95)",
+    paddingHorizontal: 16,
+  },
+  fullscreenToolbar: {
+    backgroundColor: "rgba(13,31,46,0.95)",
+    paddingHorizontal: 16,
+  },
+  fullscreenControlsOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+  },
+  controlsHintBtn: {
+    position: "absolute",
+    top: 20,
+    right: 16,
+    backgroundColor: "rgba(8,16,30,0.75)",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    zIndex: 50,
+    borderWidth: 1,
+    borderColor: "#2d4b6d",
+  },
+  controlsHintText: { color: "#8fa9c8", fontSize: 13 },
 });

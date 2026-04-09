@@ -9,6 +9,9 @@ type CreateSongInput = {
   defaultKey?: string;
   zone?: string;
   tags?: string[];
+  youtubeUrl?: string;
+  spotifyUrl?: string;
+  driveUrl?: string;
 };
 
 type UpdateSongInput = Partial<CreateSongInput>;
@@ -79,6 +82,9 @@ export class SongsService {
         defaultKey: input.defaultKey?.trim() || null,
         zone: input.zone?.trim() || null,
         tags: Array.isArray(input.tags) ? (input.tags as Prisma.InputJsonValue) : Prisma.JsonNull,
+        youtubeUrl: input.youtubeUrl?.trim() || null,
+        spotifyUrl: input.spotifyUrl?.trim() || null,
+        driveUrl: input.driveUrl?.trim() || null,
       },
     });
 
@@ -97,6 +103,9 @@ export class SongsService {
       defaultKey?: string | null;
       zone?: string | null;
       tags?: Prisma.InputJsonValue;
+      youtubeUrl?: string | null;
+      spotifyUrl?: string | null;
+      driveUrl?: string | null;
     } = {};
 
     if (typeof input.title === "string") {
@@ -111,6 +120,9 @@ export class SongsService {
     if (typeof input.defaultKey === "string") data.defaultKey = input.defaultKey.trim() || null;
     if (typeof input.zone === "string") data.zone = input.zone.trim() || null;
     if (Array.isArray(input.tags)) data.tags = input.tags as Prisma.InputJsonValue;
+    if (typeof input.youtubeUrl === "string") data.youtubeUrl = input.youtubeUrl.trim() || null;
+    if (typeof input.spotifyUrl === "string") data.spotifyUrl = input.spotifyUrl.trim() || null;
+    if (typeof input.driveUrl === "string") data.driveUrl = input.driveUrl.trim() || null;
 
     const song = await this.prisma.song.update({
       where: { id },

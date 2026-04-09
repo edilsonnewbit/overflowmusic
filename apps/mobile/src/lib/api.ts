@@ -3,6 +3,7 @@ import type {
   AuthUser,
   ChecklistRun,
   ChecklistTemplate,
+  EventMusician,
   EventSetlist,
   LoginPayload,
   LoginResponse,
@@ -326,7 +327,7 @@ export async function createEvent(
 
 export async function updateEvent(
   id: string,
-  input: { title?: string; dateTime?: string; location?: string; address?: string },
+  input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
   const bearerToken = (accessToken || "").trim();
@@ -552,6 +553,7 @@ export async function updateProfile(
   accessToken: string,
   data: {
     name: string;
+    volunteerArea?: string | null;
     instruments?: string[];
     instagramProfile?: string | null;
     birthDate?: string | null;
@@ -594,6 +596,30 @@ export type Rehearsal = {
 
 export async function fetchRehearsals(): Promise<{ ok: boolean; rehearsals: Rehearsal[] }> {
   const response = await fetch(`${API_BASE}/rehearsals`, { method: "GET" });
+  const body = await parseJson(response);
+  if (!response.ok || !Array.isArray(body.rehearsals)) return { ok: false, rehearsals: [] };
+  return { ok: true, rehearsals: body.rehearsals as Rehearsal[] };
+}
+
+export async function fetchEventMusicians(
+  eventId: string,
+): Promise<{ ok: boolean; musicians: EventMusician[] }> {
+  const response = await fetch(
+    `${API_BASE}/events/${encodeURIComponent(eventId)}/musicians`,
+    { method: "GET" },
+  );
+  const body = await parseJson(response);
+  if (!response.ok || !Array.isArray(body.musicians)) return { ok: false, musicians: [] };
+  return { ok: true, musicians: body.musicians as EventMusician[] };
+}
+
+export async function fetchEventRehearsals(
+  eventId: string,
+): Promise<{ ok: boolean; rehearsals: Rehearsal[] }> {
+  const response = await fetch(
+    `${API_BASE}/events/${encodeURIComponent(eventId)}/rehearsals`,
+    { method: "GET" },
+  );
   const body = await parseJson(response);
   if (!response.ok || !Array.isArray(body.rehearsals)) return { ok: false, rehearsals: [] };
   return { ok: true, rehearsals: body.rehearsals as Rehearsal[] };

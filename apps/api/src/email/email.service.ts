@@ -10,12 +10,12 @@ export class EmailService implements OnModuleInit {
     // Configuração do transporter SMTP
     // Variáveis de ambiente usadas: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: (process.env.SMTP_PORT || '587') === '465',
+      host: (process.env.SMTP_HOST || 'smtp.gmail.com').trim(),
+      port: parseInt((process.env.SMTP_PORT || '587').trim(), 10),
+      secure: (process.env.SMTP_PORT || '587').trim() === '465',
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: (process.env.SMTP_USER || '').replace(/\s/g, ''),
+        pass: (process.env.SMTP_PASS || '').replace(/\s/g, ''),
       },
     });
   }

@@ -2,6 +2,58 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-05-07 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: BFF routes para decisões (fix crítico), QR Code por evento, Chat ao vivo no evento, Admin de decisões
+- Feito:
+  - `apps/web/app/api/decisao/[slug]/route.ts` (novo): BFF público — GET info evento + POST registrar decisão
+  - `apps/web/app/api/decisao/[slug]/event/route.ts` (novo): fix crítico — rota `/event` que a página decisao chamava
+  - `apps/web/components/QRCodeCanvas.tsx` (novo): componente canvas-based com biblioteca `qrcode`
+  - `apps/web/app/events/[eventId]/page.tsx`: seção "Formulário de Decisões" com QR Code, link direto e link admin; import EventChat e useAuth; integração do chat
+  - `apps/api/prisma/schema.prisma`: modelo `EventChatMessage` + relações em Event e User
+  - `apps/api/src/events/event-chat.service.ts` (novo): list/send/delete com proteção de auth
+  - `apps/api/src/events/event-chat.controller.ts` (novo): GET/POST/DELETE `/api/events/:eventId/chat`
+  - `apps/api/src/app.module.ts`: registrado EventChatController + EventChatService
+  - `apps/web/app/api/events/[eventId]/chat/route.ts` (novo): BFF GET + POST para chat
+  - `apps/web/app/api/events/[eventId]/chat/[messageId]/route.ts` (novo): BFF DELETE mensagem
+  - `apps/web/components/EventChat.tsx` (novo): componente React com polling 4s, bolhas estilo WhatsApp, mensagem privada, delete (autor/admin)
+  - `apps/web/app/admin/decisoes/page.tsx` (novo): tabela paginada de decisões de fé + exportação CSV
+  - `apps/web/app/api/admin/decisoes/[eventId]/route.ts` (novo): BFF GET lista decisões
+  - `apps/web/app/api/admin/decisoes/[eventId]/csv/route.ts` (novo): BFF GET CSV export
+  - `apps/web/package.json`: adicionado `qrcode` + `@types/qrcode`
+  - `npx prisma generate` executado — `eventChatMessage` confirmado no PrismaClient
+- Commit: `b30189f` → pushed origin/develop
+- Status: ✅ 0 erros TS em todos os arquivos
+- Pendências:
+  - `prisma db push` na VPS (necessário para criar tabela `EventChatMessage` no banco)
+  - Testar formulário de decisão pública via QR Code
+  - Tela de audição mobile: já existe em `apps/mobile/app/audicao.tsx`
+- Próximo passo: `prisma db push` na VPS após conectar ao servidor, validar chat e formulário de decisão end-to-end
+
+
+- Objetivo: Metrônomo com som real, tela cheia cifra, botão sem acordes, logo login mais abaixo
+- Feito:
+  - `apps/mobile/assets/click.wav`: arquivo WAV 22050Hz/16bit/mono/50ms gerado (click sonoro para metrônomo)
+  - `apps/mobile/package.json`: adicionado `expo-av: ^16.0.8`
+  - `apps/mobile/app/present.tsx`: `import { Audio } from "expo-av"`; `soundRef` + loading useEffect; `playClick()` useCallback (som + vibração); engine metrônomo usa `playClick` em vez de `Vibration.vibrate`; states `cifraFullscreen`, `showChords`, `showCifraControls`; botões ⛶ (tela cheia) e ♪ (sem acordes) na toolbar row 1; filtro de acordes via `showChords`; overlay fullscreen (`position:absolute zIndex:40`) com controles auto-hide 3s + seta ▼ para reexibir; `showControlsTemporarily` useCallback
+  - `apps/mobile/src/screens/LoginScreen.tsx`: `paddingTop: 72 → 110` (logo desce)
+- Commit: `b713089`
+- APK: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` (BUILD SUCCESSFUL 1m33s, 448 tasks)
+- **ATENÇÃO**: APK inclui código nativo do `expo-av` — o APK anterior NÃO funciona com esse bundle JS
+- Status: ✅ 0 erros TS, build OK
+- Próximo passo: testar metrônomo com fone, validar auto-scroll no fullscreen
+
+### [2026-04-21 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Fix "ver cifra" no modo apresentação + paridade de eventos mobile vs web (status chips + músicos)
+- Feito:
+  - `apps/mobile/app/present.tsx`: `loadChart` não cria cache vazio quando fetchSongs falha (permite retry); `handleToggleCifra` com try/catch/finally — sempre abre o painel após tentativa
+  - `apps/mobile/src/lib/api.ts`: `updateEvent` recebe `status?: string` e `eventType?: string` no tipo de input
+  - `apps/mobile/src/context/SessionContext.tsx`: `handleUpdateEvent` e sua interface recebem `status?: string`
+  - `apps/mobile/src/screens/EventsScreen.tsx`: prop `onUpdateEvent` recebe `status?`; chips de status (DRAFT/ACTIVE/PUBLISHED/FINISHED) clicáveis no card de evento; seção "Músicos" agrupada por `instrumentRole` com badge de status (PENDING/CONFIRMED/DECLINED/EXPIRED)
+- Commits: `7c61d75`, `2c8d9e4`
+- APK: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` (EXIT:0)
+- Status: ✅ 0 erros TS, build OK
+- Próximo passo: subir Docker local e rodar `prisma db push` para aplicar coluna `photoUrl`
+
 ### [2026-04-20 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: (1) Todos os campos no perfil mobile; (2) Foto do Google exibida no web e mobile
 - Feito:

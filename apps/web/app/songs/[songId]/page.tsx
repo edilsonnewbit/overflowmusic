@@ -14,6 +14,40 @@ const TABERNACLE_ZONES = [
   { value: "Z5", label: "Z5 — Santuário (Alegria)", description: "Alegria, dança, liberdade • Celebração na presença de Deus" },
 ];
 
+// ── Helpers: converter URL do usuário para URL de embed ─────────────────────
+
+function getYoutubeEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    let id: string | null = null;
+    if (u.hostname.includes("youtu.be")) {
+      id = u.pathname.slice(1).split("?")[0] ?? null;
+    } else if (u.hostname.includes("youtube.com")) {
+      id = u.searchParams.get("v") ?? u.pathname.split("/embed/")[1]?.split("?")[0] ?? null;
+    }
+    return id ? `https://www.youtube.com/embed/${id}?rel=0` : null;
+  } catch { return null; }
+}
+
+function getSpotifyEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes("spotify.com")) return null;
+    const path = u.pathname.replace("/intl-pt/", "/");
+    return `https://open.spotify.com/embed${path}?utm_source=generator`;
+  } catch { return null; }
+}
+
+function getDriveEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes("drive.google.com")) return null;
+    const match = u.pathname.match(/\/file\/d\/([^/]+)/);
+    const id = match?.[1];
+    return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+  } catch { return null; }
+}
+
 // ── page ─────────────────────────────────────────────────────────────────────
 
 export default function SongDetailPage({ params }: { params: Promise<{ songId: string }> }) {
@@ -33,6 +67,12 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   const [zoneEdit, setZoneEdit] = useState<string | null>(null);
   const [savingZone, setSavingZone] = useState(false);
   const [zoneSaveMsg, setZoneSaveMsg] = useState("");
+  const [urlsEditOpen, setUrlsEditOpen] = useState(false);
+  const [urlYoutube, setUrlYoutube] = useState("");
+  const [urlSpotify, setUrlSpotify] = useState("");
+  const [urlDrive, setUrlDrive] = useState("");
+  const [savingUrls, setSavingUrls] = useState(false);
+  const [urlsSaveMsg, setUrlsSaveMsg] = useState("");
 
   useEffect(() => {
     void params.then((p) => setSongId(p.songId));
@@ -42,6 +82,13 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
     if (!songId) return;
     void loadSong(songId);
   }, [songId]);
+
+  useEffect(() => {
+    if (!song) return;
+    setUrlYoutube(song.youtubeUrl ?? "");
+    setUrlSpotify(song.spotifyUrl ?? "");
+    setUrlDrive(song.driveUrl ?? "");
+  }, [song]);
 
   async function loadSong(id: string) {
     setLoading(true);
@@ -77,6 +124,32 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
       setZoneSaveMsg(e instanceof Error ? e.message : "Erro ao salvar.");
     } finally {
       setSavingZone(false);
+    }
+  }
+
+  async function saveUrls() {
+    if (!songId) return;
+    setSavingUrls(true);
+    setUrlsSaveMsg("");
+    try {
+      const res = await fetch(`/api/songs/${songId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          youtubeUrl: urlYoutube.trim() || null,
+          spotifyUrl: urlSpotify.trim() || null,
+          driveUrl: urlDrive.trim() || null,
+        }),
+      });
+      const body = (await res.json()) as { ok: boolean; message?: string };
+      if (!body.ok) throw new Error(body.message || "Erro ao salvar.");
+      setUrlsSaveMsg("Links salvos.");
+      setUrlsEditOpen(false);
+      await loadSong(songId);
+    } catch (e) {
+      setUrlsSaveMsg(e instanceof Error ? e.message : "Erro ao salvar.");
+    } finally {
+      setSavingUrls(false);
     }
   }
 
@@ -231,6 +304,112 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
             </Link>
           )}
         </div>
+
+        {/* ── Media Players ─────────────────────────────────────────────── */}
+        {(song.youtubeUrl || song.spotifyUrl || song.driveUrl) && (
+          <div style={mediaContainerStyle}>
+            <p style={mediaTitleStyle}>Players de Áudio</p>
+            <div style={mediaGridStyle}>
+              {song.youtubeUrl && (() => {
+                const embed = getYoutubeEmbedUrl(song.youtubeUrl!);
+                return embed ? (
+                  <div style={mediaCardStyle}>
+                    <p style={mediaLabelStyle}>YouTube</p>
+                    <iframe
+                      src={embed}
+                      style={iframeStyle}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title="YouTube player"
+                    />
+                  </div>
+                ) : (
+                  <div style={mediaCardStyle}>
+                    <p style={mediaLabelStyle}>YouTube</p>
+                    <a href={song.youtubeUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>
+                      ▶ Abrir no YouTube
+                    </a>
+                  </div>
+                );
+              })()}
+
+              {song.spotifyUrl && (() => {
+                const embed = getSpotifyEmbedUrl(song.spotifyUrl!);
+                return embed ? (
+                  <div style={mediaCardStyle}>
+                    <p style={mediaLabelStyle}>Spotify</p>
+                    <iframe
+                      src={embed}
+                      style={{ ...iframeStyle, height: 152, borderRadius: 12 }}
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                      title="Spotify player"
+                    />
+                  </div>
+                ) : (
+                  <div style={mediaCardStyle}>
+                    <p style={mediaLabelStyle}>Spotify</p>
+                    <a href={song.spotifyUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>
+                      ▶ Abrir no Spotify
+                    </a>
+                  </div>
+                );
+              })()}
+
+              {song.driveUrl && (() => {
+                const embed = getDriveEmbedUrl(song.driveUrl!);
+                return embed ? (
+                  <div style={mediaCardStyle}>
+                    <p style={mediaLabelStyle}>Google Drive (MP3)</p>
+                    <iframe
+                      src={embed}
+                      style={{ ...iframeStyle, height: 80 }}
+                      allow="autoplay"
+                      title="Drive audio player"
+                    />
+                  </div>
+                ) : (
+                  <div style={mediaCardStyle}>
+                    <p style={mediaLabelStyle}>Google Drive</p>
+                    <a href={song.driveUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>
+                      ▶ Abrir no Drive
+                    </a>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* ── Editar links de áudio ─────────────────────────────────────── */}
+        <div style={{ marginTop: song.youtubeUrl || song.spotifyUrl || song.driveUrl ? 0 : 16 }}>
+          {!urlsEditOpen ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={() => setUrlsEditOpen(true)} style={zoneEditBtnStyle}>
+                {song.youtubeUrl || song.spotifyUrl || song.driveUrl ? "✏ Editar links de áudio" : "+ Adicionar links de áudio"}
+              </button>
+              {urlsSaveMsg && <span style={{ fontSize: 12, color: "#7cf2a2" }}>{urlsSaveMsg}</span>}
+            </div>
+          ) : (
+            <div style={urlsEditBoxStyle}>
+              <p style={mediaTitleStyle}>Links de áudio / vídeo</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <UrlField label="YouTube" value={urlYoutube} onChange={setUrlYoutube} placeholder="https://www.youtube.com/watch?v=..." disabled={savingUrls} />
+                <UrlField label="Spotify" value={urlSpotify} onChange={setUrlSpotify} placeholder="https://open.spotify.com/track/..." disabled={savingUrls} />
+                <UrlField label="Google Drive (MP3)" value={urlDrive} onChange={setUrlDrive} placeholder="https://drive.google.com/file/d/.../view" disabled={savingUrls} />
+              </div>
+              {urlsSaveMsg && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#f87171" }}>{urlsSaveMsg}</p>}
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <button onClick={() => void saveUrls()} disabled={savingUrls} style={zoneSaveBtnStyle}>
+                  {savingUrls ? "..." : "Salvar"}
+                </button>
+                <button onClick={() => { setUrlsEditOpen(false); setUrlsSaveMsg(""); }} disabled={savingUrls} style={zoneCancelBtnStyle}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
@@ -244,6 +423,34 @@ function MetaPill({ label, value }: { label: string; value: string }) {
       <span style={{ color: "#7a94b0", fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}>{label} </span>
       <span style={{ fontWeight: 700, color: "#7cf2a2" }}>{value}</span>
     </span>
+  );
+}
+
+function UrlField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  disabled: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label style={{ color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>{label}</label>
+      <input
+        type="url"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        style={urlInputStyle}
+      />
+    </div>
   );
 }
 
@@ -384,4 +591,75 @@ const zoneCancelBtnStyle: CSSProperties = {
   padding: "5px 12px",
   fontSize: 13,
   cursor: "pointer",
+};
+
+// ── Media player styles ──────────────────────────────────────────────────────
+
+const mediaContainerStyle: CSSProperties = {
+  marginTop: 24,
+  background: "#0a1929",
+  border: "1px solid #1e3a55",
+  borderRadius: 12,
+  padding: "16px 20px",
+};
+
+const mediaTitleStyle: CSSProperties = {
+  margin: "0 0 14px",
+  color: "#7a94b0",
+  fontSize: 11,
+  textTransform: "uppercase",
+  letterSpacing: 1.5,
+  fontWeight: 700,
+};
+
+const mediaGridStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
+};
+
+const mediaCardStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+};
+
+const mediaLabelStyle: CSSProperties = {
+  margin: 0,
+  color: "#7a94b0",
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+const iframeStyle: CSSProperties = {
+  width: "100%",
+  height: 200,
+  border: "none",
+  borderRadius: 8,
+};
+
+const externalLinkStyle: CSSProperties = {
+  color: "#7cf2a2",
+  fontSize: 14,
+  textDecoration: "none",
+};
+
+const urlsEditBoxStyle: CSSProperties = {
+  marginTop: 16,
+  background: "#0a1929",
+  border: "1px solid #1e3a55",
+  borderRadius: 12,
+  padding: "16px 20px",
+};
+
+const urlInputStyle: CSSProperties = {
+  background: "#0d2035",
+  border: "1px solid #2d4b6d",
+  borderRadius: 6,
+  color: "#e8f2ff",
+  fontSize: 13,
+  padding: "7px 10px",
+  width: "100%",
+  outline: "none",
+  boxSizing: "border-box",
 };

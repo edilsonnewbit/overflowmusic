@@ -1,14 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import type { EventSetlist, MusicEvent, SetlistItem } from "../types";
+import type { EventMusician, EventSetlist, MusicEvent, SetlistItem } from "../types";
 import { styles } from "../styles";
+import { fetchEventMusicians, fetchEventRehearsals, type Rehearsal } from "../lib/api";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Rascunho", ACTIVE: "Ativo", PUBLISHED: "Publicado", FINISHED: "Encerrado", ARCHIVED: "Arquivado",
 };
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: "#8fa9c8", ACTIVE: "#60a5fa", PUBLISHED: "#7cf2a2", FINISHED: "#94a3b8", ARCHIVED: "#4b5563",
+};
+const INSTRUMENT_ROLES = ["Bateria", "Baixo", "Guitarra", "Teclado", "Violão", "Vocal", "Trompete", "Saxofone", "Outro"];
+const SLOT_COLOR: Record<string, string> = {
+  PENDING: "#fbbf24", CONFIRMED: "#7cf2a2", DECLINED: "#f87171", EXPIRED: "#94a3b8",
+};
+const SLOT_LABEL: Record<string, string> = {
+  PENDING: "Aguardando", CONFIRMED: "Confirmado", DECLINED: "Recusou", EXPIRED: "Expirado",
 };
 type Props = {
   events: MusicEvent[];
@@ -24,8 +32,10 @@ type Props = {
   statusText: string;
   onCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
   creatingEvent: boolean;
-  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
+  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string }) => Promise<void>;
   onDeleteEvent: (id: string) => Promise<void>;
+  focusMode?: boolean;
+  onExitFocusMode?: () => void;
 };
 
 function formatDate(iso: string) {
@@ -48,6 +58,8 @@ export function EventsScreen({
   creatingEvent,
   onUpdateEvent,
   onDeleteEvent,
+  focusMode = false,
+  onExitFocusMode,
 }: Props) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -160,41 +172,75 @@ export function EventsScreen({
   }
 
   const isBusy = reorderingId !== null || loadingSetlist;
+  const displayedEvents = focusMode && activeEventId
+    ? events.filter((e) => e.id === activeEventId)
+    : events;
+
+  const [eventMusicians, setEventMusicians] = useState<EventMusician[]>([]);
+  const [loadingMusicians, setLoadingMusicians] = useState(false);
+  const [eventRehearsals, setEventRehearsals] = useState<Rehearsal[]>([]);
+  const [loadingRehearsals, setLoadingRehearsals] = useState(false);
+
+  useEffect(() => {
+    if (!activeEventId) { setEventMusicians([]); setEventRehearsals([]); return; }
+    setLoadingMusicians(true);
+    void fetchEventMusicians(activeEventId).then(({ musicians }) => {
+      setEventMusicians(musicians);
+      setLoadingMusicians(false);
+    });
+    setLoadingRehearsals(true);
+    void fetchEventRehearsals(activeEventId).then(({ rehearsals }) => {
+      setEventRehearsals(rehearsals);
+      setLoadingRehearsals(false);
+    });
+  }, [activeEventId]);
 
   return (
     <View style={styles.card}>
       {/* ── Header row */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <Text style={styles.cardTitle}>Eventos</Text>
-        <Pressable
-          style={({ pressed }) => ([
-            {
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: showForm ? "#f28c8c" : "#2a6644",
-              backgroundColor: showForm ? "#2a1010" : "#0e2c1e",
-              opacity: pressed ? 0.75 : 1,
-            },
-          ])}
-          onPress={() => { setShowForm((v) => !v); setFormError(""); }}
-        >
-          <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 16, lineHeight: 20 }}>
-            {showForm ? "✕" : "+"}
-          </Text>
-          <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 13, fontWeight: "700" }}>
-            {showForm ? "Cancelar" : "Novo Evento"}
-          </Text>
-        </Pressable>
+        {focusMode ? (
+          <Pressable
+            onPress={onExitFocusMode}
+            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}
+          >
+            <Text style={{ color: "#1ecad3", fontSize: 18, lineHeight: 22 }}>←</Text>
+            <Text style={{ color: "#1ecad3", fontSize: 13, fontWeight: "600" }}>Todos os eventos</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.cardTitle}>Eventos</Text>
+        )}
+        {!focusMode && (
+          <Pressable
+            style={({ pressed }) => ([
+              {
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: showForm ? "#f28c8c" : "#2a6644",
+                backgroundColor: showForm ? "#2a1010" : "#0e2c1e",
+                opacity: pressed ? 0.75 : 1,
+              },
+            ])}
+            onPress={() => { setShowForm((v) => !v); setFormError(""); }}
+          >
+            <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 16, lineHeight: 20 }}>
+              {showForm ? "✕" : "+"}
+            </Text>
+            <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 13, fontWeight: "700" }}>
+              {showForm ? "Cancelar" : "Novo Evento"}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
-      <Text style={[styles.helper, { marginBottom: 8 }]}>{statusText}</Text>
+      {!focusMode && <Text style={[styles.helper, { marginBottom: 8 }]}>{statusText}</Text>}
 
-      {showForm && (
+      {!focusMode && showForm && (
         <View style={{ marginBottom: 12, gap: 6 }}>
           <TextInput
             style={formInputStyle}
@@ -264,10 +310,10 @@ export function EventsScreen({
 
       {loading ? (
         <ActivityIndicator color="#7cf2a2" style={{ marginTop: 12 }} />
-      ) : events.length === 0 ? (
+      ) : displayedEvents.length === 0 ? (
         <Text style={[styles.listItem, { textAlign: "center", color: "#4a6278", marginTop: 8 }]}>Nenhum evento encontrado.</Text>
       ) : (
-        events.map((ev) => {
+        displayedEvents.map((ev) => {
           const isActive = ev.id === activeEventId;
           const isEditing = editingEventId === ev.id;
           const statusColor = STATUS_COLOR[ev.computedStatus ?? ev.status] ?? "#8fa9c8";
@@ -352,6 +398,33 @@ export function EventsScreen({
                   >
                     <Text style={{ color: "#f28c8c", fontSize: 13 }}>🗑 Excluir</Text>
                   </Pressable>
+                </View>
+
+                {/* Status chips */}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                  {(["DRAFT", "ACTIVE", "PUBLISHED", "FINISHED"] as const).map((s) => {
+                    const isCurrent = (ev.computedStatus ?? ev.status) === s;
+                    const sc = STATUS_COLOR[s] ?? "#8fa9c8";
+                    return (
+                      <Pressable
+                        key={s}
+                        onPress={() => !isCurrent && void onUpdateEvent(ev.id, { status: s })}
+                        style={({ pressed }) => ([
+                          {
+                            paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+                            borderWidth: 1,
+                            borderColor: isCurrent ? sc : "#2a4a6a",
+                            backgroundColor: isCurrent ? sc + "22" : "transparent",
+                            opacity: pressed ? 0.7 : 1,
+                          },
+                        ])}
+                      >
+                        <Text style={{ color: isCurrent ? sc : "#8fa9c8", fontSize: 11, fontWeight: isCurrent ? "700" : "400" }}>
+                          {STATUS_LABEL[s]}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
 
@@ -459,63 +532,72 @@ export function EventsScreen({
                         padding: 10,
                       }}
                     >
-                      {/* Title + controles em linha */}
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={{ flex: 1, color: "#e8f2ff", fontSize: 14, fontWeight: "600" }}>
-                          {idx + 1}. {item.songTitle}
-                        </Text>
-                        <Pressable
-                          disabled={isBusy || isFirst}
-                          onPress={() => void onMoveItem(item, "up", sortedItems)}
-                          style={[orderBtnStyle, (isBusy || isFirst) && { opacity: 0.25 }]}
-                        >
-                          <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▲</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={isBusy || isLast}
-                          onPress={() => void onMoveItem(item, "down", sortedItems)}
-                          style={[orderBtnStyle, (isBusy || isLast) && { opacity: 0.25 }]}
-                        >
-                          <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▼</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={isBusy}
-                          onPress={() => void onRemoveItem(item.id)}
-                          style={[orderBtnStyle, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
-                          accessibilityLabel={`Remover ${item.songTitle} do setlist`}
-                        >
-                          <Text style={{ color: "#f28c8c", fontSize: 11, lineHeight: 14 }}>✕</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() =>
-                            editingItemId === item.id
-                              ? setEditingItemId(null)
-                              : startItemEdit(item)
-                          }
-                          style={[orderBtnStyle, { borderColor: editingItemId === item.id ? "#f28c8c" : "#2d4b6d" }]}
-                          accessibilityLabel="Editar item do setlist"
-                        >
-                          <Text style={{ color: editingItemId === item.id ? "#f28c8c" : "#7cf2a2", fontSize: 11, lineHeight: 14 }}>
-                            {editingItemId === item.id ? "✕" : "✏"}
-                          </Text>
-                        </Pressable>
-                      </View>
+                      {/* Layout principal: [▲/▼] | [conteúdo] | [✕ ✏] */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        {/* Botões de ordem empilhados à esquerda */}
+                        <View style={{ gap: 2 }}>
+                          <Pressable
+                            disabled={isBusy || isFirst}
+                            onPress={() => void onMoveItem(item, "up", sortedItems)}
+                            style={[orderBtnStyle, (isBusy || isFirst) && { opacity: 0.25 }]}
+                          >
+                            <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▲</Text>
+                          </Pressable>
+                          <Pressable
+                            disabled={isBusy || isLast}
+                            onPress={() => void onMoveItem(item, "down", sortedItems)}
+                            style={[orderBtnStyle, (isBusy || isLast) && { opacity: 0.25 }]}
+                          >
+                            <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▼</Text>
+                          </Pressable>
+                        </View>
 
-                      {/* Info */}
-                      <Text style={[styles.helper, { marginTop: 3 }]}>
-                        {[
-                          item.key && `Tom: ${item.key}`,
-                          item.leaderName && `Líder: ${item.leaderName}`,
-                          item.zone && `Zona: ${item.zone}`,
-                        ]
-                          .filter(Boolean)
-                          .join("  ·  ")}
-                      </Text>
-                      {item.transitionNotes ? (
-                        <Text style={[styles.helper, { fontStyle: "italic" }]}>
-                          {item.transitionNotes}
-                        </Text>
-                      ) : null}
+                        {/* Conteúdo central: título + info */}
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: "#e8f2ff", fontSize: 14, fontWeight: "600" }}>
+                            {idx + 1}. {item.songTitle}
+                          </Text>
+                          <Text style={[styles.helper, { marginTop: 2 }]}>
+                            {[
+                              item.key && `Tom: ${item.key}`,
+                              item.leaderName && `Líder: ${item.leaderName}`,
+                              item.zone && `Zona: ${item.zone}`,
+                            ]
+                              .filter(Boolean)
+                              .join("  ·  ")}
+                          </Text>
+                          {item.transitionNotes ? (
+                            <Text style={[styles.helper, { fontStyle: "italic" }]}>
+                              {item.transitionNotes}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        {/* Ações à direita: remover + editar */}
+                        <View style={{ gap: 4 }}>
+                          <Pressable
+                            disabled={isBusy}
+                            onPress={() => void onRemoveItem(item.id)}
+                            style={[orderBtnStyle, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
+                            accessibilityLabel={`Remover ${item.songTitle} do setlist`}
+                          >
+                            <Text style={{ color: "#f28c8c", fontSize: 11, lineHeight: 14 }}>✕</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() =>
+                              editingItemId === item.id
+                                ? setEditingItemId(null)
+                                : startItemEdit(item)
+                            }
+                            style={[orderBtnStyle, { borderColor: editingItemId === item.id ? "#f28c8c" : "#2d4b6d" }]}
+                            accessibilityLabel="Editar item do setlist"
+                          >
+                            <Text style={{ color: editingItemId === item.id ? "#f28c8c" : "#7cf2a2", fontSize: 11, lineHeight: 14 }}>
+                              {editingItemId === item.id ? "✕" : "✏"}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
 
                       {editingItemId === item.id && (
                           <View style={{ marginTop: 8, gap: 6 }}>
@@ -574,7 +656,12 @@ export function EventsScreen({
                 })}
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
                   <Pressable
-                    style={[styles.primaryButton, { flex: 1, backgroundColor: "#1a3a5a" }]}
+                    style={({ pressed }) => ({
+                      flex: 1, borderRadius: 12, paddingVertical: 14,
+                      alignItems: "center" as const, justifyContent: "center" as const,
+                      borderWidth: 1.5, borderColor: "#60a5fa",
+                      backgroundColor: pressed ? "#60a5fa22" : "transparent",
+                    })}
                     onPress={() => {
                       const activeEvent = events.find((e) => e.id === activeEventId);
                       const lines = sortedItems.map(
@@ -588,10 +675,12 @@ export function EventsScreen({
                       });
                     }}
                   >
-                    <Text style={styles.primaryButtonText}>Compartilhar</Text>
+                    <Text style={{ color: "#60a5fa", fontWeight: "700", fontSize: 15, letterSpacing: 0.5 }}>
+                      Compartilhar
+                    </Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.primaryButton, { flex: 1, backgroundColor: "#1a4a3a" }]}
+                    style={[styles.primaryButton, { flex: 1 }]}
                     onPress={() => router.push("/present")}
                     accessibilityLabel="Iniciar modo apresentação"
                   >
@@ -602,6 +691,93 @@ export function EventsScreen({
             )}
             </>
           )}
+          {/* Equipe de Músicos */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.cardTitle}>Equipe de Músicos</Text>
+            {loadingMusicians ? (
+              <ActivityIndicator color="#7cf2a2" style={{ marginTop: 8 }} />
+            ) : eventMusicians.length === 0 ? (
+              <Text style={[styles.helper, { marginTop: 4 }]}>Nenhum músico escalado.</Text>
+            ) : (
+              <>
+                {INSTRUMENT_ROLES.filter((role) =>
+                  eventMusicians.some((m) => m.instrumentRole === role)
+                ).map((role) => {
+                  const slots = eventMusicians
+                    .filter((m) => m.instrumentRole === role)
+                    .sort((a, b) => a.priority - b.priority);
+                  const confirmed = slots.filter((m) => m.status === "CONFIRMED").length;
+                  const badgeColor = confirmed >= slots.length ? "#7cf2a2" : "#fbbf24";
+                  return (
+                    <View key={role} style={{ marginBottom: 12 }}>
+                      {/* Role header */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <Text style={{ color: "#b3c6e0", fontSize: 14, fontWeight: "700" }}>{role}</Text>
+                        <View style={{
+                          borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1,
+                          borderWidth: 1, borderColor: badgeColor,
+                        }}>
+                          <Text style={{ color: badgeColor, fontSize: 11, fontWeight: "600" }}>
+                            {confirmed}/{slots.length} vaga{slots.length !== 1 ? "s" : ""}
+                          </Text>
+                        </View>
+                      </View>
+                      {/* Musician rows */}
+                      {slots.map((m) => {
+                        const sc = SLOT_COLOR[m.status] ?? "#8fa9c8";
+                        return (
+                          <View key={m.id} style={{
+                            flexDirection: "row", alignItems: "center", gap: 6,
+                            padding: 8, backgroundColor: "rgba(15,33,55,0.7)",
+                            borderRadius: 8, borderWidth: 1, borderColor: "#2d4b6d", marginBottom: 4,
+                          }}>
+                            <Text style={{ flex: 1, color: "#e8f2ff", fontSize: 13 }}>
+                              {m.user?.name ?? m.userId}
+                            </Text>
+                            <View style={{
+                              borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2,
+                              backgroundColor: sc + "22", borderWidth: 1, borderColor: sc,
+                            }}>
+                              <Text style={{ color: sc, fontSize: 10, fontWeight: "700" }}>
+                                {SLOT_LABEL[m.status] ?? m.status}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
+              </>
+            )}
+          </View>
+
+          {/* Ensaios */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.cardTitle}>Ensaios</Text>
+            {loadingRehearsals ? (
+              <ActivityIndicator color="#7cf2a2" style={{ marginTop: 8 }} />
+            ) : eventRehearsals.length === 0 ? (
+              <Text style={[styles.helper, { marginTop: 4 }]}>Nenhum ensaio vinculado.</Text>
+            ) : (
+              eventRehearsals.map((r) => (
+                <View key={r.id} style={{
+                  marginTop: 8, padding: 10,
+                  backgroundColor: "#0d1d2e", borderRadius: 8,
+                  borderWidth: 1, borderColor: "#1e3a54",
+                }}>
+                  <Text style={{ color: "#e8f2ff", fontSize: 13, fontWeight: "600" }}>{r.title}</Text>
+                  <Text style={[styles.helper, { marginTop: 2 }]}>
+                    {new Date(r.dateTime).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                    {r.location ? `  —  ${r.location}` : ""}
+                  </Text>
+                  {r.durationMinutes ? (
+                    <Text style={[styles.helper, { marginTop: 1 }]}>⏱ {r.durationMinutes} min</Text>
+                  ) : null}
+                </View>
+              ))
+            )}
+          </View>
         </View>
       )}
     </View>

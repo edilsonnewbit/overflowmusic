@@ -1,4 +1,4 @@
-import { SafeAreaView } from "react-native";
+import { SafeAreaView, ScrollView } from "react-native";
 import { HomeScreen } from "../../src/screens/HomeScreen";
 import { styles } from "../../src/styles";
 

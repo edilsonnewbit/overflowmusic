@@ -1,0 +1,21 @@
+import { NextRequest, NextResponse } from "next/server";
+import { serverApiFetch } from "@/lib/server-api";
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json();
+    const response = await serverApiFetch(`auditions/${params.id}/status`, {
+      method: "PATCH",
+      authMode: "admin",
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "internal error";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
+}

@@ -47,6 +47,42 @@ enum ChordChartSourceType {
   MANUAL
 }
 
+enum AuditionStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model Audition {
+  id               String        @id @default(uuid())
+  name             String
+  email            String
+  whatsapp         String
+  birthDate        String?
+  city             String?
+  church           String?
+  pastorName       String?
+  instagramProfile String?
+  volunteerArea    String
+  skills           String[]      @default([])
+  availability     String[]      @default([])
+  hasTransport     Boolean       @default(false)
+  motivation       String?
+  driveFileId      String?
+  driveFileUrl     String?
+  status           AuditionStatus @default(PENDING)
+  adminNotes       String?
+  reviewedAt       DateTime?
+  reviewedBy       String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([status])
+  @@index([email])
+  @@index([volunteerArea])
+}
+
 model User {
   id                String     @id @default(uuid())
   name              String
@@ -58,6 +94,7 @@ model User {
   role              UserRole   @default(MEMBER)
   status            UserStatus @default(PENDING_APPROVAL)
   instruments       String[]   @default([])
+  volunteerArea     String?
   instagramProfile  String?
   birthDate         DateTime?
   church            String?
@@ -76,6 +113,8 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens  PasswordResetToken[]
   eventMusicians       EventMusician[]
+  sentChatMessages     EventChatMessage[] @relation("ChatSender")
+  receivedChatMessages EventChatMessage[] @relation("ChatRecipient")
 
   @@index([status])
   @@index([emailVerified])
@@ -121,6 +160,7 @@ model PushToken {
 model Event {
   id                       String      @id @default(uuid())
   title                    String
+  slug                     String?     @unique
   dateTime                 DateTime
   location                 String?
   address                  String?
@@ -137,6 +177,35 @@ model Event {
   musicians                EventMusician[]
   instrumentConfigs        EventInstrumentConfig[]
   rehearsals               EventRehearsal[]
+  decisions                EventDecision[]
+  chatMessages             EventChatMessage[]
+
+  @@index([slug])
+}
+
+enum DecisionType {
+  PRIMEIRA_VEZ
+  RECONSAGRACAO
+  BATISMO
+  OUTRO
+}
+
+model EventDecision {
+  id          String       @id @default(uuid())
+  eventId     String
+  name        String
+  whatsapp    String
+  city        String?
+  church      String?
+  decisionType DecisionType @default(PRIMEIRA_VEZ)
+  howDidYouHear String?
+  acceptsContact Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime     @default(now())
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([createdAt])
 }
 
 model EventInstrumentConfig {
@@ -205,6 +274,9 @@ model Song {
   defaultKey  String?
   zone        String?
   tags        Json?
+  youtubeUrl  String?
+  spotifyUrl  String?
+  driveUrl    String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   chordCharts ChordChart[]
@@ -323,6 +395,22 @@ model OrganizationMember {
 
   @@unique([userId, organizationId])
   @@index([organizationId])
+}
+
+model EventChatMessage {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  text      String
+  isPrivate Boolean  @default(false)
+  toUserId  String?
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation("ChatSender", fields: [userId], references: [id], onDelete: Cascade)
+  toUser    User?    @relation("ChatRecipient", fields: [toUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+  @@index([userId])
 }
 
 model AuditLog {
