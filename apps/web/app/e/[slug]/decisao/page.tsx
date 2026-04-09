@@ -6,10 +6,17 @@ type DecisionType = "PRIMEIRA_VEZ" | "RECONSAGRACAO" | "BATISMO" | "OUTRO";
 type ChurchHelp = "WANTS_CHURCH" | "HAS_CHURCH" | "UNDECIDED";
 
 const DECISION_LABELS: Record<DecisionType, string> = {
-  PRIMEIRA_VEZ: "Primeira vez",
-  RECONSAGRACAO: "Reconsagração",
-  BATISMO: "Batismo",
-  OUTRO: "Outro",
+  PRIMEIRA_VEZ: "Aceitei Jesus hoje",
+  RECONSAGRACAO: "Quero voltar pra Deus",
+  BATISMO: "Quero ser batizado",
+  OUTRO: "Outra decisão",
+};
+
+const DECISION_SUBLABELS: Record<DecisionType, string> = {
+  PRIMEIRA_VEZ: "Primeira vez entregando minha vida",
+  RECONSAGRACAO: "Me afastei e quero recomeçar",
+  BATISMO: "Dar esse próximo passo na fé",
+  OUTRO: "Algo diferente aconteceu no meu coração",
 };
 
 const DECISION_ICONS: Record<DecisionType, string> = {
@@ -186,7 +193,7 @@ export default function DecisaoPage({ params }: PageProps) {
                   type="button"
                   onClick={() => setDecisionType(type)}
                   style={{
-                    padding: "14px 12px",
+                    padding: "16px 12px",
                     borderRadius: 12,
                     border: selected ? "2px solid #7cf2a2" : "1px solid #2d4b6d",
                     background: selected ? "#0f3020" : "#0a1520",
@@ -194,9 +201,12 @@ export default function DecisaoPage({ params }: PageProps) {
                     textAlign: "center",
                   }}
                 >
-                  <div style={{ fontSize: 24, marginBottom: 4 }}>{DECISION_ICONS[type]}</div>
-                  <div style={{ color: selected ? "#7cf2a2" : "#8fa9c8", fontSize: 13, fontWeight: selected ? 700 : 400 }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>{DECISION_ICONS[type]}</div>
+                  <div style={{ color: selected ? "#7cf2a2" : "#e9edef", fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
                     {DECISION_LABELS[type]}
+                  </div>
+                  <div style={{ color: selected ? "#7cf2a2cc" : "#8fa9c8", fontSize: 11, lineHeight: 1.35 }}>
+                    {DECISION_SUBLABELS[type]}
                   </div>
                 </button>
               );
