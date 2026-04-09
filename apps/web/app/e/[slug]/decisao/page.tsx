@@ -34,7 +34,10 @@ type EventInfo = {
   location: string | null;
 };
 
-export default function DecisaoPage({ params }: { params: { slug: string } }) {
+type PageProps = { params: Promise<{ slug: string }> };
+
+export default function DecisaoPage({ params }: PageProps) {
+  const [slug, setSlug] = useState<string | null>(null);
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -52,9 +55,14 @@ export default function DecisaoPage({ params }: { params: { slug: string } }) {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    void params.then(({ slug: s }) => setSlug(s));
+  }, [params]);
+
+  useEffect(() => {
+    if (!slug) return;
     async function load() {
       try {
-        const res = await fetch(`/api/decisao/${params.slug}/event`);
+        const res = await fetch(`/api/decisao/${slug}/event`);
         if (!res.ok) { setNotFound(true); return; }
         const body = (await res.json()) as EventInfo;
         setEvent(body);
@@ -65,7 +73,7 @@ export default function DecisaoPage({ params }: { params: { slug: string } }) {
       }
     }
     void load();
-  }, [params.slug]);
+  }, [slug]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,7 +84,7 @@ export default function DecisaoPage({ params }: { params: { slug: string } }) {
     }
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/decisao/${params.slug}`, {
+      const res = await fetch(`/api/decisao/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), whatsapp: whatsapp.trim(), city: city.trim(), church: church.trim(), decisionType, howDidYouHear, acceptsContact }),
