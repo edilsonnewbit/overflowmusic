@@ -114,6 +114,7 @@ export default function EventDetailPage({ params }: PageProps) {
   const [editConfirmationDeadline, setEditConfirmationDeadline] = useState("");
   const [saving, setSaving] = useState(false);
   const [generatingSlug, setGeneratingSlug] = useState(false);
+  const [activeTab, setActiveTab] = useState<"setlist" | "equipe" | "ensaios" | "decisoes" | "chat">("setlist");
 
   // songs catalog
   const [songs, setSongs] = useState<SongOption[]>([]);
@@ -657,7 +658,17 @@ export default function EventDetailPage({ params }: PageProps) {
 
           {!loading && event && (
             <>
-              {/* Musician Team Section */}
+              {/* Navegação por Abas */}
+              <nav style={tabNavStyle}>
+                {(["setlist", "equipe", "ensaios", "decisoes", "chat"] as const).map((tab) => (
+                  <button key={tab} style={activeTab === tab ? activeTabBtnStyle : tabBtnStyle} onClick={() => setActiveTab(tab)}>
+                    {({ setlist: "🎵 Setlist", equipe: "👥 Equipe", ensaios: "🎸 Ensaios", decisoes: "📋 Decisões", chat: "💬 Chat" } as Record<string, string>)[tab]}
+                  </button>
+                ))}
+              </nav>
+
+              {/* Aba: Equipe de Músicos */}
+              {activeTab === "equipe" && (
               <section style={{ ...sectionStyle, marginBottom: 16 }}>
                 <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>Equipe de Músicos</h2>
 
@@ -753,8 +764,10 @@ export default function EventDetailPage({ params }: PageProps) {
                   </button>
                 </form>
               </section>
+              )} {/* /equipe */}
 
-              {/* Setlist */}
+              {/* Aba: Setlist */}
+              {activeTab === "setlist" && (<>
               <section style={sectionStyle}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <h2 style={{ margin: 0, fontSize: 18, color: "#7cf2a2" }}>
@@ -1035,11 +1048,13 @@ export default function EventDetailPage({ params }: PageProps) {
                   → Ver Checklists do evento
                 </Link>
               </section>
+              </>)} {/* /setlist */}
 
-              {/* Ensaios */}
-              {eventId && <RehearsalsSection eventId={eventId} />}
+              {/* Aba: Ensaios */}
+              {activeTab === "ensaios" && eventId && <RehearsalsSection eventId={eventId} />}
 
-              {/* QR Code — Formulário de Decisões */}
+              {/* Aba: Decisões */}
+              {activeTab === "decisoes" && (
               <section style={{ ...sectionStyle, marginTop: 16 }}>
                 <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>📋 Formulário de Decisões</h2>
                 {event.slug ? (() => {
@@ -1107,8 +1122,10 @@ export default function EventDetailPage({ params }: PageProps) {
                 )}
               </section>
 
-              {/* Chat do Evento */}
-              {eventId && authUser && (
+              )} {/* /decisoes */}
+
+              {/* Aba: Chat */}
+              {activeTab === "chat" && eventId && authUser && (
                 <section style={{ ...sectionStyle, marginTop: 16 }}>
                   <EventChat
                     eventId={eventId}
@@ -1126,6 +1143,39 @@ export default function EventDetailPage({ params }: PageProps) {
     </AuthGate>
   );
 }
+
+const tabNavStyle: CSSProperties = {
+  display: "flex",
+  gap: 4,
+  marginBottom: 16,
+  background: "rgba(10, 22, 38, 0.6)",
+  borderRadius: 12,
+  padding: "6px",
+  border: "1px solid #2d4b6d",
+  flexWrap: "wrap",
+};
+
+const tabBtnStyle: CSSProperties = {
+  background: "transparent",
+  border: "none",
+  color: "#8fa9c8",
+  borderRadius: 8,
+  padding: "7px 16px",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const activeTabBtnStyle: CSSProperties = {
+  background: "#1b3756",
+  border: "1px solid #2d4b6d",
+  color: "#7cf2a2",
+  borderRadius: 8,
+  padding: "7px 16px",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+};
 
 const headerStyle: CSSProperties = {
   background: "linear-gradient(135deg, #1b3756 0%, #122840 55%, #0f2137 100%)",
