@@ -51,7 +51,7 @@ export default function EventChat({ eventId, currentUserId, currentUserName, isA
 
   useEffect(() => {
     fetchMessages();
-    const interval = setInterval(fetchMessages, 4000);
+    const interval = setInterval(fetchMessages, 10000);
     return () => clearInterval(interval);
   }, [fetchMessages]);
 
@@ -100,7 +100,7 @@ export default function EventChat({ eventId, currentUserId, currentUserName, isA
     <div className="flex flex-col border border-zinc-700 rounded-xl overflow-hidden bg-zinc-900 mt-6">
       <div className="px-4 py-3 border-b border-zinc-700 flex items-center gap-2">
         <span className="text-lg font-semibold text-white">💬 Chat do Evento</span>
-        <span className="text-xs text-zinc-400 ml-auto">atualiza a cada 4s</span>
+        <span className="text-xs text-zinc-400 ml-auto">atualiza a cada 10s</span>
       </div>
 
       {/* Messages */}
