@@ -11,6 +11,11 @@ type MusicianSlot = {
   user: { id: string; name: string };
 };
 
+type InstrumentConfig = {
+  instrumentRole: string;
+  requiredCount: number;
+};
+
 type EventRaw = {
   id: string;
   title: string;
@@ -22,6 +27,7 @@ type EventRaw = {
   status: string;
   computedStatus?: string;
   musicians: MusicianSlot[];
+  instrumentConfigs?: InstrumentConfig[];
 };
 
 export type UpcomingEvent = {
@@ -82,16 +88,26 @@ export async function GET(request: NextRequest) {
       .map((e) => {
         const slots = (e.musicians ?? []).filter((s) => s.user != null);
 
-        // Deduplicate by role: for each instrumentRole, show only the lowest-priority slot.
-        // This correctly handles cascading invites (priority per role, not global).
-        const roleMap = new Map<string, MusicianSlot>();
+        // Build a map of requiredCount per instrument (number of vagas).
+        const configMap = new Map<string, number>(
+          (e.instrumentConfigs ?? []).map((c) => [c.instrumentRole, c.requiredCount])
+        );
+
+        // Group by role, sort by priority, then keep top N (requiredCount) per role.
+        // This handles both cascading invites (1 vaga → keep 1) and multi-slot
+        // instruments (2 vagas → keep 2).
+        const roleGroups = new Map<string, MusicianSlot[]>();
         for (const s of slots) {
-          const existing = roleMap.get(s.instrumentRole);
-          if (!existing || s.priority < existing.priority) {
-            roleMap.set(s.instrumentRole, s);
-          }
+          if (!roleGroups.has(s.instrumentRole)) roleGroups.set(s.instrumentRole, []);
+          roleGroups.get(s.instrumentRole)!.push(s);
         }
-        const primary = Array.from(roleMap.values());
+
+        const primary: MusicianSlot[] = [];
+        for (const [role, group] of roleGroups) {
+          const count = configMap.get(role) ?? 1;
+          const sorted = group.slice().sort((a, b) => a.priority - b.priority);
+          primary.push(...sorted.slice(0, count));
+        }
         const confirmed = primary
           .filter((s) => s.status === "CONFIRMED")
           .map((s) => ({ id: s.user.id, name: s.user.name, role: s.instrumentRole }));
