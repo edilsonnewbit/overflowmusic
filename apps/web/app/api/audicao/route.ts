@@ -8,19 +8,24 @@ const API_INTERNAL =
 /**
  * POST /api/audicao
  * Proxy público para POST /api/auditions no backend.
- * Repassa o multipart/form-data sem modificação.
+ * Repassa o stream bruto do request (multipart/form-data) sem re-parsear em memória,
+ * o que é necessário para uploads de vídeo grandes.
  */
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-
     const target = `${API_INTERNAL.replace(/\/$/, "")}/auditions`;
 
-    const response = await fetch(target, {
+    const contentType = request.headers.get("content-type") ?? "";
+
+    // duplex: "half" é necessário para enviar ReadableStream como body no Node.js 18+
+    const fetchOptions: RequestInit & { duplex?: string } = {
       method: "POST",
-      body: formData,
-      // Não setar Content-Type manualmente — o browser/node define o boundary correto
-    });
+      body: request.body,
+      headers: { "content-type": contentType },
+      duplex: "half",
+    };
+
+    const response = await fetch(target, fetchOptions);
 
     const body = await response.json();
     return NextResponse.json(body, { status: response.status });
