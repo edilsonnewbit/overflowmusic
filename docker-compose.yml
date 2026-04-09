@@ -63,6 +63,7 @@ services:
     pull_policy: always
     restart: always
     environment:
+      TZ: America/Recife
       PORT: 3000
       NEXT_PUBLIC_API_URL: https://music.overflowmvmt.com/api
       ADMIN_API_KEY: ${ADMIN_API_KEY}
