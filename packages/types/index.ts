@@ -13,7 +13,7 @@ export const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; skills: str
   },
   MIDIA: {
     label: "Mídia",
-    skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides/ProPresenter", "Iluminação", "Som/PA"],
+    skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides", "Iluminação", "Som/PA"],
   },
   DANCA: {
     label: "Dança",

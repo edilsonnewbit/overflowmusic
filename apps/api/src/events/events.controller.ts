@@ -199,4 +199,30 @@ export class EventsController {
     await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.rehearsalsService.removeFromEvent(id, rehearsalId);
   }
+
+  // ── Volunteers ─────────────────────────────────────────────────────────────
+
+  @Get(":id/volunteers")
+  async listVolunteers(@Param("id") id: string) {
+    return this.eventsService.listVolunteers(id);
+  }
+
+  @Post(":id/volunteers")
+  async addVolunteer(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { userId: string; volunteerArea: string; role?: string },
+  ) {
+    await this.authService.assertAdminKeyOrContentManager(authorization);
+    return this.eventsService.addVolunteer(id, body);
+  }
+
+  @Delete(":id/volunteers/:volunteerId")
+  async removeVolunteer(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("volunteerId") volunteerId: string,
+  ) {
+    await this.authService.assertAdminKeyOrContentManager(authorization);
+    return this.eventsService.removeVolunteer(volunteerId);
+  }
 }

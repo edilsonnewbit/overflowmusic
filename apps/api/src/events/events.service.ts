@@ -441,4 +441,34 @@ export class EventsService {
       await this.notifications.sendMusicianReminder(slot.userId, slot.event.title, slot.instrumentRole, slot.id);
     }
   }
+
+  // ── Volunteers ──────────────────────────────────────────────────────────────
+
+  async listVolunteers(eventId: string) {
+    const volunteers = await this.prisma.eventVolunteer.findMany({
+      where: { eventId },
+      include: { user: { select: { id: true, name: true, volunteerArea: true } } },
+      orderBy: [{ volunteerArea: "asc" }, { createdAt: "asc" }],
+    });
+    return { ok: true, volunteers };
+  }
+
+  async addVolunteer(eventId: string, input: { userId: string; volunteerArea: string; role?: string }) {
+    const existing = await this.prisma.eventVolunteer.findFirst({
+      where: { eventId, userId: input.userId, volunteerArea: input.volunteerArea },
+    });
+    if (existing) {
+      throw new BadRequestException("Voluntário já escalado nesta área para este evento.");
+    }
+    const volunteer = await this.prisma.eventVolunteer.create({
+      data: { eventId, userId: input.userId, volunteerArea: input.volunteerArea, role: input.role ?? null },
+      include: { user: { select: { id: true, name: true, volunteerArea: true } } },
+    });
+    return { ok: true, volunteer };
+  }
+
+  async removeVolunteer(volunteerId: string) {
+    await this.prisma.eventVolunteer.delete({ where: { id: volunteerId } });
+    return { ok: true };
+  }
 }

@@ -42,6 +42,12 @@ enum MusicianSlotStatus {
   EXPIRED
 }
 
+enum VolunteerSlotStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
 enum ChordChartSourceType {
   TXT_IMPORT
   MANUAL
@@ -113,6 +119,7 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens  PasswordResetToken[]
   eventMusicians       EventMusician[]
+  eventVolunteers      EventVolunteer[]
   sentChatMessages     EventChatMessage[] @relation("ChatSender")
   receivedChatMessages EventChatMessage[] @relation("ChatRecipient")
 
@@ -175,6 +182,7 @@ model Event {
   setlist                  Setlist?
   checklistRuns            ChecklistRun[]
   musicians                EventMusician[]
+  volunteers               EventVolunteer[]
   instrumentConfigs        EventInstrumentConfig[]
   rehearsals               EventRehearsal[]
   decisions                EventDecision[]
@@ -237,6 +245,23 @@ model EventMusician {
 
   @@unique([eventId, instrumentRole, userId])
   @@index([eventId, instrumentRole, priority])
+  @@index([eventId, status])
+}
+
+model EventVolunteer {
+  id             String              @id @default(uuid())
+  eventId        String
+  userId         String
+  volunteerArea  String
+  role           String?
+  status         VolunteerSlotStatus @default(PENDING)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  event          Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId, volunteerArea])
+  @@index([eventId, volunteerArea])
   @@index([eventId, status])
 }
 
