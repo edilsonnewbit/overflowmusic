@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { useAuth } from "@/components/AuthProvider";
 
 type UserRole = "SUPER_ADMIN" | "ADMIN" | "LEADER" | "MEMBER";
 
@@ -67,6 +68,8 @@ export default function TeamPage() {
 }
 
 function TeamContent() {
+  const { user: authUser } = useAuth();
+  const callerRole = authUser?.role ?? "";
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +170,7 @@ function TeamContent() {
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {group.map((member) => (
-                      <MemberCard key={member.id} member={member} onUpdated={() => void load()} />
+                      <MemberCard key={member.id} member={member} callerRole={callerRole} onUpdated={() => void load()} />
                     ))}
                   </div>
                 </section>
@@ -180,7 +183,7 @@ function TeamContent() {
   );
 }
 
-function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () => void }) {
+function MemberCard({ member, callerRole, onUpdated }: { member: TeamMember; callerRole: string; onUpdated: () => void }) {
   const initials = getInitials(member.name);
   const roleColor = ROLE_COLOR[member.role];
   const [editing, setEditing] = useState(false);
@@ -200,10 +203,16 @@ function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () =
     setSaving(true);
     setSaveError("");
     try {
+      const payload: { role?: string; instruments: string[]; volunteerArea: string | null } = {
+        instruments: editSkills,
+        volunteerArea: editArea,
+      };
+      if (callerRole === "SUPER_ADMIN") payload.role = editRole;
+
       const res = await fetch(`/api/admin/users/${member.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: editRole, instruments: editSkills, volunteerArea: editArea }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = (await res.json()) as { message?: string };
@@ -270,19 +279,21 @@ function MemberCard({ member, onUpdated }: { member: TeamMember; onUpdated: () =
 
       {editing && (
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* Role selector */}
-          <div>
-            <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>Função</p>
-            <select
-              value={editRole}
-              onChange={(e) => setEditRole(e.target.value as UserRole)}
-              style={{ background: "#0b1d31", border: "1px solid #2d4b6d", borderRadius: 8, color: "#e8f2ff", padding: "6px 10px", fontSize: 13, width: "100%", appearance: "none" as const }}
-            >
-              {Object.entries(ROLE_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
+          {/* Role selector — somente SUPER_ADMIN pode alterar função */}
+          {callerRole === "SUPER_ADMIN" && (
+            <div>
+              <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8fa9c8" }}>Função</p>
+              <select
+                value={editRole}
+                onChange={(e) => setEditRole(e.target.value as UserRole)}
+                style={{ background: "#0b1d31", border: "1px solid #2d4b6d", borderRadius: 8, color: "#e8f2ff", padding: "6px 10px", fontSize: 13, width: "100%", appearance: "none" as const }}
+              >
+                {Object.entries(ROLE_LABEL).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Area selector */}
           <div>

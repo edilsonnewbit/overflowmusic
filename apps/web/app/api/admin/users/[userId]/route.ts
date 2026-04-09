@@ -13,12 +13,20 @@ export async function PATCH(request: NextRequest, context: Params) {
 
     const meRes = await serverApiFetch("auth/me", { method: "GET", authMode: "user", userToken: token });
     const me = (await meRes.json()) as { user?: { role?: string } };
-    if (me.user?.role !== "SUPER_ADMIN") {
+    const callerRole = me.user?.role;
+
+    if (callerRole !== "SUPER_ADMIN" && callerRole !== "ADMIN") {
       return NextResponse.json({ ok: false, message: "forbidden" }, { status: 403 });
     }
 
     const { userId } = await context.params;
-    const body = (await request.json()) as { role?: string; instruments?: string[] };
+    const body = (await request.json()) as { role?: string; instruments?: string[]; volunteerArea?: string | null };
+
+    // Alterar o role de outro usuário exige SUPER_ADMIN
+    if (body.role !== undefined && callerRole !== "SUPER_ADMIN") {
+      return NextResponse.json({ ok: false, message: "forbidden: apenas Super Admin pode alterar função" }, { status: 403 });
+    }
+
     const response = await serverApiFetch(`admin/users/${userId}`, {
       method: "PATCH",
       body: JSON.stringify(body),
