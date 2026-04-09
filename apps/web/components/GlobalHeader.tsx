@@ -18,6 +18,7 @@ const NAV_LINKS = [
 const ADMIN_LINKS = [
   { href: "/admin/team", label: "Equipe", icon: "👥" },
   { href: "/admin/users", label: "Aprovações", icon: "🔑" },
+  { href: "/admin/audicoes", label: "Audições", icon: "🎤" },
 ];
 
 export function GlobalHeader() {
