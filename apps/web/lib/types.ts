@@ -24,9 +24,10 @@ export type AuthUser = {
   pastorName?: string | null;
   whatsapp?: string | null;
   address?: string | null;
+  photoUrl?: string | null;
+  volunteerArea?: string | null;
   volunteerTermsVersion?: string | null;
   volunteerTermsAcceptedAt?: string | null;
-  volunteerArea?: string | null;
 };
 
 export type LoginPayload = {
