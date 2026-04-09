@@ -47,6 +47,7 @@ type SongOption = {
   artist: string | null;
   defaultKey: string | null;
   zone: string | null;
+  youtubeUrl: string | null;
 };
 
 type TeamUser = {
@@ -149,6 +150,9 @@ export default function EventDetailPage({ params }: PageProps) {
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  // youtube modal
+  const [youtubeSong, setYoutubeSong] = useState<{ title: string; url: string } | null>(null);
 
   // inline edit setlist item
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -864,14 +868,29 @@ export default function EventDetailPage({ params }: PageProps) {
                             <div style={{ flex: 1 }}>
                               {/* Linha do título — clicável para abrir edição */}
                               <p
-                                style={{ margin: 0, fontWeight: 700, opacity: isMoving ? 0.5 : 1, cursor: "pointer" }}
+                                style={{ margin: 0, fontWeight: 700, opacity: isMoving ? 0.5 : 1, cursor: "pointer", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}
                                 onClick={() => editingItemId === item.id ? setEditingItemId(null) : openEditItem(item)}
                                 title="Clique para editar"
                               >
-                                <span style={{ color: "#8fa9c8", marginRight: 6, fontSize: 13 }}>{idx + 1}.</span>
+                                <span style={{ color: "#8fa9c8", marginRight: 2, fontSize: 13 }}>{idx + 1}.</span>
                                 {item.songTitle}
-                                {isMoving && <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 8 }}>movendo...</span>}
-                                <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 8, opacity: 0.6 }}>✎</span>
+                                {isMoving && <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 4 }}>movendo...</span>}
+                                <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 4, opacity: 0.6 }}>✎</span>
+                                {(() => {
+                                  const yt = songs.find((s) => s.title.toLowerCase() === item.songTitle.toLowerCase())?.youtubeUrl;
+                                  if (!yt) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      title="Assistir no YouTube"
+                                      onClick={(e) => { e.stopPropagation(); setYoutubeSong({ title: item.songTitle, url: yt }); }}
+                                      style={{ display: "inline-flex", alignItems: "center", marginLeft: 6, padding: "1px 6px", background: "#ff0000", border: "none", borderRadius: 4, cursor: "pointer", gap: 4, lineHeight: 1 }}
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.8 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+                                      <span style={{ fontSize: 10, color: "white", fontWeight: 600 }}>YT</span>
+                                    </button>
+                                  );
+                                })()}
                               </p>
 
                               {/* Visualização (quando não está editando) */}
@@ -1163,6 +1182,41 @@ export default function EventDetailPage({ params }: PageProps) {
           )}
         </section>
       </main>
+
+      {/* Modal YouTube */}
+      {youtubeSong && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setYoutubeSong(null)}
+        >
+          <div
+            style={{ background: "#0d1f2f", borderRadius: 12, overflow: "hidden", width: "100%", maxWidth: 800, border: "1px solid #1a3a5c" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid #1a3a5c" }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>{youtubeSong.title}</span>
+              <button
+                type="button"
+                onClick={() => setYoutubeSong(null)}
+                style={{ background: "none", border: "none", color: "#8fa9c8", cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+              >✕</button>
+            </div>
+            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0 }}>
+              <iframe
+                src={(() => {
+                  const url = youtubeSong.url;
+                  const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+                  const id = m ? m[1] : null;
+                  return id ? `https://www.youtube.com/embed/${id}?autoplay=1` : url;
+                })()}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </AuthGate>
   );
 }
