@@ -529,9 +529,21 @@ export default function EventDetailPage({ params }: PageProps) {
               <h1 style={{ margin: "10px 0 4px", fontSize: 26 }}>Carregando...</h1>
             ) : event ? (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-                  <div style={{ flex: 1 }}>
-                    <h1 style={{ margin: "10px 0 4px", fontSize: 26 }}>{event.title}</h1>
+                {/* Header do evento — título + ações */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  {/* Coluna esquerda: título + data + endereço */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                      <h1 style={{ margin: 0, fontSize: 22, lineHeight: 1.2 }}>{event.title}</h1>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
+                        color: STATUS_COLOR[displayStatus] ?? "#8fa9c8",
+                        border: `1px solid ${STATUS_COLOR[displayStatus] ?? "#8fa9c8"}`,
+                        borderRadius: 6, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0,
+                      }}>
+                        {STATUS_LABEL[displayStatus] ?? displayStatus}
+                      </span>
+                    </div>
                     <p style={{ margin: "0 0 4px", color: "#b3c6e0", fontSize: 14 }}>
                       {formatDate(event.dateTime)}
                       {event.location ? ` — ${event.location}` : ""}
@@ -558,16 +570,6 @@ export default function EventDetailPage({ params }: PageProps) {
                     {event.description && (
                       <p style={{ margin: "4px 0 0", color: "#8fa9c8", fontSize: 13 }}>{event.description}</p>
                     )}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
-                      color: STATUS_COLOR[displayStatus] ?? "#8fa9c8",
-                      border: `1px solid ${STATUS_COLOR[displayStatus] ?? "#8fa9c8"}`,
-                      borderRadius: 6, padding: "2px 10px",
-                    }}>
-                      {STATUS_LABEL[displayStatus] ?? displayStatus}
-                    </span>
                     {event.confirmationDeadline && (() => {
                       const deadline = new Date(event.confirmationDeadline);
                       const now = new Date();
@@ -576,6 +578,7 @@ export default function EventDetailPage({ params }: PageProps) {
                       const urgent = !passed && hoursLeft < 24;
                       return (
                         <span style={{
+                          display: "inline-block", marginTop: 6,
                           fontSize: 11, fontWeight: 600,
                           color: passed ? "#f87171" : urgent ? "#fbbf24" : "#8fa9c8",
                           border: `1px solid ${passed ? "#f87171" : urgent ? "#fbbf24" : "#4a6278"}`,
@@ -585,6 +588,10 @@ export default function EventDetailPage({ params }: PageProps) {
                         </span>
                       );
                     })()}
+                  </div>
+
+                  {/* Coluna direita: botões de status + editar */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
                       {event.status === "DRAFT" && (
                         <button style={smallBtn("#60a5fa")} disabled={saving} onClick={() => void changeStatus("ACTIVE")}>Ativar</button>
@@ -592,11 +599,21 @@ export default function EventDetailPage({ params }: PageProps) {
                       {(event.status === "DRAFT" || event.status === "ACTIVE") && (
                         <button style={smallBtn("#7cf2a2")} disabled={saving} onClick={() => void changeStatus("PUBLISHED")}>Publicar</button>
                       )}
-                      {(event.status === "ACTIVE" || event.status === "PUBLISHED") && (
-                        <button style={smallBtn("#94a3b8")} disabled={saving} onClick={() => void changeStatus("ARCHIVED")}>Arquivar</button>
-                      )}
+                      {/* botão editar — ícone lápis */}
                       <button
-                        style={smallBtn("#fbbf24")}
+                        title="Editar evento"
+                        aria-label="Editar evento"
+                        style={{
+                          background: "transparent",
+                          border: "1px solid #fbbf24",
+                          borderRadius: 8,
+                          padding: "5px 8px",
+                          cursor: "pointer",
+                          color: "#fbbf24",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
                         onClick={() => {
                           setEditTitle(event.title);
                           setEditDateTime(event.dateTime.slice(0, 16));
@@ -611,7 +628,10 @@ export default function EventDetailPage({ params }: PageProps) {
                           setShowEdit((v) => !v);
                         }}
                       >
-                        Editar
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
                       </button>
                     </div>
                   </div>
