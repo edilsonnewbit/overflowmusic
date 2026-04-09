@@ -8,9 +8,10 @@ export type ChatMessage = {
   isPrivate: boolean;
   createdAt: string;
   userId: string;
+  userName: string;
+  userPhoto: string | null;
   toUserId: string | null;
-  user: { id: string; name: string };
-  toUser: { id: string; name: string } | null;
+  toUserName: string | null;
 };
 
 type EventMember = {
@@ -40,7 +41,8 @@ export default function EventChat({ eventId, currentUserId, currentUserName, isA
       const res = await fetch(`/api/events/${eventId}/chat`);
       if (res.ok) {
         const data = await res.json();
-        setMessages(data);
+        const msgs = Array.isArray(data) ? data : (Array.isArray(data?.messages) ? data.messages : []);
+        setMessages(msgs);
       }
     } catch {
       // silente — sem interrupção de UX para polling
@@ -121,11 +123,11 @@ export default function EventChat({ eventId, currentUserId, currentUserName, isA
                 }`}
               >
                 {!isMine && (
-                  <span className="block text-xs font-semibold text-zinc-300 mb-1">{msg.user.name}</span>
+                  <span className="block text-xs font-semibold text-zinc-300 mb-1">{msg.userName}</span>
                 )}
                 {msg.isPrivate && (
                   <span className="block text-xs text-amber-300 mb-0.5">
-                    🔒 Privado {msg.toUser ? `→ ${msg.toUser.name}` : ""}
+                    🔒 Privado {msg.toUserName ? `→ ${msg.toUserName}` : ""}
                   </span>
                 )}
                 {msg.text}
