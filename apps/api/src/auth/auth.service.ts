@@ -787,8 +787,9 @@ export class AuthService implements OnModuleInit {
           status: "APPROVED",
           reviewedAt: new Date(),
         },
+        // On update: only ensure the user is APPROVED.
+        // Do NOT overwrite role — allows manual promotion to SUPER_ADMIN.
         update: {
-          role: "ADMIN",
           status: "APPROVED",
           reviewedAt: new Date(),
         },
