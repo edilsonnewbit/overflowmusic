@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Headers, Param, Post } from "@nestjs/com
 import { SkipThrottle } from "@nestjs/throttler";
 import { EventChatService } from "./event-chat.service";
 
-@SkipThrottle()
+@SkipThrottle({ global: true })
 @Controller("api/events/:eventId/chat")
 export class EventChatController {
   constructor(private readonly service: EventChatService) {}

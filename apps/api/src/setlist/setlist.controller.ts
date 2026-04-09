@@ -33,7 +33,7 @@ type ReorderBody = {
   items: Array<{ id: string; order: number }>;
 };
 
-@SkipThrottle()
+@SkipThrottle({ global: true })
 @Controller("api/events/:eventId/setlist")
 export class SetlistController {
   constructor(

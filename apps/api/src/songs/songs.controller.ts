@@ -43,7 +43,7 @@ type PreviewTxtBody = {
   content: string;
 };
 
-@SkipThrottle()
+@SkipThrottle({ global: true })
 @Controller("api/songs")
 export class SongsController {
   constructor(

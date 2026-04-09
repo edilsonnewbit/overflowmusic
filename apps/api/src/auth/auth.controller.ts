@@ -59,7 +59,7 @@ export class AuthController {
     private readonly auditService: AuditService,
   ) {}
 
-  @Throttle({ auth: { limit: 10, ttl: 60000 } })
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
   @Post("api/auth/google")
   async googleLogin(@Body() body: GoogleLoginBody) {
     const profileFields = {
@@ -90,7 +90,7 @@ export class AuthController {
     );
   }
 
-  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @Throttle({ global: { limit: 5, ttl: 60000 } })
   @Post("api/auth/register")
   async emailRegister(@Body() body: {
     email: string;
@@ -114,7 +114,7 @@ export class AuthController {
     });
   }
 
-  @Throttle({ auth: { limit: 10, ttl: 60000 } })
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
   @Post("api/auth/login")
   async emailLogin(@Body() body: { email: string; password: string }) {
     return this.authService.emailLogin({
@@ -123,31 +123,31 @@ export class AuthController {
     });
   }
 
-  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @Throttle({ global: { limit: 5, ttl: 60000 } })
   @Post("api/auth/verify-email")
   async verifyEmail(@Body() body: { token: string }) {
     return this.authService.verifyEmail(body.token);
   }
 
-  @Throttle({ auth: { limit: 3, ttl: 60000 } })
+  @Throttle({ global: { limit: 3, ttl: 60000 } })
   @Post("api/auth/resend-verification")
   async resendVerification(@Body() body: { email: string }) {
     return this.authService.resendVerificationEmail(body.email);
   }
 
-  @Throttle({ auth: { limit: 3, ttl: 60000 } })
+  @Throttle({ global: { limit: 3, ttl: 60000 } })
   @Post("api/auth/request-password-reset")
   async requestPasswordReset(@Body() body: { email: string }) {
     return this.authService.requestPasswordReset(body.email);
   }
 
-  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @Throttle({ global: { limit: 5, ttl: 60000 } })
   @Post("api/auth/reset-password")
   async resetPassword(@Body() body: { token: string; password: string }) {
     return this.authService.resetPassword(body.token, body.password);
   }
 
-  @SkipThrottle()
+  @SkipThrottle({ global: true })
   @Get("api/auth/me")
   async me(@Headers("authorization") authorization?: string) {
     const token = (authorization || "").replace(/^Bearer\s+/i, "");
@@ -158,7 +158,7 @@ export class AuthController {
     return this.authService.getMe(token);
   }
 
-  @Throttle({ auth: { limit: 10, ttl: 60000 } })
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
   @Post("api/auth/refresh")
   async refreshToken(@Headers("authorization") authorization?: string) {
     const token = (authorization || "").replace(/^Bearer\s+/i, "");
@@ -169,7 +169,7 @@ export class AuthController {
     return this.authService.refreshAccessToken(token);
   }
 
-  @SkipThrottle()
+  @SkipThrottle({ global: true })
   @Patch("api/auth/me")
   async updateMe(
     @Headers("authorization") authorization: string | undefined,

@@ -40,7 +40,6 @@ import { SongsService } from "./songs/songs.service";
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       { name: "global", ttl: 60000, limit: 500 },
-      { name: "auth", ttl: 60000, limit: 10 },
     ]),
   ],
   controllers: [
