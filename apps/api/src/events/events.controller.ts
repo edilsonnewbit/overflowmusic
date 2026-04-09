@@ -108,7 +108,7 @@ export class EventsController {
 
   @Delete(":id")
   async remove(@Headers("authorization") authorization: string | undefined, @Param("id") id: string) {
-    await this.authService.assertAdminKeyOrContentManager(authorization);
+    await this.authService.assertAdminKeyOrSuperAdmin(authorization);
     const result = await this.eventsService.remove(id);
     void this.auditService.log({ action: "event.deleted", resourceType: "Event", resourceId: id });
     return result;

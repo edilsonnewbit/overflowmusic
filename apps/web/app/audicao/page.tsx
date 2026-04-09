@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { maskPhone } from "@/lib/phone-mask";
 
 // ─── Volunteer areas ──────────────────────────────────────────────────────────
 
@@ -173,7 +174,7 @@ export default function AudicaoPage() {
               <input style={inputStyle} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" required />
             </Field>
             <Field label="WhatsApp *">
-              <input style={inputStyle} type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(11) 99999-9999" required />
+              <input style={inputStyle} type="tel" value={whatsapp} onChange={(e) => setWhatsapp(maskPhone(e.target.value))} placeholder="(11) 99999-9999" maxLength={16} required />
             </Field>
           </Row>
           <Row>

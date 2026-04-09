@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { NotificationBell } from "@/components/NotificationBell";
 
 const isAdmin = (role?: string) => role === "SUPER_ADMIN" || role === "ADMIN";
+const isLeader = (role?: string) => role === "LEADER";
 
 const NAV_LINKS = [
   { href: "/events", label: "Eventos", icon: "📅" },
@@ -15,9 +16,15 @@ const NAV_LINKS = [
   { href: "/rehearsals", label: "Ensaios", icon: "🎸" },
 ];
 
+// Exclusivo para ADMIN e SUPER_ADMIN (páginas protegidas por AuthGate)
 const ADMIN_LINKS = [
   { href: "/admin/team", label: "Equipe", icon: "👥" },
   { href: "/admin/users", label: "Aprovações", icon: "🔑" },
+  { href: "/admin/audicoes", label: "Audições", icon: "🎤" },
+];
+
+// Links adicionais para LEADER (somente leitura, sem acesso a /admin/users)
+const LEADER_LINKS = [
   { href: "/admin/audicoes", label: "Audições", icon: "🎤" },
 ];
 
@@ -45,15 +52,16 @@ export function GlobalHeader() {
     ? [
         ...NAV_LINKS,
         ...(isAdmin(user.role) ? ADMIN_LINKS : []),
+        ...(isLeader(user.role) ? LEADER_LINKS : []),
       ]
     : [];
 
   return (
     <header className="global-header">
       <div className="global-header-inner">
-        {/* Brand */}
+        {/* Brand */}d
         <Link href="/" className="brand-block" style={{ textDecoration: "none" }}>
-          <p className="brand-kicker">Overflow Music</p>
+          <p className="brand-kicker">Overflow Movement</p>
           <p className="brand-title">Operations Console</p>
         </Link>
 

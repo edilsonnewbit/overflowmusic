@@ -684,7 +684,13 @@ export default function EventDetailPage({ params }: PageProps) {
             <>
               {/* Navegação por Abas */}
               <nav style={tabNavStyle}>
-                {(["setlist", "musicos", "voluntarios", "ensaios", "decisoes", "chat"] as const).map((tab) => (
+                {(["setlist", "musicos", "voluntarios", "ensaios", "decisoes", "chat"] as const)
+                  .filter((tab) => {
+                    // MEMBER vê apenas setlist e chat
+                    if (authUser?.role === "MEMBER") return tab === "setlist" || tab === "chat";
+                    return true;
+                  })
+                  .map((tab) => (
                   <button key={tab} style={activeTab === tab ? activeTabBtnStyle : tabBtnStyle} onClick={() => setActiveTab(tab)}>
                     {({ setlist: "🎵 Setlist", musicos: "🎸 Músicos", voluntarios: "👥 Voluntários", ensaios: "📝 Ensaios", decisoes: "📋 Decisões", chat: "💬 Chat" } as Record<string, string>)[tab]}
                   </button>

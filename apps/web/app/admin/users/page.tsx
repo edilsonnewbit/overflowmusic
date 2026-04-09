@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { useAuth } from "@/components/AuthProvider";
 
 type UserRole = "SUPER_ADMIN" | "ADMIN" | "LEADER" | "MEMBER";
 
@@ -37,6 +38,8 @@ const ROLE_LABEL: Record<UserRole, string> = {
 };
 
 export default function AdminUsersPage() {
+  const { user: authUser } = useAuth();
+  const isSuperAdmin = authUser?.role === "SUPER_ADMIN";
   const [users, setUsers] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Carregando...");
@@ -156,21 +159,30 @@ export default function AdminUsersPage() {
                         ))}
                       </select>
 
-                      <button
-                        style={approveBtn}
-                        disabled={isBusy}
-                        onClick={() => void approveUser(u.id)}
-                      >
-                        {isBusy ? "..." : "✓ Aprovar"}
-                      </button>
+                      {isSuperAdmin && (
+                        <>
+                          <button
+                            style={approveBtn}
+                            disabled={isBusy}
+                            onClick={() => void approveUser(u.id)}
+                          >
+                            {isBusy ? "..." : "✓ Aprovar"}
+                          </button>
 
-                      <button
-                        style={rejectBtn}
-                        disabled={isBusy}
-                        onClick={() => void rejectUser(u.id)}
-                      >
-                        {isBusy ? "..." : "✕ Rejeitar"}
-                      </button>
+                          <button
+                            style={rejectBtn}
+                            disabled={isBusy}
+                            onClick={() => void rejectUser(u.id)}
+                          >
+                            {isBusy ? "..." : "✕ Rejeitar"}
+                          </button>
+                        </>
+                      )}
+                      {!isSuperAdmin && (
+                        <span style={{ fontSize: 12, color: "#5a7a9a", fontStyle: "italic" }}>
+                          Somente Super Admin pode aprovar
+                        </span>
+                      )}
                     </div>
                   </li>
                 );
