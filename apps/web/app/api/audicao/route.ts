@@ -54,7 +54,7 @@ setInterval(() => {
 /**
  * POST /api/audicao
  * Proxy público para POST /api/auditions no backend.
- * Aplica rate limiting por IP antes de repassar.
+ * Lê o body como ArrayBuffer e repassa com o Content-Type original (multipart/form-data).
  */
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
@@ -74,16 +74,28 @@ export async function POST(request: NextRequest) {
     const target = `${API_INTERNAL.replace(/\/$/, "")}/auditions`;
     const contentType = request.headers.get("content-type") ?? "";
 
-    // Repassa o stream diretamente — evita carregar o vídeo inteiro em memória
-    const fetchOptions: RequestInit & { duplex?: string } = {
-      method: "POST",
-      body: request.body,
-      headers: { "content-type": contentType },
-      duplex: "half",
-    };
+    // ArrayBuffer lê o body completo incluindo o arquivo de vídeo
+    const bodyBuffer = await request.arrayBuffer();
 
-    const response = await fetch(target, fetchOptions);
-    const body = await response.json();
+    const response = await fetch(target, {
+      method: "POST",
+      body: bodyBuffer,
+      headers: { "content-type": contentType },
+    });
+
+    // Lê como text primeiro para evitar body already consumed em caso de erro de parse
+    const responseText = await response.text();
+    let body: unknown;
+    try {
+      body = JSON.parse(responseText);
+    } catch {
+      // NestJS retornou resposta não-JSON (ex: erro HTML do multer)
+      return NextResponse.json(
+        { ok: false, message: `Erro interno: ${responseText.slice(0, 300)}` },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(body, { status: response.status });
   } catch (error) {
     const message = error instanceof Error ? error.message : "internal error";
