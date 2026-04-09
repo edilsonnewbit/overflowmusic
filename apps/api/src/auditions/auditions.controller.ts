@@ -9,6 +9,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { AuditionsService } from "./auditions.service";
 
@@ -20,8 +21,10 @@ export class AuditionsController {
    * POST /api/auditions
    * Rota pública — qualquer pessoa pode se inscrever.
    * Aceita multipart/form-data com campos de texto + vídeo opcional (campo "video").
+   * Throttle secundário: 10 envios por BFF por minuto (o BFF já limita 3/hora por IP real).
    */
   @Post()
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
   @UseInterceptors(
     FileInterceptor("video", {
       limits: { fileSize: 300 * 1024 * 1024 }, // 300 MB
