@@ -14,6 +14,8 @@ type Decision = {
   decisionType: string | null;
   howDidYouHear: string | null;
   acceptsContact: boolean;
+  churchHelp: string | null;
+  wantsPrayer: boolean | null;
   notes: string | null;
   createdAt: string;
   event?: { id: string; title: string; slug?: string | null };
@@ -94,7 +96,9 @@ function AdminDecisoesContent() {
                     <th className="px-4 py-3">Tipo</th>
                     <th className="px-4 py-3">Cidade</th>
                     <th className="px-4 py-3">Igreja</th>
-                    <th className="px-4 py-3">Contato</th>
+                    <th className="px-4 py-3">Contato?</th>
+                    <th className="px-4 py-3">Conexão Igreja</th>
+                    <th className="px-4 py-3">Oração?</th>
                     <th className="px-4 py-3">Data</th>
                     <th className="px-4 py-3">Obs</th>
                   </tr>
@@ -122,6 +126,12 @@ function AdminDecisoesContent() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${d.acceptsContact ? "bg-emerald-900 text-emerald-300" : "bg-zinc-700 text-zinc-400"}`}>
                           {d.acceptsContact ? "Sim" : "Não"}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-300 text-xs">
+                        {d.churchHelp === "WANTS_CHURCH" ? "✅ Quer indicação" : d.churchHelp === "HAS_CHURCH" ? "🙌 Tem igreja" : d.churchHelp === "UNDECIDED" ? "🤔 Indefinido" : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {d.wantsPrayer === true ? <span className="text-emerald-400 text-xs font-semibold">🙏 Sim</span> : d.wantsPrayer === false ? <span className="text-zinc-400 text-xs">Não agora</span> : <span className="text-zinc-500 text-xs">—</span>}
                       </td>
                       <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">
                         {new Date(d.createdAt).toLocaleDateString("pt-BR")}

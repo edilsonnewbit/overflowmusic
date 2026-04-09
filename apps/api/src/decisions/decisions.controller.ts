@@ -24,6 +24,8 @@ export class DecisionsController {
       decisionType?: "PRIMEIRA_VEZ" | "RECONSAGRACAO" | "BATISMO" | "OUTRO";
       howDidYouHear?: string;
       acceptsContact?: boolean;
+      churchHelp?: string;
+      wantsPrayer?: boolean;
       notes?: string;
     },
   ) {

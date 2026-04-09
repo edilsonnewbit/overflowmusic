@@ -13,6 +13,8 @@ export type CreateDecisionInput = {
   decisionType?: DecisionType;
   howDidYouHear?: string;
   acceptsContact?: boolean;
+  churchHelp?: string;
+  wantsPrayer?: boolean;
   notes?: string;
 };
 
@@ -72,6 +74,8 @@ export class DecisionsService {
         decisionType,
         howDidYouHear: (input.howDidYouHear || "").trim() || null,
         acceptsContact: input.acceptsContact ?? true,
+        churchHelp: (input.churchHelp || "").trim() || null,
+        wantsPrayer: input.wantsPrayer ?? null,
         notes: (input.notes || "").trim() || null,
       },
     });
