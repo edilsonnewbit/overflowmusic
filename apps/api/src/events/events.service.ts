@@ -29,7 +29,7 @@ type CreateEventInput = {
   responseWindowHours?: number;
 };
 
-type UpdateEventInput = Partial<CreateEventInput>;
+type UpdateEventInput = Partial<CreateEventInput> & { generateSlug?: boolean };
 
 type MusicianSlotInput = {
   instrumentRole: string;
@@ -183,6 +183,12 @@ export class EventsService {
       data.confirmationDeadline = input.confirmationDeadline ? new Date(input.confirmationDeadline) : null;
     } else if (input.confirmationDeadline === null) {
       data.confirmationDeadline = null;
+    }
+
+    // Gera slug se solicitado explicitamente e evento ainda não tem slug
+    if (input.generateSlug && !existing.slug) {
+      const titleForSlug = (data.title as string | undefined) ?? existing.title;
+      (data as Record<string, unknown>).slug = generateSlug(titleForSlug);
     }
 
     const event = await this.prisma.event.update({ where: { id }, data });

@@ -28,7 +28,7 @@ type CreateEventBody = {
   responseWindowHours?: number;
 };
 
-type UpdateEventBody = Partial<CreateEventBody>;
+type UpdateEventBody = Partial<CreateEventBody> & { generateSlug?: boolean };
 
 type MusicianBody = {
   instrumentRole: string;

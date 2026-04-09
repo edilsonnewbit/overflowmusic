@@ -113,6 +113,7 @@ export default function EventDetailPage({ params }: PageProps) {
   const [editDescription, setEditDescription] = useState("");
   const [editConfirmationDeadline, setEditConfirmationDeadline] = useState("");
   const [saving, setSaving] = useState(false);
+  const [generatingSlug, setGeneratingSlug] = useState(false);
 
   // songs catalog
   const [songs, setSongs] = useState<SongOption[]>([]);
@@ -1039,44 +1040,72 @@ export default function EventDetailPage({ params }: PageProps) {
               {eventId && <RehearsalsSection eventId={eventId} />}
 
               {/* QR Code — Formulário de Decisões */}
-              {event.slug && (() => {
-                const decisaoUrl = typeof window !== "undefined"
-                  ? `${window.location.origin}/e/${event.slug}/decisao`
-                  : `https://music.overflowmvmt.com/e/${event.slug}/decisao`;
-                return (
-                  <section style={{ ...sectionStyle, marginTop: 16 }}>
-                    <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>📋 Formulário de Decisões</h2>
-                    <p style={{ color: "#8fa9c8", fontSize: 13, margin: "0 0 16px", lineHeight: 1.5 }}>
-                      Apresente este QR Code durante o evento para registrar decisões de fé dos presentes.
+              <section style={{ ...sectionStyle, marginTop: 16 }}>
+                <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>📋 Formulário de Decisões</h2>
+                {event.slug ? (() => {
+                  const decisaoUrl = typeof window !== "undefined"
+                    ? `${window.location.origin}/e/${event.slug}/decisao`
+                    : `https://music.overflowmvmt.com/e/${event.slug}/decisao`;
+                  return (
+                    <>
+                      <p style={{ color: "#8fa9c8", fontSize: 13, margin: "0 0 16px", lineHeight: 1.5 }}>
+                        Apresente este QR Code durante o evento para registrar decisões de fé dos presentes.
+                      </p>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
+                        <div style={{ background: "#ffffff", padding: 12, borderRadius: 12, display: "inline-block" }}>
+                          <QRCodeCanvas url={decisaoUrl} size={180} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                          <p style={{ color: "#b3c6e0", fontSize: 12, margin: "0 0 8px", wordBreak: "break-all" }}>
+                            🔗 {decisaoUrl}
+                          </p>
+                          <a
+                            href={decisaoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 12, color: "#60a5fa", textDecoration: "none", border: "1px solid #60a5fa", borderRadius: 6, padding: "4px 12px", display: "inline-block", marginBottom: 8 }}
+                          >
+                            Abrir formulário ↗
+                          </a>
+                          <br />
+                          <Link
+                            href={`/admin/decisoes?eventId=${eventId}`}
+                            style={{ fontSize: 12, color: "#7cf2a2", textDecoration: "none", border: "1px solid #7cf2a2", borderRadius: 6, padding: "4px 12px", display: "inline-block" }}
+                          >
+                            Ver respostas →
+                          </Link>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })() : (
+                  <>
+                    <p style={{ color: "#8fa9c8", fontSize: 13, margin: "0 0 12px", lineHeight: 1.5 }}>
+                      Este evento ainda não tem um link de decisões gerado. Clique abaixo para criar o QR Code.
                     </p>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
-                      <div style={{ background: "#ffffff", padding: 12, borderRadius: 12, display: "inline-block" }}>
-                        <QRCodeCanvas url={decisaoUrl} size={180} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 200 }}>
-                        <p style={{ color: "#b3c6e0", fontSize: 12, margin: "0 0 8px", wordBreak: "break-all" }}>
-                          🔗 {decisaoUrl}
-                        </p>
-                        <a
-                          href={decisaoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ fontSize: 12, color: "#60a5fa", textDecoration: "none", border: "1px solid #60a5fa", borderRadius: 6, padding: "4px 12px", display: "inline-block", marginBottom: 8 }}
-                        >
-                          Abrir formulário ↗
-                        </a>
-                        <br />
-                        <Link
-                          href={`/admin/decisoes?eventId=${eventId}`}
-                          style={{ fontSize: 12, color: "#7cf2a2", textDecoration: "none", border: "1px solid #7cf2a2", borderRadius: 6, padding: "4px 12px", display: "inline-block" }}
-                        >
-                          Ver respostas →
-                        </Link>
-                      </div>
-                    </div>
-                  </section>
-                );
-              })()}
+                    <button
+                      style={smallBtn("#7cf2a2")}
+                      disabled={generatingSlug}
+                      onClick={async () => {
+                        if (!eventId) return;
+                        setGeneratingSlug(true);
+                        try {
+                          await fetch(`/api/events/${eventId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ generateSlug: true }),
+                          });
+                          await loadEvent(eventId);
+                        } finally {
+                          setGeneratingSlug(false);
+                        }
+                      }}
+                    >
+                      {generatingSlug ? "Gerando..." : "🔗 Gerar QR Code"}
+                    </button>
+                  </>
+                )}
+              </section>
 
               {/* Chat do Evento */}
               {eventId && authUser && (
