@@ -26,6 +26,7 @@ export type AuthUser = {
   address?: string | null;
   volunteerTermsVersion?: string | null;
   volunteerTermsAcceptedAt?: string | null;
+  volunteerArea?: string | null;
 };
 
 export type LoginPayload = {
