@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthGate } from "@/components/AuthGate";
 
@@ -26,7 +26,7 @@ const DECISION_TYPE_LABEL: Record<string, string> = {
   OUTRO: "Outro",
 };
 
-export default function AdminDecisoesPage() {
+function AdminDecisoesContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -141,5 +141,13 @@ export default function AdminDecisoesPage() {
         </div>
       </main>
     </AuthGate>
+  );
+}
+
+export default function AdminDecisoesPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminDecisoesContent />
+    </Suspense>
   );
 }
