@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverApiFetch } from "@/lib/server-api";
 
+type Params = { params: Promise<{ id: string }> };
+
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: Params
 ) {
+  const { id } = await params;
   try {
     const body = await request.json();
-    const response = await serverApiFetch(`auditions/${params.id}/status`, {
+    const response = await serverApiFetch(`auditions/${id}/status`, {
       method: "PATCH",
       authMode: "admin",
       body: JSON.stringify(body),
