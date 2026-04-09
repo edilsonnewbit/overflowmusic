@@ -876,21 +876,6 @@ export default function EventDetailPage({ params }: PageProps) {
                                 {item.songTitle}
                                 {isMoving && <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 4 }}>movendo...</span>}
                                 <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 4, opacity: 0.6 }}>✎</span>
-                                {(() => {
-                                  const yt = songs.find((s) => s.title.toLowerCase() === item.songTitle.toLowerCase())?.youtubeUrl;
-                                  if (!yt) return null;
-                                  return (
-                                    <button
-                                      type="button"
-                                      title="Assistir no YouTube"
-                                      onClick={(e) => { e.stopPropagation(); setYoutubeSong({ title: item.songTitle, url: yt }); }}
-                                      style={{ display: "inline-flex", alignItems: "center", marginLeft: 6, padding: "1px 6px", background: "#ff0000", border: "none", borderRadius: 4, cursor: "pointer", gap: 4, lineHeight: 1 }}
-                                    >
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.8 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
-                                      <span style={{ fontSize: 10, color: "white", fontWeight: 600 }}>YT</span>
-                                    </button>
-                                  );
-                                })()}
                               </p>
 
                               {/* Visualização (quando não está editando) */}
@@ -961,14 +946,30 @@ export default function EventDetailPage({ params }: PageProps) {
                                 </div>
                               )}
                             </div>
-                            <button
-                              style={deleteBtn}
-                              disabled={isBusy}
-                              onClick={() => void deleteSetlistItem(item.id)}
-                              title="Remover"
-                            >
-                              {isDeleting ? "..." : "✕"}
-                            </button>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, flexShrink: 0 }}>
+                              <button
+                                style={deleteBtn}
+                                disabled={isBusy}
+                                onClick={() => void deleteSetlistItem(item.id)}
+                                title="Remover"
+                              >
+                                {isDeleting ? "..." : "✕"}
+                              </button>
+                              {(() => {
+                                const yt = songs.find((s) => s.title.toLowerCase() === item.songTitle.toLowerCase())?.youtubeUrl;
+                                if (!yt) return null;
+                                return (
+                                  <button
+                                    type="button"
+                                    title="Assistir no YouTube"
+                                    onClick={(e) => { e.stopPropagation(); setYoutubeSong({ title: item.songTitle, url: yt }); }}
+                                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 20, padding: 0, background: "#ff0000", border: "none", borderRadius: 4, cursor: "pointer" }}
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.8 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+                                  </button>
+                                );
+                              })()}
+                            </div>
                           </div>
                         </li>
                       );
