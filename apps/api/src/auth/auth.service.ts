@@ -452,8 +452,6 @@ export class AuthService implements OnModuleInit {
     }
 
     return { ok: true, message: "If the email exists, a password reset link has been sent" };
-
-    return { ok: true, message: "If the email exists, a password reset link has been sent" };
   }
 
   /**
@@ -713,6 +711,42 @@ export class AuthService implements OnModuleInit {
     }
 
     if (!["SUPER_ADMIN", "ADMIN", "LEADER"].includes(user.role)) {
+      throw new UnauthorizedException("unauthorized");
+    }
+  }
+
+  /**
+   * Accepts either the ADMIN_API_KEY (server-to-server) or a valid JWT
+   * from a user with role SUPER_ADMIN | ADMIN only.
+   * Use for operations that LEADER must not perform (delete, approve users, etc.).
+   */
+  async assertAdminKeyOrAdmin(authorization: string | undefined): Promise<void> {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
+    if (this.adminApiKey && token === this.adminApiKey) return;
+    try {
+      const payload = this.verifyToken(token);
+      const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+      if (!user || user.status !== "APPROVED") throw new Error();
+      if (!["SUPER_ADMIN", "ADMIN"].includes(user.role)) throw new Error();
+    } catch {
+      throw new UnauthorizedException("unauthorized");
+    }
+  }
+
+  /**
+   * Accepts either the ADMIN_API_KEY (server-to-server) or a valid JWT
+   * from a user with role SUPER_ADMIN only.
+   * Use for destructive / governance operations (delete, approve/reject users, change roles).
+   */
+  async assertAdminKeyOrSuperAdmin(authorization: string | undefined): Promise<void> {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
+    if (this.adminApiKey && token === this.adminApiKey) return;
+    try {
+      const payload = this.verifyToken(token);
+      const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+      if (!user || user.status !== "APPROVED") throw new Error();
+      if (user.role !== "SUPER_ADMIN") throw new Error();
+    } catch {
       throw new UnauthorizedException("unauthorized");
     }
   }

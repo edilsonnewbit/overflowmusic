@@ -107,7 +107,7 @@ export class SongsController {
 
   @Delete(":id")
   async remove(@Headers("authorization") authorization: string | undefined, @Param("id") id: string) {
-    await this.assertWriteAccess(authorization);
+    await this.authService.assertAdminKeyOrSuperAdmin(authorization);
     return this.songsService.remove(id);
   }
 
