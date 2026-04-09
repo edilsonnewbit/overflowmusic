@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverApiFetch } from "@/lib/server-api";
 import { cookies } from "next/headers";
+import { ACCESS_TOKEN_COOKIE } from "@/lib/auth-cookie";
 
 type Params = { params: Promise<{ eventId: string }> };
 
 async function getUserToken(): Promise<string | null> {
   const jar = await cookies();
-  return jar.get("session_token")?.value ?? null;
+  return jar.get(ACCESS_TOKEN_COOKIE)?.value ?? null;
 }
 
 /** GET /api/events/[eventId]/chat — listar mensagens */
