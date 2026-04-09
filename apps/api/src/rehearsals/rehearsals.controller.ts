@@ -25,7 +25,7 @@ type CreateRehearsalBody = {
 
 type UpdateRehearsalBody = Partial<CreateRehearsalBody>;
 
-@SkipThrottle()
+@SkipThrottle({ global: true })
 @Controller("api/rehearsals")
 export class RehearsalsController {
   constructor(

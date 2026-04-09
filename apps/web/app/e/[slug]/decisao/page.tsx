@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type DecisionType = "PRIMEIRA_VEZ" | "RECONSAGRACAO" | "BATISMO" | "OUTRO";
+type ChurchHelp = "WANTS_CHURCH" | "HAS_CHURCH" | "UNDECIDED";
 
 const DECISION_LABELS: Record<DecisionType, string> = {
   PRIMEIRA_VEZ: "Primeira vez",
@@ -18,6 +18,12 @@ const DECISION_ICONS: Record<DecisionType, string> = {
   BATISMO: "💧",
   OUTRO: "💛",
 };
+
+const CHURCH_HELP_OPTIONS: { value: ChurchHelp; label: string; icon: string }[] = [
+  { value: "WANTS_CHURCH", label: "Quero que me indiquem uma igreja", icon: "✅" },
+  { value: "HAS_CHURCH",   label: "Já faço parte de uma igreja",      icon: "🙌" },
+  { value: "UNDECIDED",    label: "Ainda não sei / quero entender melhor", icon: "🤔" },
+];
 
 const HOW_OPTIONS = [
   "Amigo ou familiar",
@@ -45,9 +51,10 @@ export default function DecisaoPage({ params }: PageProps) {
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [city, setCity] = useState("");
-  const [church, setChurch] = useState("");
   const [decisionType, setDecisionType] = useState<DecisionType>("PRIMEIRA_VEZ");
   const [howDidYouHear, setHowDidYouHear] = useState("");
+  const [churchHelp, setChurchHelp] = useState<ChurchHelp | null>(null);
+  const [wantsPrayer, setWantsPrayer] = useState<boolean | null>(null);
   const [acceptsContact, setAcceptsContact] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
@@ -87,7 +94,16 @@ export default function DecisaoPage({ params }: PageProps) {
       const res = await fetch(`/api/decisao/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), whatsapp: whatsapp.trim(), city: city.trim(), church: church.trim(), decisionType, howDidYouHear, acceptsContact }),
+        body: JSON.stringify({
+          name: name.trim(),
+          whatsapp: whatsapp.trim(),
+          city: city.trim(),
+          decisionType,
+          howDidYouHear,
+          acceptsContact,
+          churchHelp,
+          wantsPrayer,
+        }),
       });
       const body = (await res.json()) as { ok?: boolean; message?: string };
       if (!res.ok) { setError(body.message ?? "Erro ao enviar."); return; }
@@ -126,7 +142,7 @@ export default function DecisaoPage({ params }: PageProps) {
           <p style={{ fontSize: 56, marginBottom: 16 }}>🎉</p>
           <h1 style={{ color: "#7cf2a2", fontSize: 24, fontWeight: 700, marginBottom: 12 }}>Decisão registrada!</h1>
           <p style={{ color: "#b3c6e0", fontSize: 15, lineHeight: 1.6, marginBottom: 8 }}>
-            Que alegria! Nossa equipe entrará em contato pelo WhatsApp para acompanhar você.
+            Que alegria! Nossa equipe entrará em contato pelo WhatsApp para te acompanhar nesse próximo passo.
           </p>
           <p style={{ color: "#5a7a9a", fontSize: 13 }}>Você pode fechar esta página.</p>
         </div>
@@ -158,9 +174,9 @@ export default function DecisaoPage({ params }: PageProps) {
 
       <form onSubmit={(e) => void handleSubmit(e)} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-        {/* Tipo de decisão */}
+        {/* BLOCO 1 — O que Deus fez */}
         <div style={cardStyle}>
-          <p style={sectionLabel}>Qual foi sua decisão?</p>
+          <p style={sectionLabel}>O que Deus fez no seu coração hoje?</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
             {(Object.keys(DECISION_LABELS) as DecisionType[]).map((type) => {
               const selected = decisionType === type;
@@ -188,7 +204,7 @@ export default function DecisaoPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Dados pessoais */}
+        {/* BLOCO 2 — Dados pessoais */}
         <div style={cardStyle}>
           <p style={sectionLabel}>Seus dados</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
@@ -200,16 +216,79 @@ export default function DecisaoPage({ params }: PageProps) {
               <label style={labelStyle}>WhatsApp *</label>
               <input style={inputStyle} type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(11) 99999-9999" required />
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Cidade</label>
-                <input style={inputStyle} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Sua cidade" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Igreja (se tiver)</label>
-                <input style={inputStyle} value={church} onChange={(e) => setChurch(e.target.value)} placeholder="Nome da igreja" />
-              </div>
+            <div>
+              <label style={labelStyle}>Cidade *</label>
+              <input style={inputStyle} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Sua cidade" />
             </div>
+          </div>
+        </div>
+
+        {/* BLOCO 3 — Conexão com igreja */}
+        <div style={cardStyle}>
+          <p style={sectionLabel}>Quer ajuda para continuar essa caminhada?</p>
+          <p style={{ color: "#7a9dbf", fontSize: 13, margin: "6px 0 14px", lineHeight: 1.5 }}>
+            Podemos te conectar com uma igreja séria na sua cidade pra te acompanhar de perto.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {CHURCH_HELP_OPTIONS.map((opt) => {
+              const selected = churchHelp === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setChurchHelp(selected ? null : opt.value)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "13px 16px",
+                    borderRadius: 12,
+                    border: selected ? "2px solid #7cf2a2" : "1px solid #2d4b6d",
+                    background: selected ? "#0f3020" : "#0a1520",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{opt.icon}</span>
+                  <span style={{ color: selected ? "#7cf2a2" : "#8fa9c8", fontSize: 14, fontWeight: selected ? 600 : 400 }}>
+                    {opt.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* BLOCO 4 — Oração */}
+        <div style={cardStyle}>
+          <p style={sectionLabel}>Você gostaria que alguém orasse por você?</p>
+          <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+            {[
+              { value: true,  label: "Sim 🙏" },
+              { value: false, label: "Não agora" },
+            ].map((opt) => {
+              const selected = wantsPrayer === opt.value;
+              return (
+                <button
+                  key={String(opt.value)}
+                  type="button"
+                  onClick={() => setWantsPrayer(selected ? null : opt.value)}
+                  style={{
+                    flex: 1,
+                    padding: "13px 12px",
+                    borderRadius: 12,
+                    border: selected ? "2px solid #7cf2a2" : "1px solid #2d4b6d",
+                    background: selected ? "#0f3020" : "#0a1520",
+                    color: selected ? "#7cf2a2" : "#8fa9c8",
+                    fontSize: 14,
+                    fontWeight: selected ? 700 : 400,
+                    cursor: "pointer",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -248,7 +327,7 @@ export default function DecisaoPage({ params }: PageProps) {
             style={{ accentColor: "#7cf2a2", marginTop: 2, flexShrink: 0 }}
           />
           <span style={{ color: "#7a9dbf", fontSize: 13, lineHeight: 1.5 }}>
-            Aceito ser contatado(a) pelo WhatsApp para acompanhamento espiritual.
+            Aceito ser contatado(a) pelo WhatsApp para que possamos te conectar com uma igreja e te acompanhar nesse início de caminhada.
             Seus dados serão usados exclusivamente para esse fim, conforme a LGPD.
           </span>
         </label>
@@ -271,7 +350,7 @@ export default function DecisaoPage({ params }: PageProps) {
             opacity: submitting ? 0.7 : 1,
           }}
         >
-          {submitting ? "Registrando..." : "Registrar minha decisão ✝️"}
+          {submitting ? "Registrando..." : "Quero dar o próximo passo 🙏"}
         </button>
 
         <p style={{ color: "#3a5570", fontSize: 11, textAlign: "center", lineHeight: 1.5, margin: 0 }}>

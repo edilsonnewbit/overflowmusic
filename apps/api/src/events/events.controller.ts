@@ -36,7 +36,7 @@ type MusicianBody = {
   priority: number;
 };
 
-@SkipThrottle()
+@SkipThrottle({ global: true })
 @Controller("api/events")
 export class EventsController {
   constructor(

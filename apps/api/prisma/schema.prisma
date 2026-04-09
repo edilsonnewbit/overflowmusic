@@ -199,18 +199,20 @@ enum DecisionType {
 }
 
 model EventDecision {
-  id          String       @id @default(uuid())
-  eventId     String
-  name        String
-  whatsapp    String
-  city        String?
-  church      String?
-  decisionType DecisionType @default(PRIMEIRA_VEZ)
+  id            String       @id @default(uuid())
+  eventId       String
+  name          String
+  whatsapp      String
+  city          String?
+  church        String?
+  decisionType  DecisionType @default(PRIMEIRA_VEZ)
   howDidYouHear String?
-  acceptsContact Boolean  @default(true)
-  notes       String?
-  createdAt   DateTime     @default(now())
-  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  acceptsContact Boolean    @default(true)
+  churchHelp    String?
+  wantsPrayer   Boolean?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  event         Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId])
   @@index([createdAt])

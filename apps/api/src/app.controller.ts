@@ -3,7 +3,7 @@ import { SkipThrottle } from "@nestjs/throttler";
 import { PrismaService } from "./prisma/prisma.service";
 import { QueueService } from "./notifications/queue.service";
 
-@SkipThrottle()
+@SkipThrottle({ global: true })
 @Controller()
 export class AppController {
   private readonly version = process.env.IMAGE_TAG || "dev";
