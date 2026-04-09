@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { CSSProperties, FormEvent, useCallback, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { useAuth } from "@/components/AuthProvider";
+import { QRCodeCanvas } from "@/components/QRCodeCanvas";
+import EventChat from "@/components/EventChat";
 import type { EventStatus, SetlistItem, EventSetlist } from "@/lib/types";
 type Setlist = NonNullable<EventSetlist>;
 
@@ -18,6 +21,7 @@ type EventMusician = {
 type Event = {
   id: string;
   title: string;
+  slug?: string | null;
   dateTime: string;
   location: string | null;
   address?: string | null;
@@ -94,6 +98,7 @@ const TABERNACLE_ZONES = [
 ];
 
 export default function EventDetailPage({ params }: PageProps) {
+  const { user: authUser } = useAuth();
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1032,6 +1037,59 @@ export default function EventDetailPage({ params }: PageProps) {
 
               {/* Ensaios */}
               {eventId && <RehearsalsSection eventId={eventId} />}
+
+              {/* QR Code — Formulário de Decisões */}
+              {event.slug && (() => {
+                const decisaoUrl = typeof window !== "undefined"
+                  ? `${window.location.origin}/e/${event.slug}/decisao`
+                  : `https://music.overflowmvmt.com/e/${event.slug}/decisao`;
+                return (
+                  <section style={{ ...sectionStyle, marginTop: 16 }}>
+                    <h2 style={{ margin: "0 0 14px", fontSize: 18, color: "#7cf2a2" }}>📋 Formulário de Decisões</h2>
+                    <p style={{ color: "#8fa9c8", fontSize: 13, margin: "0 0 16px", lineHeight: 1.5 }}>
+                      Apresente este QR Code durante o evento para registrar decisões de fé dos presentes.
+                    </p>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
+                      <div style={{ background: "#ffffff", padding: 12, borderRadius: 12, display: "inline-block" }}>
+                        <QRCodeCanvas url={decisaoUrl} size={180} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 200 }}>
+                        <p style={{ color: "#b3c6e0", fontSize: 12, margin: "0 0 8px", wordBreak: "break-all" }}>
+                          🔗 {decisaoUrl}
+                        </p>
+                        <a
+                          href={decisaoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: 12, color: "#60a5fa", textDecoration: "none", border: "1px solid #60a5fa", borderRadius: 6, padding: "4px 12px", display: "inline-block", marginBottom: 8 }}
+                        >
+                          Abrir formulário ↗
+                        </a>
+                        <br />
+                        <Link
+                          href={`/admin/decisoes?eventId=${eventId}`}
+                          style={{ fontSize: 12, color: "#7cf2a2", textDecoration: "none", border: "1px solid #7cf2a2", borderRadius: 6, padding: "4px 12px", display: "inline-block" }}
+                        >
+                          Ver respostas →
+                        </Link>
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
+
+              {/* Chat do Evento */}
+              {eventId && authUser && (
+                <section style={{ ...sectionStyle, marginTop: 16 }}>
+                  <EventChat
+                    eventId={eventId}
+                    currentUserId={authUser.id}
+                    currentUserName={authUser.name}
+                    isAdmin={authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN"}
+                    members={teamUsers.map((u) => ({ id: u.id, name: u.name }))}
+                  />
+                </section>
+              )}
             </>
           )}
         </section>

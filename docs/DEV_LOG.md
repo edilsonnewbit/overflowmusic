@@ -2,6 +2,19 @@
 
 Registro oficial de progresso para handoff entre LLMs.
 
+### [2026-04-22 BRT] - GitHub Copilot (Claude Sonnet 4.6)
+- Objetivo: Metrônomo com som real, tela cheia cifra, botão sem acordes, logo login mais abaixo
+- Feito:
+  - `apps/mobile/assets/click.wav`: arquivo WAV 22050Hz/16bit/mono/50ms gerado (click sonoro para metrônomo)
+  - `apps/mobile/package.json`: adicionado `expo-av: ^16.0.8`
+  - `apps/mobile/app/present.tsx`: `import { Audio } from "expo-av"`; `soundRef` + loading useEffect; `playClick()` useCallback (som + vibração); engine metrônomo usa `playClick` em vez de `Vibration.vibrate`; states `cifraFullscreen`, `showChords`, `showCifraControls`; botões ⛶ (tela cheia) e ♪ (sem acordes) na toolbar row 1; filtro de acordes via `showChords`; overlay fullscreen (`position:absolute zIndex:40`) com controles auto-hide 3s + seta ▼ para reexibir; `showControlsTemporarily` useCallback
+  - `apps/mobile/src/screens/LoginScreen.tsx`: `paddingTop: 72 → 110` (logo desce)
+- Commit: `b713089`
+- APK: `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` (BUILD SUCCESSFUL 1m33s, 448 tasks)
+- **ATENÇÃO**: APK inclui código nativo do `expo-av` — o APK anterior NÃO funciona com esse bundle JS
+- Status: ✅ 0 erros TS, build OK
+- Próximo passo: testar metrônomo com fone, validar auto-scroll no fullscreen
+
 ### [2026-04-21 BRT] - GitHub Copilot (Claude Sonnet 4.6)
 - Objetivo: Fix "ver cifra" no modo apresentação + paridade de eventos mobile vs web (status chips + músicos)
 - Feito:

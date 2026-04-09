@@ -2,6 +2,19 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { EventStatus, EventType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { randomBytes } from "node:crypto";
+
+function generateSlug(title: string): string {
+  const base = title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  const suffix = randomBytes(3).toString("hex");
+  return `${base}-${suffix}`;
+}
 
 type CreateEventInput = {
   title: string;
@@ -112,6 +125,7 @@ export class EventsService {
     const event = await this.prisma.event.create({
       data: {
         title,
+        slug: generateSlug(title),
         dateTime,
         location: input.location?.trim() || null,
         address: input.address?.trim() || null,

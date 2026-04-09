@@ -113,6 +113,8 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens  PasswordResetToken[]
   eventMusicians       EventMusician[]
+  sentChatMessages     EventChatMessage[] @relation("ChatSender")
+  receivedChatMessages EventChatMessage[] @relation("ChatRecipient")
 
   @@index([status])
   @@index([emailVerified])
@@ -176,6 +178,7 @@ model Event {
   instrumentConfigs        EventInstrumentConfig[]
   rehearsals               EventRehearsal[]
   decisions                EventDecision[]
+  chatMessages             EventChatMessage[]
 
   @@index([slug])
 }
@@ -392,6 +395,22 @@ model OrganizationMember {
 
   @@unique([userId, organizationId])
   @@index([organizationId])
+}
+
+model EventChatMessage {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  text      String
+  isPrivate Boolean  @default(false)
+  toUserId  String?
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation("ChatSender", fields: [userId], references: [id], onDelete: Cascade)
+  toUser    User?    @relation("ChatRecipient", fields: [toUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+  @@index([userId])
 }
 
 model AuditLog {
