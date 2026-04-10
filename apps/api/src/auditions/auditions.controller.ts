@@ -7,11 +7,8 @@ import {
   Param,
   Patch,
   Post,
-  UploadedFile,
-  UseInterceptors,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
-import { FileInterceptor } from "@nestjs/platform-express";
 import { AuditionsService } from "./auditions.service";
 
 @Controller("api/auditions")
@@ -23,38 +20,28 @@ export class AuditionsController {
   /**
    * POST /api/auditions
    * Rota pública — qualquer pessoa pode se inscrever.
-   * Aceita multipart/form-data com campos de texto + vídeo opcional (campo "video").
+   * Aceita JSON com link do YouTube opcional.
    * Throttle secundário: 10 envios por BFF por minuto (o BFF já limita 3/hora por IP real).
    */
   @Post()
   @Throttle({ global: { limit: 10, ttl: 60000 } })
-  @UseInterceptors(
-    FileInterceptor("video", {
-      limits: { fileSize: 300 * 1024 * 1024 }, // 300 MB
-    })
-  )
-  async create(
-    @Body() body: Record<string, string>,
-    @UploadedFile() file?: Express.Multer.File,
-  ) {
+  async create(@Body() body: Record<string, unknown>) {
     try {
       return await this.service.create({
-        name: body.name,
-        email: body.email,
-        whatsapp: body.whatsapp,
-        birthDate: body.birthDate,
-        city: body.city,
-        church: body.church,
-        pastorName: body.pastorName,
-        instagramProfile: body.instagramProfile,
-        volunteerArea: body.volunteerArea,
-        skills: body.skills ? (JSON.parse(body.skills) as string[]) : [],
-        availability: body.availability ? (JSON.parse(body.availability) as string[]) : [],
-        hasTransport: body.hasTransport === "true",
-        motivation: body.motivation,
-        videoBuffer: file?.buffer,
-        videoMimeType: file?.mimetype,
-        videoFilename: file?.originalname,
+        name: body.name as string,
+        email: body.email as string,
+        whatsapp: body.whatsapp as string,
+        birthDate: body.birthDate as string | undefined,
+        city: body.city as string | undefined,
+        church: body.church as string | undefined,
+        pastorName: body.pastorName as string | undefined,
+        instagramProfile: body.instagramProfile as string | undefined,
+        volunteerArea: body.volunteerArea as string,
+        skills: Array.isArray(body.skills) ? (body.skills as string[]) : [],
+        availability: Array.isArray(body.availability) ? (body.availability as string[]) : [],
+        hasTransport: body.hasTransport === true,
+        motivation: body.motivation as string | undefined,
+        youtubeUrl: (body.youtubeUrl as string | null | undefined) ?? null,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

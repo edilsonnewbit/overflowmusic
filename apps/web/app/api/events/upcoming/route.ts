@@ -38,9 +38,9 @@ export type UpcomingEvent = {
   eventType: string;
   status: string;
   musicians: {
-    confirmed: { id: string; name: string; role: string }[];
-    pending: { id: string; name: string; role: string }[];
-    declined: { id: string; name: string; role: string }[];
+    confirmed: { id: string; slotId: string; name: string; role: string }[];
+    pending: { id: string; slotId: string; name: string; role: string }[];
+    declined: { id: string; slotId: string; name: string; role: string }[];
   };
   totalSlots: number;
   confirmedCount: number;
@@ -110,13 +110,13 @@ export async function GET(request: NextRequest) {
         }
         const confirmed = primary
           .filter((s) => s.status === "CONFIRMED")
-          .map((s) => ({ id: s.user.id, name: s.user.name, role: s.instrumentRole }));
+          .map((s) => ({ id: s.user.id, slotId: s.id, name: s.user.name, role: s.instrumentRole }));
         const pending = primary
           .filter((s) => s.status === "PENDING")
-          .map((s) => ({ id: s.user.id, name: s.user.name, role: s.instrumentRole }));
+          .map((s) => ({ id: s.user.id, slotId: s.id, name: s.user.name, role: s.instrumentRole }));
         const declined = primary
           .filter((s) => s.status === "DECLINED" || s.status === "EXPIRED")
-          .map((s) => ({ id: s.user.id, name: s.user.name, role: s.instrumentRole }));
+          .map((s) => ({ id: s.user.id, slotId: s.id, name: s.user.name, role: s.instrumentRole }));
 
         return {
           id: e.id,
