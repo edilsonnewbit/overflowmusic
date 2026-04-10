@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Logger,
   Param,
   Patch,
   Post,
@@ -15,6 +16,8 @@ import { AuditionsService } from "./auditions.service";
 
 @Controller("api/auditions")
 export class AuditionsController {
+  private readonly logger = new Logger(AuditionsController.name);
+
   constructor(private readonly service: AuditionsService) {}
 
   /**
@@ -34,24 +37,30 @@ export class AuditionsController {
     @Body() body: Record<string, string>,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.service.create({
-      name: body.name,
-      email: body.email,
-      whatsapp: body.whatsapp,
-      birthDate: body.birthDate,
-      city: body.city,
-      church: body.church,
-      pastorName: body.pastorName,
-      instagramProfile: body.instagramProfile,
-      volunteerArea: body.volunteerArea,
-      skills: body.skills ? (JSON.parse(body.skills) as string[]) : [],
-      availability: body.availability ? (JSON.parse(body.availability) as string[]) : [],
-      hasTransport: body.hasTransport === "true",
-      motivation: body.motivation,
-      videoBuffer: file?.buffer,
-      videoMimeType: file?.mimetype,
-      videoFilename: file?.originalname,
-    });
+    try {
+      return await this.service.create({
+        name: body.name,
+        email: body.email,
+        whatsapp: body.whatsapp,
+        birthDate: body.birthDate,
+        city: body.city,
+        church: body.church,
+        pastorName: body.pastorName,
+        instagramProfile: body.instagramProfile,
+        volunteerArea: body.volunteerArea,
+        skills: body.skills ? (JSON.parse(body.skills) as string[]) : [],
+        availability: body.availability ? (JSON.parse(body.availability) as string[]) : [],
+        hasTransport: body.hasTransport === "true",
+        motivation: body.motivation,
+        videoBuffer: file?.buffer,
+        videoMimeType: file?.mimetype,
+        videoFilename: file?.originalname,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error("[AuditionsController] create falhou:", message);
+      throw err;
+    }
   }
 
   /**

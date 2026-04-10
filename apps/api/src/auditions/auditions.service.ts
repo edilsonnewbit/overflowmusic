@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { DriveService } from "../drive/drive.service";
 import { AuthService } from "../auth/auth.service";
@@ -36,6 +36,8 @@ export type AuditionSummary = {
 
 @Injectable()
 export class AuditionsService {
+  private readonly logger = new Logger(AuditionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly drive: DriveService,
@@ -64,14 +66,19 @@ export class AuditionsService {
       if (input.videoBuffer.length > maxBytes) {
         throw new BadRequestException("O vídeo não pode ultrapassar 300 MB");
       }
-      const result = await this.drive.uploadFile({
-        buffer: input.videoBuffer,
-        mimeType: input.videoMimeType ?? "video/mp4",
-        filename: input.videoFilename ?? `audicao_${Date.now()}.mp4`,
-      });
-      if (result) {
-        driveFileId = result.fileId;
-        driveFileUrl = result.webViewLink;
+      try {
+        const result = await this.drive.uploadFile({
+          buffer: input.videoBuffer,
+          mimeType: input.videoMimeType ?? "video/mp4",
+          filename: input.videoFilename ?? `audicao_${Date.now()}.mp4`,
+        });
+        if (result) {
+          driveFileId = result.fileId;
+          driveFileUrl = result.webViewLink;
+        }
+      } catch (err) {
+        // Falha no Drive não impede o cadastro — audição é salva sem link de vídeo
+        this.logger.warn("[AuditionsService] Falha no upload para o Drive:", err);
       }
     }
 
