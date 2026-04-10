@@ -39,7 +39,7 @@ import { SongsService } from "./songs/songs.service";
     PrismaModule,
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
-      { name: "global", ttl: 60000, limit: 500 }, // 500 req/min global
+      { name: "global", ttl: 60000, limit: 500 },
     ]),
   ],
   controllers: [
