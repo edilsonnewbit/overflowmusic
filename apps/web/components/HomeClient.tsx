@@ -63,12 +63,19 @@ function formatDate(iso: string) {
 }
 
 function daysUntil(iso: string) {
-  const diff = new Date(iso).getTime() - Date.now();
-  const days = Math.ceil(diff / 86_400_000);
-  if (days === 0) return "Hoje";
-  if (days === 1) return "Amanhã";
-  if (days < 0) return null;
-  return `Em ${days} dias`;
+  const eventDate = new Date(iso);
+  const today = new Date();
+
+  // Compara só a data (dia), ignorando hora
+  const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const diffDays = Math.round((eventDay.getTime() - todayDay.getTime()) / 86_400_000);
+
+  if (diffDays === 0) return "Hoje";
+  if (diffDays === 1) return "Amanhã";
+  if (diffDays < 0) return null;
+  return `Em ${diffDays} dias`;
 }
 
 export function HomeClient() {
