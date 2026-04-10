@@ -14,7 +14,7 @@ type DashboardStats = {
   totalChecklists: number;
 };
 
-type MusicianItem = { id: string; name: string; role: string };
+type MusicianItem = { id: string; slotId: string; name: string; role: string };
 
 type UpcomingEvent = {
   id: string;
@@ -75,6 +75,26 @@ export function HomeClient() {
   const { loading: authLoading, user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
+  const [confirmingSlot, setConfirmingSlot] = useState<string | null>(null);
+
+  async function handleConfirm(slotId: string) {
+    setConfirmingSlot(slotId);
+    try {
+      await fetch(`/api/events/slots/${slotId}/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CONFIRMED" }),
+      });
+      // Recarrega os eventos após confirmar
+      const res = await fetch("/api/events/upcoming", { cache: "no-store" });
+      if (res.ok) {
+        const e = (await res.json()) as { events?: UpcomingEvent[] };
+        setUpcomingEvents(e.events ?? []);
+      }
+    } finally {
+      setConfirmingSlot(null);
+    }
+  }
 
   const session: SessionState = authLoading ? "loading" : user ? "logged_in" : "guest";
 
@@ -248,8 +268,31 @@ export function HomeClient() {
                             <span style={slotLabelStyle("pending")}>⏳ Aguardando</span>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                               {ev.musicians.pending.map((m) => (
-                                <span key={m.id} style={chipStyle("#2a2010", "#ffcc44")}>
-                                  {m.name} <em style={{ opacity: 0.65, fontStyle: "normal" }}>· {m.role}</em>
+                                <span key={m.slotId} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                  <span style={chipStyle("#2a2010", "#ffcc44")}>
+                                    {m.name} <em style={{ opacity: 0.65, fontStyle: "normal" }}>· {m.role}</em>
+                                  </span>
+                                  {user?.id === m.id && (
+                                    <button
+                                      title="Confirmar presença"
+                                      disabled={confirmingSlot === m.slotId}
+                                      onClick={(e) => { e.preventDefault(); void handleConfirm(m.slotId); }}
+                                      style={{
+                                        padding: "2px 8px",
+                                        borderRadius: 99,
+                                        border: "1px solid #7cf2a2",
+                                        background: "#0f3020",
+                                        color: "#7cf2a2",
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        cursor: confirmingSlot === m.slotId ? "not-allowed" : "pointer",
+                                        opacity: confirmingSlot === m.slotId ? 0.5 : 1,
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {confirmingSlot === m.slotId ? "..." : "✓ Confirmar"}
+                                    </button>
+                                  )}
                                 </span>
                               ))}
                             </div>
