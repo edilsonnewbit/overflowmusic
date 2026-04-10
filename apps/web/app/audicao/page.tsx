@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { maskPhone } from "@/lib/phone-mask";
 
 // ─── Volunteer areas ──────────────────────────────────────────────────────────
@@ -19,8 +19,6 @@ const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: string; skil
 const AREA_KEYS = Object.keys(VOLUNTEER_AREAS) as VolunteerArea[];
 
 const AVAILABILITY_OPTIONS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
-
-const MAX_VIDEO_MB = 300;
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -48,10 +46,8 @@ export default function AudicaoPage() {
   // Motivação
   const [motivation, setMotivation] = useState("");
 
-  // Vídeo
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoError, setVideoError] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
+  // Link do YouTube
+  const [youtubeUrl, setYoutubeUrl] = useState("");
 
   // Estado do envio
   const [submitting, setSubmitting] = useState(false);
@@ -71,19 +67,6 @@ export default function AudicaoPage() {
     setAvailability((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
   }
 
-  function handleVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setVideoError("");
-    if (!file) { setVideoFile(null); return; }
-    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
-      setVideoError(`O vídeo deve ter no máximo ${MAX_VIDEO_MB} MB.`);
-      setVideoFile(null);
-      e.target.value = "";
-      return;
-    }
-    setVideoFile(file);
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -99,23 +82,26 @@ export default function AudicaoPage() {
 
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append("name", name.trim());
-      formData.append("email", email.trim().toLowerCase());
-      formData.append("whatsapp", whatsapp.trim());
-      formData.append("birthDate", birthDate.trim());
-      formData.append("city", city.trim());
-      formData.append("church", church.trim());
-      formData.append("pastorName", pastorName.trim());
-      formData.append("instagramProfile", instagramProfile.trim());
-      formData.append("volunteerArea", volunteerArea);
-      formData.append("skills", JSON.stringify(skills));
-      formData.append("availability", JSON.stringify(availability));
-      formData.append("hasTransport", String(hasTransport));
-      formData.append("motivation", motivation.trim());
-      if (videoFile) formData.append("video", videoFile);
-
-      const res = await fetch("/api/audicao", { method: "POST", body: formData });
+      const res = await fetch("/api/audicao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          whatsapp: whatsapp.trim(),
+          birthDate: birthDate.trim(),
+          city: city.trim(),
+          church: church.trim(),
+          pastorName: pastorName.trim(),
+          instagramProfile: instagramProfile.trim(),
+          volunteerArea,
+          skills,
+          availability,
+          hasTransport,
+          motivation: motivation.trim(),
+          youtubeUrl: youtubeUrl.trim() || null,
+        }),
+      });
       const body = (await res.json()) as { ok?: boolean; message?: string };
 
       if (!res.ok) {
@@ -308,48 +294,22 @@ export default function AudicaoPage() {
           </p>
         </Section>
 
-        {/* ── Vídeo ──────────────────────────────────────────────────── */}
+        {/* ── Link do YouTube ─────────────────────────────────────────── */}
         <Section title="Vídeo de apresentação">
-          <p style={{ color: "#7a9dbf", fontSize: 13, margin: "0 0 12px", lineHeight: 1.5 }}>
-            Grave um vídeo curto (1–3 min) cantando, tocando ou se apresentando.
-            Formatos aceitos: MP4, MOV, AVI. Máximo {MAX_VIDEO_MB} MB.
+          <p style={{ color: "#7a9dbf", fontSize: 13, margin: "0 0 4px", lineHeight: 1.5 }}>
+            Grave um vídeo curto (1–3 min) cantando, tocando ou se apresentando, publique no YouTube e cole o link abaixo.
           </p>
-          <div
-            onClick={() => fileRef.current?.click()}
-            style={{
-              border: "2px dashed #2d4b6d",
-              borderRadius: 12, padding: "28px 20px",
-              textAlign: "center", cursor: "pointer",
-              background: videoFile ? "#0f2040" : "#0a1520",
-              transition: "border-color 0.15s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#7cf2a2")}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#2d4b6d")}
-          >
-            {videoFile ? (
-              <>
-                <p style={{ color: "#7cf2a2", fontWeight: 700, margin: 0, fontSize: 15 }}>✓ {videoFile.name}</p>
-                <p style={{ color: "#5a8a6a", fontSize: 12, margin: "4px 0 0" }}>
-                  {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
-                </p>
-              </>
-            ) : (
-              <>
-                <p style={{ color: "#5a7a9a", fontSize: 14, margin: 0 }}>🎬 Clique para selecionar o vídeo</p>
-                <p style={{ color: "#3a5570", fontSize: 12, margin: "6px 0 0" }}>ou arraste o arquivo aqui</p>
-              </>
-            )}
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="video/mp4,video/quicktime,video/avi,video/*"
-            style={{ display: "none" }}
-            onChange={handleVideoChange}
-          />
-          {videoError && <p style={{ color: "#f87171", fontSize: 13, margin: "6px 0 0" }}>{videoError}</p>}
-          <p style={{ color: "#3a5570", fontSize: 12, margin: "6px 0 0" }}>
-            ℹ️ O vídeo é opcional, mas ajuda muito na avaliação. Será armazenado de forma segura.
+          <Field label="Link do YouTube (opcional)">
+            <input
+              style={inputStyle}
+              type="url"
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
+          </Field>
+          <p style={{ color: "#3a5570", fontSize: 12, margin: "4px 0 0" }}>
+            ℹ️ O vídeo pode ser não listado. Ajuda muito na avaliação.
           </p>
         </Section>
 

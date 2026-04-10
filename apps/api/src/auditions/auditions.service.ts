@@ -1,6 +1,5 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { DriveService } from "../drive/drive.service";
 import { AuthService } from "../auth/auth.service";
 import { VOLUNTEER_AREAS } from "../auth/auth.types";
 
@@ -18,9 +17,7 @@ export type CreateAuditionInput = {
   availability?: string[];
   hasTransport?: boolean;
   motivation?: string;
-  videoBuffer?: Buffer;
-  videoMimeType?: string;
-  videoFilename?: string;
+  youtubeUrl?: string | null;
 };
 
 export type AuditionSummary = {
@@ -36,11 +33,8 @@ export type AuditionSummary = {
 
 @Injectable()
 export class AuditionsService {
-  private readonly logger = new Logger(AuditionsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly drive: DriveService,
     private readonly auth: AuthService,
   ) {}
 
@@ -58,29 +52,8 @@ export class AuditionsService {
       throw new BadRequestException("Área de voluntariado inválida");
     }
 
-    let driveFileId: string | null = null;
-    let driveFileUrl: string | null = null;
-
-    if (input.videoBuffer && input.videoBuffer.length > 0) {
-      const maxBytes = 300 * 1024 * 1024; // 300 MB
-      if (input.videoBuffer.length > maxBytes) {
-        throw new BadRequestException("O vídeo não pode ultrapassar 300 MB");
-      }
-      try {
-        const result = await this.drive.uploadFile({
-          buffer: input.videoBuffer,
-          mimeType: input.videoMimeType ?? "video/mp4",
-          filename: input.videoFilename ?? `audicao_${Date.now()}.mp4`,
-        });
-        if (result) {
-          driveFileId = result.fileId;
-          driveFileUrl = result.webViewLink;
-        }
-      } catch (err) {
-        // Falha no Drive não impede o cadastro — audição é salva sem link de vídeo
-        this.logger.warn("[AuditionsService] Falha no upload para o Drive:", err);
-      }
-    }
+    const driveFileId: string | null = null;
+    const driveFileUrl: string | null = (input.youtubeUrl || "").trim() || null;
 
     const audition = await this.prisma.audition.create({
       data: {
