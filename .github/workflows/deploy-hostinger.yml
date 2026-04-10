@@ -113,6 +113,7 @@ jobs:
             SMTP_FROM=${{ secrets.SMTP_FROM }}
             GOOGLE_DRIVE_FOLDER_ID=${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
             GOOGLE_SERVICE_ACCOUNT_KEY=${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+            GOOGLE_REFRESH_TOKEN=${{ secrets.GOOGLE_REFRESH_TOKEN }}
 
       - name: Wait before forcing restart
         run: sleep 15
@@ -146,6 +147,7 @@ jobs:
             SMTP_FROM=${{ secrets.SMTP_FROM }}
             GOOGLE_DRIVE_FOLDER_ID=${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
             GOOGLE_SERVICE_ACCOUNT_KEY=${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+            GOOGLE_REFRESH_TOKEN=${{ secrets.GOOGLE_REFRESH_TOKEN }}
 
       - name: Verify API rollout version
         continue-on-error: true  # TODO: remover após SSL real e API estáveis na VPS

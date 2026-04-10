@@ -9,37 +9,54 @@ export class DriveService implements OnModuleInit {
   private readonly folderId = (process.env.GOOGLE_DRIVE_FOLDER_ID || "").trim();
 
   onModuleInit(): void {
-    const keyRaw = (process.env.GOOGLE_SERVICE_ACCOUNT_KEY || "").trim();
-    if (!keyRaw || !this.folderId) {
-      this.logger.warn(
-        "[DriveService] GOOGLE_SERVICE_ACCOUNT_KEY ou GOOGLE_DRIVE_FOLDER_ID não configurados. Upload de vídeos desabilitado."
-      );
+    if (!this.folderId) {
+      this.logger.warn("[DriveService] GOOGLE_DRIVE_FOLDER_ID não configurado. Upload desabilitado.");
       return;
     }
 
-    try {
-      const key = JSON.parse(
-        keyRaw.startsWith("{") ? keyRaw : Buffer.from(keyRaw, "base64").toString("utf-8")
-      );
-      const auth = new google.auth.GoogleAuth({
-        credentials: key,
-        scopes: ["https://www.googleapis.com/auth/drive.file"],
-      });
-      this.drive = google.drive({ version: "v3", auth });
-      this.logger.log("[DriveService] Autenticado com sucesso via Service Account.");
-    } catch (err) {
-      this.logger.error("[DriveService] Falha ao inicializar credenciais:", err);
+    // Opção A: OAuth2 com refresh token (recomendado — usa cota do dono da pasta)
+    const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || "").trim();
+    const clientId = (process.env.GOOGLE_CLIENT_ID || "").trim();
+    const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
+
+    if (refreshToken && clientId && clientSecret) {
+      try {
+        const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
+        oauth2.setCredentials({ refresh_token: refreshToken });
+        this.drive = google.drive({ version: "v3", auth: oauth2 });
+        this.logger.log("[DriveService] Autenticado via OAuth2 refresh token.");
+        return;
+      } catch (err) {
+        this.logger.error("[DriveService] Falha ao inicializar OAuth2:", err);
+      }
     }
+
+    // Opção B (fallback): Service Account
+    const keyRaw = (process.env.GOOGLE_SERVICE_ACCOUNT_KEY || "").trim();
+    if (keyRaw) {
+      try {
+        const key = JSON.parse(
+          keyRaw.startsWith("{") ? keyRaw : Buffer.from(keyRaw, "base64").toString("utf-8")
+        );
+        const auth = new google.auth.GoogleAuth({
+          credentials: key,
+          scopes: ["https://www.googleapis.com/auth/drive.file"],
+        });
+        this.drive = google.drive({ version: "v3", auth });
+        this.logger.log("[DriveService] Autenticado via Service Account.");
+      } catch (err) {
+        this.logger.error("[DriveService] Falha ao inicializar Service Account:", err);
+      }
+      return;
+    }
+
+    this.logger.warn("[DriveService] Nenhuma credencial configurada. Upload desabilitado.");
   }
 
   get isAvailable(): boolean {
     return this.drive !== null && this.folderId !== "";
   }
 
-  /**
-   * Faz upload de um buffer para o Google Drive na pasta configurada.
-   * Retorna { fileId, webViewLink } ou null se Drive não estiver configurado.
-   */
   async uploadFile(opts: {
     buffer: Buffer;
     mimeType: string;
@@ -68,7 +85,6 @@ export class DriveService implements OnModuleInit {
       throw new Error("Drive upload falhou: resposta sem id ou webViewLink");
     }
 
-    // Tornar o arquivo acessível para leitura por quem tiver o link
     await this.drive.permissions.create({
       fileId,
       requestBody: { role: "reader", type: "anyone" },
