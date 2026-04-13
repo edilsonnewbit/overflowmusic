@@ -94,6 +94,12 @@ export class EventsService {
           },
           orderBy: [{ instrumentRole: "asc" }, { priority: "asc" }],
         },
+        volunteers: {
+          include: {
+            user: { select: { id: true, name: true } },
+          },
+          orderBy: [{ volunteerArea: "asc" }],
+        },
         instrumentConfigs: true,
       },
     });

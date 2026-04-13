@@ -11,6 +11,14 @@ type MusicianSlot = {
   user: { id: string; name: string };
 };
 
+type VolunteerSlot = {
+  id: string;
+  volunteerArea: string;
+  role: string | null;
+  status: "PENDING" | "CONFIRMED" | "DECLINED";
+  user: { id: string; name: string };
+};
+
 type InstrumentConfig = {
   instrumentRole: string;
   requiredCount: number;
@@ -27,7 +35,16 @@ type EventRaw = {
   status: string;
   computedStatus?: string;
   musicians: MusicianSlot[];
+  volunteers?: VolunteerSlot[];
   instrumentConfigs?: InstrumentConfig[];
+};
+
+type VolunteerItem = { id: string; name: string; role: string | null };
+type VolunteerAreaGroup = {
+  area: string;
+  confirmed: VolunteerItem[];
+  pending: VolunteerItem[];
+  declined: VolunteerItem[];
 };
 
 export type UpcomingEvent = {
@@ -42,6 +59,7 @@ export type UpcomingEvent = {
     pending: { id: string; slotId: string; name: string; role: string }[];
     declined: { id: string; slotId: string; name: string; role: string }[];
   };
+  volunteerAreas: VolunteerAreaGroup[];
   totalSlots: number;
   confirmedCount: number;
   pendingCount: number;
@@ -118,6 +136,27 @@ export async function GET(request: NextRequest) {
           .filter((s) => s.status === "DECLINED" || s.status === "EXPIRED")
           .map((s) => ({ id: s.user.id, slotId: s.id, name: s.user.name, role: s.instrumentRole }));
 
+        // Group volunteers by area
+        const AREA_ORDER = ["Mídia", "Intercessão", "Suporte"];
+        const areaMap = new Map<string, VolunteerAreaGroup>();
+        for (const v of e.volunteers ?? []) {
+          if (!areaMap.has(v.volunteerArea)) {
+            areaMap.set(v.volunteerArea, { area: v.volunteerArea, confirmed: [], pending: [], declined: [] });
+          }
+          const group = areaMap.get(v.volunteerArea)!;
+          const item: VolunteerItem = { id: v.user.id, name: v.user.name, role: v.role };
+          if (v.status === "CONFIRMED") group.confirmed.push(item);
+          else if (v.status === "PENDING") group.pending.push(item);
+          else group.declined.push(item);
+        }
+        const volunteerAreas = Array.from(areaMap.values()).sort((a, b) => {
+          const ai = AREA_ORDER.indexOf(a.area);
+          const bi = AREA_ORDER.indexOf(b.area);
+          const aOrder = ai === -1 ? AREA_ORDER.length : ai;
+          const bOrder = bi === -1 ? AREA_ORDER.length : bi;
+          return aOrder - bOrder;
+        });
+
         return {
           id: e.id,
           title: e.title,
@@ -126,6 +165,7 @@ export async function GET(request: NextRequest) {
           eventType: e.eventType,
           status: e.computedStatus ?? e.status,
           musicians: { confirmed, pending, declined },
+          volunteerAreas,
           totalSlots: primary.length,
           confirmedCount: confirmed.length,
           pendingCount: pending.length,

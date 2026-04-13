@@ -16,6 +16,14 @@ type DashboardStats = {
 
 type MusicianItem = { id: string; slotId: string; name: string; role: string };
 
+type VolunteerItem = { id: string; name: string; role: string | null };
+type VolunteerAreaGroup = {
+  area: string;
+  confirmed: VolunteerItem[];
+  pending: VolunteerItem[];
+  declined: VolunteerItem[];
+};
+
 type UpcomingEvent = {
   id: string;
   title: string;
@@ -28,6 +36,7 @@ type UpcomingEvent = {
     pending: MusicianItem[];
     declined: MusicianItem[];
   };
+  volunteerAreas: VolunteerAreaGroup[];
   totalSlots: number;
   confirmedCount: number;
   pendingCount: number;
@@ -90,7 +99,7 @@ export function HomeClient() {
       await fetch(`/api/events/slots/${slotId}/respond`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CONFIRMED" }),
+        body: JSON.stringify({ accept: true }),
       });
       // Recarrega os eventos após confirmar
       const res = await fetch("/api/events/upcoming", { cache: "no-store" });
@@ -256,6 +265,9 @@ export function HomeClient() {
                     {/* Musician slots */}
                     {ev.totalSlots > 0 && (
                       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#8fa9c8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                          Músicos
+                        </span>
                         {/* Confirmed */}
                         {ev.musicians.confirmed.length > 0 && (
                           <div style={slotRowStyle}>
@@ -329,6 +341,55 @@ export function HomeClient() {
                       <p style={{ margin: "12px 0 0", fontSize: 12, color: "#4a6278" }}>
                         Nenhum músico escalado ainda.
                       </p>
+                    )}
+
+                    {/* Volunteer areas */}
+                    {ev.volunteerAreas.length > 0 && (
+                      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {ev.volunteerAreas.map((area) => (
+                          <div key={area.area} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#8fa9c8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                              {area.area}
+                            </span>
+                            {area.confirmed.length > 0 && (
+                              <div style={slotRowStyle}>
+                                <span style={slotLabelStyle("confirmed")}>✓ Confirmados</span>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                  {area.confirmed.map((v) => (
+                                    <span key={v.id} style={chipStyle("#0f3020", "#7cf2a2")}>
+                                      {v.name}{v.role ? <em style={{ opacity: 0.65, fontStyle: "normal" }}> · {v.role}</em> : null}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {area.pending.length > 0 && (
+                              <div style={slotRowStyle}>
+                                <span style={slotLabelStyle("pending")}>⏳ Aguardando</span>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                  {area.pending.map((v) => (
+                                    <span key={v.id} style={chipStyle("#2a2010", "#ffcc44")}>
+                                      {v.name}{v.role ? <em style={{ opacity: 0.65, fontStyle: "normal" }}> · {v.role}</em> : null}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {area.declined.length > 0 && (
+                              <div style={slotRowStyle}>
+                                <span style={slotLabelStyle("declined")}>✗ Recusados</span>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                  {area.declined.map((v) => (
+                                    <span key={v.id} style={chipStyle("#2a1b1b", "#ff6b6b")}>
+                                      {v.name}{v.role ? <em style={{ opacity: 0.65, fontStyle: "normal" }}> · {v.role}</em> : null}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </Link>
