@@ -816,11 +816,11 @@ export default function EventDetailPage({ params }: PageProps) {
                       </Link>
                       <button
                         onClick={() => {
-                          const header = `📋 *Setlist — ${event.title}*\n\n`;
+                          const header = `*Setlist — ${event.title}*\n${formatDate(event.dateTime)}\n\n`;
                           const lines = sortedItems.map((item) => {
-                            const parts: string[] = [`*${item.order}.* ${item.songTitle}`];
-                            if (item.key) parts.push(`🎵 Tom: ${item.key}`);
-                            if (item.leaderName) parts.push(`🎤 Líder: ${item.leaderName}`);
+                            const parts: string[] = [`*${item.order}. ${item.songTitle}*`];
+                            if (item.key) parts.push(`Tom: ${item.key}`);
+                            if (item.leaderName) parts.push(`Lider: ${item.leaderName}`);
                             return parts.join("\n");
                           });
                           const text = encodeURIComponent(header + lines.join("\n\n"));
