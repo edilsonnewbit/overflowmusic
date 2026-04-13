@@ -12,6 +12,7 @@ export async function PATCH(request: NextRequest) {
     const body = (await request.json()) as {
       name?: string;
       instruments?: string[];
+      volunteerArea?: string | null;
       instagramProfile?: string | null;
       birthDate?: string | null;
       church?: string | null;
@@ -23,6 +24,7 @@ export async function PATCH(request: NextRequest) {
     const payload: {
       name?: string;
       instruments?: string[];
+      volunteerArea?: string | null;
       instagramProfile?: string | null;
       birthDate?: string | null;
       church?: string | null;
@@ -36,6 +38,7 @@ export async function PATCH(request: NextRequest) {
     if (Array.isArray(body.instruments)) {
       payload.instruments = body.instruments;
     }
+    if ("volunteerArea" in body) payload.volunteerArea = body.volunteerArea ?? null;
     if ("instagramProfile" in body) payload.instagramProfile = body.instagramProfile ?? null;
     if ("birthDate" in body) payload.birthDate = body.birthDate ?? null;
     if ("church" in body) payload.church = body.church ?? null;

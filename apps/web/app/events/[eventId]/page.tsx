@@ -815,10 +815,20 @@ export default function EventDetailPage({ params }: PageProps) {
                         ▶ Apresentar
                       </Link>
                       <button
-                        onClick={() => window.print()}
-                        style={{ color: "#8fa9c8", fontSize: 13, background: "none", border: "1px solid #2d4b6d", borderRadius: 8, padding: "4px 12px", cursor: "pointer" }}
+                        onClick={() => {
+                          const header = `📋 *Setlist — ${event.title}*\n\n`;
+                          const lines = sortedItems.map((item) => {
+                            const parts: string[] = [`*${item.order}.* ${item.songTitle}`];
+                            if (item.key) parts.push(`🎵 Tom: ${item.key}`);
+                            if (item.leaderName) parts.push(`🎤 Líder: ${item.leaderName}`);
+                            return parts.join("\n");
+                          });
+                          const text = encodeURIComponent(header + lines.join("\n\n"));
+                          window.open(`https://wa.me/?text=${text}`, "_blank");
+                        }}
+                        style={{ color: "#25d366", fontSize: 13, background: "none", border: "1px solid #25d366", borderRadius: 8, padding: "4px 12px", cursor: "pointer" }}
                       >
-                        🖨 Imprimir
+                        📲 WhatsApp
                       </button>
                     </div>
                   )}
