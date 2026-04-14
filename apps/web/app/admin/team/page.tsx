@@ -27,6 +27,7 @@ type TeamMember = {
   status: string;
   instruments: string[];
   volunteerArea?: string | null;
+  lastLoginAt?: string | null;
 };
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -252,6 +253,11 @@ function MemberCard({ member, callerRole, onUpdated }: { member: TeamMember; cal
           </p>
           <p style={{ margin: 0, color: "#5a7a9a", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {member.email}
+          </p>
+          <p style={{ margin: "1px 0 0", fontSize: 11, color: "#3d5a76" }}>
+            {member.lastLoginAt
+              ? `Último acesso: ${new Date(member.lastLoginAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
+              : "Nunca acessou"}
           </p>
           {!editing && (
             <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>

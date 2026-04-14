@@ -818,6 +818,7 @@ export class AuthService implements OnModuleInit {
       volunteerTermsAcceptedAt: user.volunteerTermsAcceptedAt ? user.volunteerTermsAcceptedAt.toISOString() : null,
       createdAt: user.createdAt.toISOString(),
       reviewedAt: user.reviewedAt ? user.reviewedAt.toISOString() : null,
+      lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
     };
   }
 

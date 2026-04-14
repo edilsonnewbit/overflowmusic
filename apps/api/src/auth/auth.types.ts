@@ -46,6 +46,7 @@ export type AuthUser = {
   volunteerTermsAcceptedAt?: string | null;
   createdAt: string;
   reviewedAt: string | null;
+  lastLoginAt?: string | null;
 };
 
 export type AccessTokenPayload = {
