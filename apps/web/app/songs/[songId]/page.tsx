@@ -258,7 +258,8 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
     setImportingLinks(true);
     setLinksMsg("");
     try {
-      const lines = multiLinks.split("\n").map((l) => l.trim()).filter(Boolean);
+      // Accept links separated by newlines, commas, or spaces
+      const lines = multiLinks.split(/[\n,\s]+/).map((l) => l.trim()).filter(Boolean);
       const files: Array<{ fileId: string; name: string }> = [];
       for (const line of lines) {
         const match = line.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
