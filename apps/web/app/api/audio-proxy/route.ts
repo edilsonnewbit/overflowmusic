@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   if (API_BASE) {
     try {
       const upstream = await fetch(
-        `${API_BASE}/api/audio-proxy?fileId=${encodeURIComponent(fileId)}`,
+        `${API_BASE}/audio-proxy?fileId=${encodeURIComponent(fileId)}`,
         { cache: "no-store" },
       );
       if (upstream.ok) {
