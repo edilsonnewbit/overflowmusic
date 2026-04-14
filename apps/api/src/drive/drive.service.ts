@@ -98,6 +98,17 @@ export class DriveService implements OnModuleInit {
     await this.drive.files.delete({ fileId });
   }
 
+  async getFileName(fileId: string): Promise<string | null> {
+    if (!this.drive) return null;
+    try {
+      const meta = await this.drive.files.get({ fileId, fields: "name", supportsAllDrives: true });
+      return meta.data.name ?? null;
+    } catch (err) {
+      this.logger.warn(`[DriveService] getFileName falhou para ${fileId}: ${String(err)}`);
+      return null;
+    }
+  }
+
   async streamFile(fileId: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
     // Try Drive API first (requires credentials)
     if (this.drive) {
