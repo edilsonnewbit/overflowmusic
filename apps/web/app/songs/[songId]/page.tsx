@@ -85,6 +85,14 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   const [folderUrl, setFolderUrl] = useState("");
   const [importingFolder, setImportingFolder] = useState(false);
   const [importMsg, setImportMsg] = useState("");
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+
+  // Load Google client ID on mount
+  useEffect(() => {
+    void fetch("/api/auth/google/config")
+      .then((r) => r.json())
+      .then((b: { ok: boolean; clientId?: string }) => { if (b.ok && b.clientId) setGoogleClientId(b.clientId); });
+  }, []);
 
   useEffect(() => {
     void params.then((p) => setSongId(p.songId));
@@ -228,23 +236,85 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
     }
   }
 
+  function extractFolderId(url: string): string | null {
+    const m = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    return m?.[1] ?? null;
+  }
+
+  async function listDriveFolder(folderId: string, accessToken: string): Promise<Array<{ fileId: string; name: string; mimeType: string }>> {
+    const q = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!res.ok) throw new Error(`Drive API: ${res.status}`);
+    const body = (await res.json()) as { files?: Array<{ id: string; name: string; mimeType: string }> };
+    return (body.files ?? [])
+      .filter((f) => f.mimeType.startsWith("audio/") || /\.(mp3|wav|aac|m4a|ogg|flac)$/i.test(f.name))
+      .map((f) => ({ fileId: f.id, name: f.name, mimeType: f.mimeType }));
+  }
+
   async function importFolder() {
     if (!songId || !folderUrl.trim()) return;
+    if (!googleClientId) { setImportMsg("Google Client ID não configurado."); return; }
+
+    const folderId = extractFolderId(folderUrl.trim());
+    if (!folderId) { setImportMsg("URL inválida. Use: drive.google.com/drive/folders/..."); return; }
+
     setImportingFolder(true);
-    setImportMsg("");
+    setImportMsg("Aguardando autorização do Google...");
+
     try {
-      const res = await fetch(`/api/songs/${songId}/tracks/import-folder`, {
+      // Load GIS script if not loaded
+      if (!(window as any).google?.accounts?.oauth2) {
+        await new Promise<void>((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://accounts.google.com/gsi/client";
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error("Falha ao carregar Google Identity Services"));
+          document.head.appendChild(s);
+        });
+      }
+
+      // Request Drive access token from the logged-in user
+      const accessToken = await new Promise<string>((resolve, reject) => {
+        const client = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: googleClientId,
+          scope: "https://www.googleapis.com/auth/drive.readonly",
+          callback: (resp: any) => {
+            if (resp.error) reject(new Error(resp.error));
+            else resolve(resp.access_token as string);
+          },
+        });
+        client.requestAccessToken({ prompt: "none" }); // silent if already consented
+      });
+
+      setImportMsg("Listando arquivos da pasta...");
+      const files = await listDriveFolder(folderId, accessToken);
+
+      if (files.length === 0) {
+        setImportMsg("Nenhum arquivo de áudio encontrado na pasta.");
+        return;
+      }
+
+      setImportMsg(`Importando ${files.length} faixa(s)...`);
+      const res = await fetch(`/api/songs/${songId}/tracks/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folderUrl: folderUrl.trim() }),
+        body: JSON.stringify({ files }),
       });
       const body = (await res.json()) as { ok: boolean; imported?: number; message?: string };
-      if (!body.ok) throw new Error(body.message || "Erro ao importar.");
+      if (!body.ok) throw new Error(body.message || "Erro ao salvar.");
       setImportMsg(`${body.imported ?? 0} faixa(s) importada(s) com sucesso.`);
       setFolderUrl("");
       await loadTracks(songId);
-    } catch (e) {
-      setImportMsg(e instanceof Error ? e.message : "Erro ao importar.");
+    } catch (e: any) {
+      // If silent token request failed, retry with consent prompt
+      if (String(e).includes("interaction_required") || String(e).includes("consent")) {
+        setImportMsg("Permissão necessária. Clique novamente para autorizar o acesso ao Drive.");
+      } else {
+        setImportMsg(e instanceof Error ? e.message : "Erro ao importar.");
+      }
     } finally {
       setImportingFolder(false);
     }

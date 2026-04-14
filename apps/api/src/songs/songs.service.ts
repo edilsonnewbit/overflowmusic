@@ -316,6 +316,31 @@ export class SongsService {
     return { ok: true };
   }
 
+  async bulkCreateTracks(songId: string, files: Array<{ fileId: string; name: string; mimeType?: string }>) {
+    await this.assertSongExists(songId);
+    if (!files.length) throw new BadRequestException("Nenhum arquivo enviado.");
+
+    function cleanName(filename: string): string {
+      return filename.replace(/\.[^.]+$/, "").replace(/^\d+\s*/, "").trim();
+    }
+
+    const existing = await this.prisma.songTrack.findMany({ where: { songId }, select: { order: true } });
+    let nextOrder = existing.length > 0 ? Math.max(...existing.map((t) => t.order)) + 1 : 1;
+
+    const created = await Promise.all(
+      files.map(async (f) => {
+        const label = cleanName(f.name);
+        const trackType = inferTrackType(f.name);
+        const driveUrl = `https://drive.google.com/file/d/${f.fileId}/view`;
+        return this.prisma.songTrack.create({
+          data: { songId, label, trackType: trackType as any, driveFileId: f.fileId, driveUrl, order: nextOrder++ },
+        });
+      })
+    );
+
+    return { ok: true, imported: created.length, tracks: created };
+  }
+
   async importTracksFromFolder(songId: string, folderUrl: string) {
     await this.assertSongExists(songId);
 
