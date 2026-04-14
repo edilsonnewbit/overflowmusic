@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -29,11 +29,51 @@ export function TransportBar({
   songTitle, songKey,
   onPlay, onPause, onSeek, onPrev, onNext, hasPrev, hasNext,
 }: Props) {
-  const isDraggingRef = useRef(false);
-  const [scrubValue, setScrubValue] = useState<number | null>(null);
+  const rangeRef       = useRef<HTMLInputElement>(null);
+  const fillRef        = useRef<HTMLDivElement>(null);
+  const currentTimeRef = useRef<HTMLSpanElement>(null);
+  const isDragging     = useRef(false);
 
-  const displayTime = scrubValue !== null ? scrubValue : currentTime;
-  const progress = duration > 0 ? displayTime / duration : 0;
+  // Update scrubber + fill + time display imperatively (no re-render during playback)
+  useEffect(() => {
+    if (isDragging.current) return;
+    const pct = duration > 0 ? currentTime / duration : 0;
+    if (rangeRef.current)       rangeRef.current.value = String(currentTime);
+    if (fillRef.current)        fillRef.current.style.width = `${pct * 100}%`;
+    if (currentTimeRef.current) currentTimeRef.current.textContent = formatTime(currentTime);
+  }, [currentTime, duration]);
+
+  // When duration changes, update the range max
+  useEffect(() => {
+    if (rangeRef.current) rangeRef.current.max = String(duration || 1);
+  }, [duration]);
+
+  function handlePointerDown() {
+    isDragging.current = true;
+  }
+
+  function handleInput(e: React.FormEvent<HTMLInputElement>) {
+    const val = parseFloat(e.currentTarget.value);
+    const pct = duration > 0 ? val / duration : 0;
+    if (fillRef.current)        fillRef.current.style.width = `${pct * 100}%`;
+    if (currentTimeRef.current) currentTimeRef.current.textContent = formatTime(val);
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLInputElement>) {
+    isDragging.current = false;
+    onSeek(parseFloat(e.currentTarget.value));
+  }
+
+  // Safety: if pointer is released outside the element
+  useEffect(() => {
+    function onPointerUp(e: PointerEvent) {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      if (rangeRef.current) onSeek(parseFloat(rangeRef.current.value));
+    }
+    window.addEventListener("pointerup", onPointerUp);
+    return () => window.removeEventListener("pointerup", onPointerUp);
+  }, [onSeek]);
 
   return (
     <div className="mt-transport">
@@ -88,32 +128,23 @@ export function TransportBar({
 
       {/* Timeline */}
       <div className="mt-timeline">
-        <span className="mt-time">{formatTime(displayTime)}</span>
+        <span className="mt-time" ref={currentTimeRef}>0:00</span>
         <div className="mt-scrubber-wrap">
           <div className="mt-scrubber-track">
-            <div className="mt-scrubber-fill" style={{ width: `${progress * 100}%` }} />
+            <div className="mt-scrubber-fill" ref={fillRef} style={{ width: "0%" }} />
           </div>
           <input
+            ref={rangeRef}
             type="range"
             min={0}
             max={duration || 1}
             step={0.1}
-            value={displayTime}
+            defaultValue={0}
             className="mt-scrubber"
             disabled={duration === 0}
-            onMouseDown={() => { isDraggingRef.current = true; }}
-            onTouchStart={() => { isDraggingRef.current = true; }}
-            onChange={(e) => setScrubValue(parseFloat(e.target.value))}
-            onMouseUp={(e) => {
-              isDraggingRef.current = false;
-              onSeek(parseFloat((e.target as HTMLInputElement).value));
-              setScrubValue(null);
-            }}
-            onTouchEnd={(e) => {
-              isDraggingRef.current = false;
-              onSeek(parseFloat((e.target as HTMLInputElement).value));
-              setScrubValue(null);
-            }}
+            onPointerDown={handlePointerDown}
+            onInput={handleInput}
+            onPointerUp={handlePointerUp}
           />
         </div>
         <span className="mt-time">{formatTime(duration)}</span>
