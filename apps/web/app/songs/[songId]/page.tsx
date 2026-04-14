@@ -85,14 +85,9 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   const [folderUrl, setFolderUrl] = useState("");
   const [importingFolder, setImportingFolder] = useState(false);
   const [importMsg, setImportMsg] = useState("");
-  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
-
-  // Load Google client ID on mount
-  useEffect(() => {
-    void fetch("/api/auth/google/config")
-      .then((r) => r.json())
-      .then((b: { ok: boolean; clientId?: string }) => { if (b.ok && b.clientId) setGoogleClientId(b.clientId); });
-  }, []);
+  const [multiLinks, setMultiLinks] = useState("");
+  const [importingLinks, setImportingLinks] = useState(false);
+  const [linksMsg, setLinksMsg] = useState("");
 
   useEffect(() => {
     void params.then((p) => setSongId(p.songId));
@@ -236,86 +231,46 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
     }
   }
 
-  function extractFolderId(url: string): string | null {
-    const m = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-    return m?.[1] ?? null;
-  }
-
-  async function listDriveFolder(folderId: string, accessToken: string): Promise<Array<{ fileId: string; name: string; mimeType: string }>> {
-    const q = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType)&orderBy=name&pageSize=100`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
-    if (!res.ok) throw new Error(`Drive API: ${res.status}`);
-    const body = (await res.json()) as { files?: Array<{ id: string; name: string; mimeType: string }> };
-    return (body.files ?? [])
-      .filter((f) => f.mimeType.startsWith("audio/") || /\.(mp3|wav|aac|m4a|ogg|flac)$/i.test(f.name))
-      .map((f) => ({ fileId: f.id, name: f.name, mimeType: f.mimeType }));
-  }
-
   async function importFolder() {
     if (!songId || !folderUrl.trim()) return;
-    if (!googleClientId) { setImportMsg("Google Client ID não configurado."); return; }
-
-    const folderId = extractFolderId(folderUrl.trim());
-    if (!folderId) { setImportMsg("URL inválida. Use: drive.google.com/drive/folders/..."); return; }
-
     setImportingFolder(true);
-    setImportMsg("Aguardando autorização do Google...");
-
+    setImportMsg("");
     try {
-      // Load GIS script if not loaded
-      if (!(window as any).google?.accounts?.oauth2) {
-        await new Promise<void>((resolve, reject) => {
-          const s = document.createElement("script");
-          s.src = "https://accounts.google.com/gsi/client";
-          s.onload = () => resolve();
-          s.onerror = () => reject(new Error("Falha ao carregar Google Identity Services"));
-          document.head.appendChild(s);
-        });
-      }
-
-      // Request Drive access token — try silent first, then with consent popup
-      const accessToken = await new Promise<string>((resolve, reject) => {
-        let attempted = false;
-        const client = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: googleClientId,
-          scope: "https://www.googleapis.com/auth/drive.readonly",
-          callback: (resp: any) => {
-            if (resp.error) {
-              if (!attempted && (resp.error === "interaction_required" || resp.error === "consent_required")) {
-                // Silent failed — retry with full consent UI
-                attempted = true;
-                client.requestAccessToken({ prompt: "consent" });
-              } else {
-                reject(new Error(resp.error));
-              }
-            } else {
-              resolve(resp.access_token as string);
-            }
-          },
-          error_callback: (err: any) => {
-            if (!attempted && err?.type === "popup_failed_to_open") {
-              attempted = true;
-              client.requestAccessToken({ prompt: "consent" });
-            } else {
-              reject(new Error(err?.type ?? "Erro ao abrir popup do Google"));
-            }
-          },
-        });
-        client.requestAccessToken({ prompt: "none" }); // silent if already consented
+      const res = await fetch(`/api/songs/${songId}/tracks/import-folder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderUrl: folderUrl.trim() }),
       });
+      const body = (await res.json()) as { ok: boolean; imported?: number; message?: string };
+      if (!body.ok) throw new Error(body.message || "Erro ao importar.");
+      setImportMsg(`${body.imported ?? 0} faixa(s) importada(s) com sucesso.`);
+      setFolderUrl("");
+      await loadTracks(songId);
+    } catch (e) {
+      setImportMsg(e instanceof Error ? e.message : "Erro ao importar.");
+    } finally {
+      setImportingFolder(false);
+    }
+  }
 
-      setImportMsg("Listando arquivos da pasta...");
-      const files = await listDriveFolder(folderId, accessToken);
-
+  async function importMultiLinks() {
+    if (!songId || !multiLinks.trim()) return;
+    setImportingLinks(true);
+    setLinksMsg("");
+    try {
+      const lines = multiLinks.split("\n").map((l) => l.trim()).filter(Boolean);
+      const files: Array<{ fileId: string; name: string }> = [];
+      for (const line of lines) {
+        const match = line.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (match?.[1]) {
+          // Use the URL path after the last / as a provisional name; user can rename later
+          files.push({ fileId: match[1], name: match[1] });
+        }
+      }
       if (files.length === 0) {
-        setImportMsg("Nenhum arquivo de áudio encontrado na pasta.");
+        setLinksMsg("Nenhum link válido do Drive encontrado. Use links no formato drive.google.com/file/d/.../view");
         return;
       }
-
-      setImportMsg(`Importando ${files.length} faixa(s)...`);
       const res = await fetch(`/api/songs/${songId}/tracks/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -323,18 +278,13 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
       });
       const body = (await res.json()) as { ok: boolean; imported?: number; message?: string };
       if (!body.ok) throw new Error(body.message || "Erro ao salvar.");
-      setImportMsg(`${body.imported ?? 0} faixa(s) importada(s) com sucesso.`);
-      setFolderUrl("");
+      setLinksMsg(`${body.imported ?? 0} faixa(s) importada(s). Renomeie os labels conforme necessário.`);
+      setMultiLinks("");
       await loadTracks(songId);
-    } catch (e: any) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("popup_closed") || msg.includes("access_denied")) {
-        setImportMsg("Autorização cancelada. Clique novamente e permita o acesso ao Drive.");
-      } else {
-        setImportMsg(msg || "Erro ao importar.");
-      }
+    } catch (e) {
+      setLinksMsg(e instanceof Error ? e.message : "Erro ao importar.");
     } finally {
-      setImportingFolder(false);
+      setImportingLinks(false);
     }
   }
 
@@ -624,36 +574,36 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
             </div>
           )}
 
-          {/* importar pasta inteira */}
+          {/* importar vários links de uma vez */}
           <div style={{ background: "#081420", border: "1px dashed #2d4b6d", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
-            <p style={{ margin: "0 0 8px", color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
-              Importar pasta do Drive
+            <p style={{ margin: "0 0 4px", color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
+              Importar múltiplos arquivos do Drive
             </p>
             <p style={{ margin: "0 0 8px", color: "#475569", fontSize: 12 }}>
-              Cole o link da pasta do Drive. Os arquivos serão importados automaticamente com o tipo detectado pelo nome.
+              No Google Drive: selecione todos os arquivos → clique direito → "Copiar links" → cole aqui (um por linha).
             </p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                type="url"
-                placeholder="https://drive.google.com/drive/folders/..."
-                value={folderUrl}
-                onChange={(e) => setFolderUrl(e.target.value)}
-                disabled={importingFolder}
-                style={{ ...urlInputStyle, flex: 1 }}
-              />
+            <textarea
+              rows={4}
+              placeholder={"https://drive.google.com/file/d/AAA.../view\nhttps://drive.google.com/file/d/BBB.../view\n..."}
+              value={multiLinks}
+              onChange={(e) => setMultiLinks(e.target.value)}
+              disabled={importingLinks}
+              style={{ ...urlInputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
               <button
-                onClick={() => void importFolder()}
-                disabled={importingFolder || !folderUrl.trim()}
-                style={{ ...zoneSaveBtnStyle, background: "#818cf8", whiteSpace: "nowrap" }}
+                onClick={() => void importMultiLinks()}
+                disabled={importingLinks || !multiLinks.trim()}
+                style={{ ...zoneSaveBtnStyle, background: "#818cf8" }}
               >
-                {importingFolder ? "Importando..." : "Importar pasta"}
+                {importingLinks ? "Importando..." : "Importar links"}
               </button>
+              {linksMsg && (
+                <span style={{ fontSize: 12, color: linksMsg.includes("sucesso") || linksMsg.includes("importada") ? "#7cf2a2" : "#f87171" }}>
+                  {linksMsg}
+                </span>
+              )}
             </div>
-            {importMsg && (
-              <p style={{ margin: "6px 0 0", fontSize: 12, color: importMsg.includes("sucesso") ? "#7cf2a2" : "#f87171" }}>
-                {importMsg}
-              </p>
-            )}
           </div>
 
           {/* separador */}
