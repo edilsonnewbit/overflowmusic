@@ -324,10 +324,17 @@ export class SongsService {
       return filename.replace(/\.[^.]+$/, "").replace(/^\d+\s*/, "").trim();
     }
 
-    // Resolve real filename from Drive Content-Disposition header when name looks like a fileId
+    // Resolve real filename from Drive API (authenticated) or Content-Disposition header (fallback)
+    const driveService = this.driveService;
     async function resolveFilename(fileId: string, providedName: string): Promise<string> {
       const looksLikeId = /^[a-zA-Z0-9_-]{20,}$/.test(providedName);
       if (!looksLikeId) return providedName;
+
+      // Try authenticated Drive API first
+      const apiName = await driveService.getFileName(fileId);
+      if (apiName) return apiName;
+
+      // Fallback: HEAD request to public download URL
       try {
         const url = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`;
         const res = await fetch(url, { method: "HEAD", redirect: "follow" });
