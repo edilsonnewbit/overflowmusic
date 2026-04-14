@@ -40,6 +40,8 @@ export function useMultitrackEngine(): MultitrackEngine {
   const isPlayingRef    = useRef<boolean>(false);
   const tracksRef       = useRef<TrackState[]>([]);
   const durationRef     = useRef<number>(0);
+  // Cache: driveFileId → decoded AudioBuffer (persists across song changes)
+  const bufferCacheRef  = useRef<Map<string, AudioBuffer>>(new Map());
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [tracks,      setTracks]      = useState<TrackState[]>([]);
@@ -150,10 +152,16 @@ export function useMultitrackEngine(): MultitrackEngine {
 
     const results = await Promise.allSettled(
       songTracks.map(async (t) => {
-        const res = await fetch(`/api/audio-proxy?fileId=${encodeURIComponent(t.driveFileId)}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const arrayBuffer = await res.arrayBuffer();
-        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        // Use cached buffer if available (no network request needed)
+        let audioBuffer = bufferCacheRef.current.get(t.driveFileId) ?? null;
+        if (!audioBuffer) {
+          const res = await fetch(`/api/audio-proxy?fileId=${encodeURIComponent(t.driveFileId)}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const arrayBuffer = await res.arrayBuffer();
+          audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          bufferCacheRef.current.set(t.driveFileId, audioBuffer);
+        }
+        // GainNode and AnalyserNode must always be recreated (they're part of the audio graph)
         const gainNode = ctx.createGain();
         const analyserNode = ctx.createAnalyser();
         analyserNode.fftSize = 256;
@@ -245,6 +253,7 @@ export function useMultitrackEngine(): MultitrackEngine {
       cancelAnimationFrame(rafRef.current);
       stopAllSources();
       void ctxRef.current?.close();
+      bufferCacheRef.current.clear();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
