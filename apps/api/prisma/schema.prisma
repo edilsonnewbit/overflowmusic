@@ -307,9 +307,37 @@ model Song {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   chordCharts ChordChart[]
+  tracks      SongTrack[]
 
   @@index([title])
   @@index([artist])
+}
+
+enum TrackType {
+  CLICK
+  GUIDE_VOCAL
+  FULL_BAND
+  PAD
+  BASS
+  STEM_KEYS
+  STEM_GUITAR
+  STEM_DRUMS
+  STEM_BACKING
+}
+
+model SongTrack {
+  id          String    @id @default(uuid())
+  songId      String
+  label       String
+  trackType   TrackType @default(STEM_BACKING)
+  driveFileId String
+  driveUrl    String
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  song        Song      @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@index([songId, order])
 }
 
 model ChordChart {

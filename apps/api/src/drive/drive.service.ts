@@ -97,4 +97,15 @@ export class DriveService implements OnModuleInit {
     if (!this.drive) return;
     await this.drive.files.delete({ fileId });
   }
+
+  async streamFile(fileId: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
+    if (!this.drive) throw new Error("Drive não disponível");
+    const meta = await this.drive.files.get({ fileId, fields: "mimeType" });
+    const mimeType = meta.data.mimeType ?? "audio/mpeg";
+    const res = await this.drive.files.get(
+      { fileId, alt: "media" },
+      { responseType: "stream" },
+    );
+    return { stream: res.data as unknown as NodeJS.ReadableStream, mimeType };
+  }
 }

@@ -250,4 +250,46 @@ export class SongsService {
     const parsed = parseChordTxt(content);
     return { content, parsed };
   }
+
+  // ── Tracks (multitrack player) ────────────────────────────────────────────
+
+  async listTracks(songId: string) {
+    await this.assertSongExists(songId);
+    const tracks = await this.prisma.songTrack.findMany({
+      where: { songId },
+      orderBy: { order: "asc" },
+    });
+    return { ok: true, tracks };
+  }
+
+  async createTrack(songId: string, input: {
+    label: string;
+    trackType: string;
+    driveFileId: string;
+    driveUrl: string;
+    order?: number;
+  }) {
+    await this.assertSongExists(songId);
+    const track = await this.prisma.songTrack.create({
+      data: {
+        songId,
+        label: input.label,
+        trackType: input.trackType as any,
+        driveFileId: input.driveFileId,
+        driveUrl: input.driveUrl,
+        order: input.order ?? 0,
+      },
+    });
+    return { ok: true, track };
+  }
+
+  async deleteTrack(songId: string, trackId: string) {
+    await this.prisma.songTrack.deleteMany({ where: { id: trackId, songId } });
+    return { ok: true };
+  }
+
+  private async assertSongExists(songId: string) {
+    const exists = await this.prisma.song.findUnique({ where: { id: songId }, select: { id: true } });
+    if (!exists) throw new BadRequestException("song not found");
+  }
 }

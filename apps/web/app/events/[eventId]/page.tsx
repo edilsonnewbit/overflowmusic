@@ -809,6 +809,12 @@ export default function EventDetailPage({ params }: PageProps) {
                   {sortedItems.length > 0 && (
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <Link
+                        href={`/events/${eventId}/multitrack`}
+                        style={{ color: "#818cf8", fontSize: 13, textDecoration: "none", border: "1px solid #818cf8", borderRadius: 8, padding: "4px 12px" }}
+                      >
+                        🎛 VS ao Vivo
+                      </Link>
+                      <Link
                         href={`/events/${eventId}/present`}
                         style={{ color: "#7cf2a2", fontSize: 13, textDecoration: "none", border: "1px solid #7cf2a2", borderRadius: 8, padding: "4px 12px" }}
                       >

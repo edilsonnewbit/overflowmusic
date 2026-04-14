@@ -8,6 +8,7 @@ import { AuditionsController } from "./auditions/auditions.controller";
 import { AuditionsService } from "./auditions/auditions.service";
 import { DecisionsController } from "./decisions/decisions.controller";
 import { DecisionsService } from "./decisions/decisions.service";
+import { AudioProxyController } from "./drive/audio-proxy.controller";
 import { DriveService } from "./drive/drive.service";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
@@ -39,11 +40,11 @@ import { SongsService } from "./songs/songs.service";
     PrismaModule,
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
-      { name: "global", ttl: 60000, limit: 500 },
     ]),
   ],
   controllers: [
     AppController,
+    AudioProxyController,
     AuditionsController,
     AuthController,
     DecisionsController,
