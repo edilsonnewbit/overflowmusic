@@ -176,6 +176,16 @@ export class SongsController {
     return this.songsService.createTrack(id, body);
   }
 
+  @Post(":id/tracks/import-folder")
+  async importTracksFromFolder(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { folderUrl: string },
+  ) {
+    await this.assertWriteAccess(authorization);
+    return this.songsService.importTracksFromFolder(id, body.folderUrl);
+  }
+
   @Delete(":id/tracks/:trackId")
   async deleteTrack(
     @Headers("authorization") authorization: string | undefined,
