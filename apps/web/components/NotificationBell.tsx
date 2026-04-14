@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
-type Invite = {
+type MusicianInvite = {
+  type: "musician";
   slotId: string;
   eventId: string;
   eventTitle: string;
@@ -12,6 +13,21 @@ type Invite = {
   instrumentRole: string;
   notifiedAt: string | null;
 };
+
+type VolunteerInvite = {
+  type: "volunteer";
+  slotId: string;
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  eventLocation: string | null;
+  eventType: string;
+  volunteerArea: string;
+  volunteerRole: string | null;
+  notifiedAt: null;
+};
+
+type Invite = MusicianInvite | VolunteerInvite;
 
 const ROLE_LABELS: Record<string, string> = {
   BATERIA: "Bateria",
@@ -68,15 +84,18 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  async function respond(slotId: string, accept: boolean) {
-    setResponding(slotId);
+  async function respond(invite: Invite, accept: boolean) {
+    setResponding(invite.slotId);
     try {
-      await fetch(`/api/events/slots/${slotId}/respond`, {
+      const url = invite.type === "volunteer"
+        ? `/api/events/volunteer-slots/${invite.slotId}/respond`
+        : `/api/events/slots/${invite.slotId}/respond`;
+      await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accept }),
       });
-      setInvites((prev) => prev.filter((i) => i.slotId !== slotId));
+      setInvites((prev) => prev.filter((i) => i.slotId !== invite.slotId));
     } finally {
       setResponding(null);
     }
@@ -128,11 +147,14 @@ export function NotificationBell() {
             <ul className="notif-list">
               {invites.map((invite) => (
                 <li key={invite.slotId} className="notif-item">
-                  <div className="notif-item-icon">🎵</div>
+                  <div className="notif-item-icon">{invite.type === "volunteer" ? "🤝" : "🎵"}</div>
                   <div className="notif-item-body">
                     <p className="notif-item-title">
-                      Você foi escalado como{" "}
-                      <strong>{ROLE_LABELS[invite.instrumentRole.toUpperCase()] ?? invite.instrumentRole}</strong>
+                      {invite.type === "volunteer" ? (
+                        <>Você foi escalado como voluntário de <strong>{invite.volunteerArea}{invite.volunteerRole ? ` — ${invite.volunteerRole}` : ""}</strong></>
+                      ) : (
+                        <>Você foi escalado como <strong>{ROLE_LABELS[invite.instrumentRole.toUpperCase()] ?? invite.instrumentRole}</strong></>
+                      )}
                     </p>
                     <p className="notif-item-event">{invite.eventTitle}</p>
                     <p className="notif-item-date">{formatDate(invite.eventDate)}</p>
@@ -144,7 +166,7 @@ export function NotificationBell() {
                         className="notif-confirm-btn"
                         type="button"
                         disabled={responding === invite.slotId}
-                        onClick={() => void respond(invite.slotId, true)}
+                        onClick={() => void respond(invite, true)}
                       >
                         {responding === invite.slotId ? "..." : "Confirmar"}
                       </button>
@@ -152,7 +174,7 @@ export function NotificationBell() {
                         className="notif-decline-btn"
                         type="button"
                         disabled={responding === invite.slotId}
-                        onClick={() => void respond(invite.slotId, false)}
+                        onClick={() => void respond(invite, false)}
                       >
                         {responding === invite.slotId ? "..." : "Recusar"}
                       </button>

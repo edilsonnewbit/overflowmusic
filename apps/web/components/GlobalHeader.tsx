@@ -12,7 +12,6 @@ const isLeader = (role?: string) => role === "LEADER";
 const NAV_LINKS = [
   { href: "/events", label: "Eventos", icon: "📅" },
   { href: "/songs", label: "Músicas", icon: "🎵" },
-  { href: "/checklists", label: "Checklists", icon: "✅" },
   { href: "/rehearsals", label: "Ensaios", icon: "🎸" },
 ];
 
