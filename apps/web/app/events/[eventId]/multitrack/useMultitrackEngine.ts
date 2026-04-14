@@ -126,20 +126,20 @@ export function useMultitrackEngine(): MultitrackEngine {
       })
     );
 
+    // Calculate outside setTracks so setDuration gets the correct value immediately
     let maxDuration = 0;
-    setTracks((prev) =>
-      prev.map((ts, i) => {
-        const result = results[i];
-        if (result.status === "fulfilled") {
-          const { audioBuffer, gainNode, analyserNode } = result.value;
-          gainNode.gain.value = ts.volume;
-          if (audioBuffer.duration > maxDuration) maxDuration = audioBuffer.duration;
-          return { ...ts, buffer: audioBuffer, gainNode, analyserNode, loadState: "ready" };
-        }
-        return { ...ts, loadState: "error" };
-      })
-    );
+    const updatedTracks = initStates.map((ts, i) => {
+      const result = results[i];
+      if (result?.status === "fulfilled") {
+        const { audioBuffer, gainNode, analyserNode } = result.value;
+        gainNode.gain.value = ts.volume;
+        if (audioBuffer.duration > maxDuration) maxDuration = audioBuffer.duration;
+        return { ...ts, buffer: audioBuffer, gainNode, analyserNode, loadState: "ready" as const };
+      }
+      return { ...ts, loadState: "error" as const };
+    });
 
+    setTracks(updatedTracks);
     setDuration(maxDuration);
     setIsLoading(false);
   }, []);
