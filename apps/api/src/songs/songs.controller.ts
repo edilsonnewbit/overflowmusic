@@ -158,6 +158,34 @@ export class SongsController {
     return this.songsService.previewTxt(content);
   }
 
+  // ── Tracks ────────────────────────────────────────────────────────────────
+
+  @SkipThrottle({ global: true })
+  @Get(":id/tracks")
+  async listTracks(@Param("id") id: string) {
+    return this.songsService.listTracks(id);
+  }
+
+  @Post(":id/tracks")
+  async createTrack(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { label: string; trackType: string; driveFileId: string; driveUrl: string; order?: number },
+  ) {
+    await this.assertWriteAccess(authorization);
+    return this.songsService.createTrack(id, body);
+  }
+
+  @Delete(":id/tracks/:trackId")
+  async deleteTrack(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Param("trackId") trackId: string,
+  ) {
+    await this.assertWriteAccess(authorization);
+    return this.songsService.deleteTrack(id, trackId);
+  }
+
   private async assertWriteAccess(authorization?: string): Promise<void> {
     await this.authService.assertAdminKeyOrContentManager(authorization);
   }

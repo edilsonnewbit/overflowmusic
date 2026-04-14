@@ -195,4 +195,30 @@ export class SetlistService {
       update: {},
     });
   }
+
+  async getSetlistTracks(eventId: string) {
+    const setlist = await this.prisma.setlist.findUnique({
+      where: { eventId },
+      include: { items: { orderBy: { order: "asc" } } },
+    });
+    if (!setlist) return { ok: true, songTracks: [] };
+
+    const titles = setlist.items.map((i) => i.songTitle);
+    const songs = await this.prisma.song.findMany({
+      where: { title: { in: titles } },
+      include: { tracks: { orderBy: { order: "asc" } } },
+    });
+
+    const byTitle = new Map(songs.map((s) => [s.title, s.tracks]));
+    const songTracks = setlist.items.map((item) => ({
+      setlistItemId: item.id,
+      order: item.order,
+      songTitle: item.songTitle,
+      key: item.key,
+      leaderName: item.leaderName,
+      tracks: byTitle.get(item.songTitle) ?? [],
+    }));
+
+    return { ok: true, songTracks };
+  }
 }

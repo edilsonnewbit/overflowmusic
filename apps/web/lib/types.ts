@@ -137,6 +137,31 @@ export type EventSetlist = {
   items: SetlistItem[];
 } | null;
 
+// ── Multitrack Player ─────────────────────────────────────────────────────────
+
+export type TrackType =
+  | "CLICK" | "GUIDE_VOCAL" | "FULL_BAND" | "PAD"
+  | "BASS" | "STEM_KEYS" | "STEM_GUITAR" | "STEM_DRUMS" | "STEM_BACKING";
+
+export type SongTrack = {
+  id: string;
+  songId: string;
+  label: string;
+  trackType: TrackType;
+  driveFileId: string;
+  driveUrl: string;
+  order: number;
+};
+
+export type SetlistSongTracks = {
+  setlistItemId: string;
+  order: number;
+  songTitle: string;
+  key: string | null;
+  leaderName: string | null;
+  tracks: SongTrack[];
+};
+
 // ── Checklists ────────────────────────────────────────────────────────────────
 
 export type ChecklistTemplate = {

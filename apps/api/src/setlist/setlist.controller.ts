@@ -96,4 +96,9 @@ export class SetlistController {
     await this.authService.assertAdminKeyOrContentManager(authorization);
     return this.setlistService.reorder(eventId, body);
   }
+
+  @Get("tracks")
+  async getSetlistTracks(@Param("eventId") eventId: string) {
+    return this.setlistService.getSetlistTracks(eventId);
+  }
 }
