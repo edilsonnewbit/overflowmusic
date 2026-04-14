@@ -82,6 +82,9 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   const [newTrackUrl, setNewTrackUrl] = useState("");
   const [addingTrack, setAddingTrack] = useState(false);
   const [trackMsg, setTrackMsg] = useState("");
+  const [folderUrl, setFolderUrl] = useState("");
+  const [importingFolder, setImportingFolder] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
 
   useEffect(() => {
     void params.then((p) => setSongId(p.songId));
@@ -222,6 +225,28 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
       await loadTracks(songId);
     } catch {
       setTrackMsg("Erro ao remover faixa.");
+    }
+  }
+
+  async function importFolder() {
+    if (!songId || !folderUrl.trim()) return;
+    setImportingFolder(true);
+    setImportMsg("");
+    try {
+      const res = await fetch(`/api/songs/${songId}/tracks/import-folder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderUrl: folderUrl.trim() }),
+      });
+      const body = (await res.json()) as { ok: boolean; imported?: number; message?: string };
+      if (!body.ok) throw new Error(body.message || "Erro ao importar.");
+      setImportMsg(`${body.imported ?? 0} faixa(s) importada(s) com sucesso.`);
+      setFolderUrl("");
+      await loadTracks(songId);
+    } catch (e) {
+      setImportMsg(e instanceof Error ? e.message : "Erro ao importar.");
+    } finally {
+      setImportingFolder(false);
     }
   }
 
@@ -510,6 +535,43 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
               ))}
             </div>
           )}
+
+          {/* importar pasta inteira */}
+          <div style={{ background: "#081420", border: "1px dashed #2d4b6d", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+            <p style={{ margin: "0 0 8px", color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
+              Importar pasta do Drive
+            </p>
+            <p style={{ margin: "0 0 8px", color: "#475569", fontSize: 12 }}>
+              Cole o link da pasta do Drive. Os arquivos serão importados automaticamente com o tipo detectado pelo nome.
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="url"
+                placeholder="https://drive.google.com/drive/folders/..."
+                value={folderUrl}
+                onChange={(e) => setFolderUrl(e.target.value)}
+                disabled={importingFolder}
+                style={{ ...urlInputStyle, flex: 1 }}
+              />
+              <button
+                onClick={() => void importFolder()}
+                disabled={importingFolder || !folderUrl.trim()}
+                style={{ ...zoneSaveBtnStyle, background: "#818cf8", whiteSpace: "nowrap" }}
+              >
+                {importingFolder ? "Importando..." : "Importar pasta"}
+              </button>
+            </div>
+            {importMsg && (
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: importMsg.includes("sucesso") ? "#7cf2a2" : "#f87171" }}>
+                {importMsg}
+              </p>
+            )}
+          </div>
+
+          {/* separador */}
+          <p style={{ margin: "0 0 8px", color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
+            Adicionar faixa individualmente
+          </p>
 
           {/* formulário para adicionar nova faixa */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

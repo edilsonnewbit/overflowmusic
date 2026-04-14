@@ -36,12 +36,31 @@ export function useMultitrackEngine(): MultitrackEngine {
   const startTimeRef = useRef<number>(0);
   const offsetRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
+  const isPlayingRef = useRef<boolean>(false);
+  const tracksRef = useRef<TrackState[]>([]);
+  const durationRef = useRef<number>(0);
 
   const [tracks, setTracks] = useState<TrackState[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // Keep refs in sync with state
+  const setTracksSync = useCallback((t: TrackState[]) => {
+    tracksRef.current = t;
+    setTracks(t);
+  }, []);
+
+  const setIsPlayingSync = useCallback((v: boolean) => {
+    isPlayingRef.current = v;
+    setIsPlaying(v);
+  }, []);
+
+  const setDurationSync = useCallback((v: number) => {
+    durationRef.current = v;
+    setDuration(v);
+  }, []);
 
   // Lazy-init AudioContext on first user interaction
   function getCtx(): AudioContext {
@@ -63,13 +82,29 @@ export function useMultitrackEngine(): MultitrackEngine {
     sourceNodesRef.current.clear();
   }
 
+  // Start all source nodes from a given offset
+  function startSources(ctx: AudioContext, fromOffset: number) {
+    stopSources();
+    const startAt = ctx.currentTime;
+    startTimeRef.current = startAt;
+    for (const ts of tracksRef.current) {
+      if (!ts.buffer || !ts.gainNode) continue;
+      const source = ctx.createBufferSource();
+      source.buffer = ts.buffer;
+      source.connect(ts.gainNode);
+      source.start(startAt, fromOffset);
+      sourceNodesRef.current.set(ts.id, source);
+      source.onended = () => { sourceNodesRef.current.delete(ts.id); };
+    }
+  }
+
   // Ticker to update currentTime while playing
   function startTicker() {
     cancelAnimationFrame(rafRef.current);
     function tick() {
       if (!ctxRef.current) return;
       const elapsed = ctxRef.current.currentTime - startTimeRef.current + offsetRef.current;
-      setCurrentTime(Math.min(elapsed, duration));
+      setCurrentTime(Math.min(elapsed, durationRef.current));
       rafRef.current = requestAnimationFrame(tick);
     }
     rafRef.current = requestAnimationFrame(tick);
@@ -77,20 +112,18 @@ export function useMultitrackEngine(): MultitrackEngine {
 
   // Load all tracks for a song
   const loadSong = useCallback(async (songTracks: SongTrack[]) => {
-    // Stop current playback and reset
     stopSources();
     cancelAnimationFrame(rafRef.current);
     offsetRef.current = 0;
-    setIsPlaying(false);
+    setIsPlayingSync(false);
     setCurrentTime(0);
-    setDuration(0);
+    setDurationSync(0);
 
     if (songTracks.length === 0) {
-      setTracks([]);
+      setTracksSync([]);
       return;
     }
 
-    // Init track states as loading
     const initStates: TrackState[] = songTracks.map((t) => ({
       id: t.id,
       label: t.label,
@@ -103,12 +136,11 @@ export function useMultitrackEngine(): MultitrackEngine {
       muted: false,
       loadState: "loading",
     }));
-    setTracks(initStates);
+    setTracksSync(initStates);
     setIsLoading(true);
 
     const ctx = getCtx();
 
-    // Load each track in parallel
     const results = await Promise.allSettled(
       songTracks.map(async (t) => {
         const res = await fetch(`/api/audio-proxy?fileId=${encodeURIComponent(t.driveFileId)}`);
@@ -126,7 +158,6 @@ export function useMultitrackEngine(): MultitrackEngine {
       })
     );
 
-    // Calculate outside setTracks so setDuration gets the correct value immediately
     let maxDuration = 0;
     const updatedTracks = initStates.map((ts, i) => {
       const result = results[i];
@@ -139,81 +170,57 @@ export function useMultitrackEngine(): MultitrackEngine {
       return { ...ts, loadState: "error" as const };
     });
 
-    setTracks(updatedTracks);
-    setDuration(maxDuration);
+    setTracksSync(updatedTracks);
+    setDurationSync(maxDuration);
     setIsLoading(false);
-  }, []);
+  }, [setTracksSync, setIsPlayingSync, setDurationSync]);
 
   const play = useCallback(() => {
     const ctx = getCtx();
-    setTracks((prev) => {
-      const startAt = ctx.currentTime;
-      startTimeRef.current = startAt;
-
-      for (const ts of prev) {
-        if (!ts.buffer || !ts.gainNode) continue;
-        const source = ctx.createBufferSource();
-        source.buffer = ts.buffer;
-        source.connect(ts.gainNode);
-        source.start(startAt, offsetRef.current);
-        sourceNodesRef.current.set(ts.id, source);
-
-        source.onended = () => {
-          sourceNodesRef.current.delete(ts.id);
-        };
-      }
-
-      startTicker();
-      setIsPlaying(true);
-      return prev;
-    });
-  }, []);
+    startSources(ctx, offsetRef.current);
+    startTicker();
+    setIsPlayingSync(true);
+  }, [setIsPlayingSync]);
 
   const pause = useCallback(() => {
     if (!ctxRef.current) return;
     offsetRef.current += ctxRef.current.currentTime - startTimeRef.current;
     stopSources();
     cancelAnimationFrame(rafRef.current);
-    setIsPlaying(false);
-  }, []);
+    setIsPlayingSync(false);
+  }, [setIsPlayingSync]);
 
   const seek = useCallback((seconds: number) => {
-    const wasPlaying = isPlaying;
-    if (wasPlaying) {
-      if (ctxRef.current) {
-        offsetRef.current += ctxRef.current.currentTime - startTimeRef.current;
-      }
-      stopSources();
-      cancelAnimationFrame(rafRef.current);
-    }
+    const ctx = ctxRef.current;
+    stopSources();
+    cancelAnimationFrame(rafRef.current);
     offsetRef.current = seconds;
     setCurrentTime(seconds);
-    if (wasPlaying) {
-      // Re-trigger play from new offset
-      setTimeout(() => play(), 0);
+
+    if (isPlayingRef.current && ctx) {
+      startSources(ctx, seconds);
+      startTicker();
     }
-  }, [isPlaying, play]);
+  }, []);
 
   const setVolume = useCallback((trackId: string, value: number) => {
-    setTracks((prev) =>
-      prev.map((ts) => {
-        if (ts.id !== trackId) return ts;
-        if (ts.gainNode) ts.gainNode.gain.value = ts.muted ? 0 : value;
-        return { ...ts, volume: value };
-      })
-    );
-  }, []);
+    const updated = tracksRef.current.map((ts) => {
+      if (ts.id !== trackId) return ts;
+      if (ts.gainNode) ts.gainNode.gain.value = ts.muted ? 0 : value;
+      return { ...ts, volume: value };
+    });
+    setTracksSync(updated);
+  }, [setTracksSync]);
 
   const toggleMute = useCallback((trackId: string) => {
-    setTracks((prev) =>
-      prev.map((ts) => {
-        if (ts.id !== trackId) return ts;
-        const nextMuted = !ts.muted;
-        if (ts.gainNode) ts.gainNode.gain.value = nextMuted ? 0 : ts.volume;
-        return { ...ts, muted: nextMuted };
-      })
-    );
-  }, []);
+    const updated = tracksRef.current.map((ts) => {
+      if (ts.id !== trackId) return ts;
+      const nextMuted = !ts.muted;
+      if (ts.gainNode) ts.gainNode.gain.value = nextMuted ? 0 : ts.volume;
+      return { ...ts, muted: nextMuted };
+    });
+    setTracksSync(updated);
+  }, [setTracksSync]);
 
   // Cleanup on unmount
   useEffect(() => {

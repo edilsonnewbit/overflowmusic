@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma, ChordChartSourceType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { DriveService } from "../drive/drive.service";
 import { parseChordTxt } from "./chord-txt-parser";
 
 type CreateSongInput = {
@@ -21,9 +22,36 @@ type ImportTxtInput = {
   songId?: string;
 };
 
+type TrackType =
+  | "CLICK" | "GUIDE_VOCAL" | "FULL_BAND" | "PAD"
+  | "BASS" | "STEM_KEYS" | "STEM_GUITAR" | "STEM_DRUMS" | "STEM_BACKING";
+
+function inferTrackType(filename: string): TrackType {
+  const n = filename.toLowerCase().replace(/[_\-\.]/g, " ");
+  if (/click|metronome/.test(n)) return "CLICK";
+  if (/lead.?vocal|voz.?principal|vocal.?guia|lead.?vox/.test(n)) return "GUIDE_VOCAL";
+  if (/backing.?vocal|back.?vocal|coro|backing/.test(n)) return "STEM_BACKING";
+  if (/full.?band|full.?mix/.test(n)) return "FULL_BAND";
+  if (/drum|bateria|beat/.test(n)) return "STEM_DRUMS";
+  if (/percuss|percussion/.test(n)) return "STEM_DRUMS";
+  if (/bass|baixo/.test(n)) return "BASS";
+  if (/guitar|guitarra|violao/.test(n)) return "STEM_GUITAR";
+  if (/keyboard|piano|teclado|organ|keys/.test(n)) return "STEM_KEYS";
+  if (/synth|pad|string/.test(n)) return "PAD";
+  return "FULL_BAND";
+}
+
+function extractFolderIdFromUrl(url: string): string | null {
+  const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  return match?.[1] ?? null;
+}
+
 @Injectable()
 export class SongsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly driveService: DriveService,
+  ) {}
 
   async list(params: { limit?: number; offset?: number; search?: string; key?: string; tags?: string } = {}) {
     const limit = Math.min(params.limit ?? 50, 200);
@@ -286,6 +314,50 @@ export class SongsService {
   async deleteTrack(songId: string, trackId: string) {
     await this.prisma.songTrack.deleteMany({ where: { id: trackId, songId } });
     return { ok: true };
+  }
+
+  async importTracksFromFolder(songId: string, folderUrl: string) {
+    await this.assertSongExists(songId);
+
+    const folderId = extractFolderIdFromUrl(folderUrl);
+    if (!folderId) throw new BadRequestException("URL da pasta inválida. Use o link do Google Drive no formato drive.google.com/drive/folders/...");
+
+    const files = await this.driveService.listFolderFiles(folderId);
+    const audioFiles = files.filter((f) =>
+      f.mimeType.startsWith("audio/") || /\.(mp3|wav|aac|m4a|ogg|flac)$/i.test(f.name)
+    );
+
+    if (audioFiles.length === 0) {
+      throw new BadRequestException("Nenhum arquivo de áudio encontrado na pasta.");
+    }
+
+    // Remove only the leading number prefix (e.g. "0 Lead Vocals.mp3" → "Lead Vocals")
+    function cleanName(filename: string): string {
+      return filename.replace(/\.[^.]+$/, "").replace(/^\d+\s*/, "").trim();
+    }
+
+    const existing = await this.prisma.songTrack.findMany({ where: { songId }, select: { order: true } });
+    let nextOrder = existing.length > 0 ? Math.max(...existing.map((t) => t.order)) + 1 : 1;
+
+    const created = await Promise.all(
+      audioFiles.map(async (f) => {
+        const label = cleanName(f.name);
+        const trackType = inferTrackType(f.name);
+        const driveUrl = `https://drive.google.com/file/d/${f.id}/view`;
+        return this.prisma.songTrack.create({
+          data: {
+            songId,
+            label,
+            trackType: trackType as any,
+            driveFileId: f.id,
+            driveUrl,
+            order: nextOrder++,
+          },
+        });
+      })
+    );
+
+    return { ok: true, imported: created.length, tracks: created };
   }
 
   private async assertSongExists(songId: string) {

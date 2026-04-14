@@ -118,6 +118,42 @@ export class DriveService implements OnModuleInit {
     return this.streamPublicFile(fileId);
   }
 
+  /** Lists audio files inside a Drive folder. Works with authenticated Drive or public API key. */
+  async listFolderFiles(folderId: string): Promise<Array<{ id: string; name: string; mimeType: string }>> {
+    // Try authenticated Drive first
+    if (this.drive) {
+      const res = await this.drive.files.list({
+        q: `'${folderId}' in parents and trashed = false`,
+        fields: "files(id, name, mimeType)",
+        orderBy: "name",
+        pageSize: 100,
+      });
+      return (res.data.files ?? []).map((f) => ({
+        id: f.id ?? "",
+        name: f.name ?? "",
+        mimeType: f.mimeType ?? "audio/mpeg",
+      }));
+    }
+
+    // Fallback: public API key (for folders shared "anyone with link")
+    const apiKey = (process.env.GOOGLE_API_KEY || "").trim();
+    if (!apiKey) {
+      throw new Error(
+        "Drive não disponível. Configure GOOGLE_API_KEY ou as credenciais OAuth/Service Account para importar pastas.",
+      );
+    }
+
+    const url =
+      `https://www.googleapis.com/drive/v3/files` +
+      `?q=${encodeURIComponent(`'${folderId}' in parents and trashed = false`)}` +
+      `&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&key=${apiKey}`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Drive API retornou ${res.status}`);
+    const body = (await res.json()) as { files?: Array<{ id: string; name: string; mimeType: string }> };
+    return (body.files ?? []).map((f) => ({ id: f.id ?? "", name: f.name ?? "", mimeType: f.mimeType ?? "audio/mpeg" }));
+  }
+
   private async streamPublicFile(fileId: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
     // Follow the redirect chain (Drive redirects large files to a confirmation page)
     const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
