@@ -6,7 +6,7 @@ type Params = { params: Promise<{ eventId: string }> };
 export async function GET(_req: NextRequest, context: Params) {
   try {
     const { eventId } = await context.params;
-    const res = await serverApiFetch(`setlist/${eventId}/tracks`, { method: "GET", authMode: "admin" });
+    const res = await serverApiFetch(`events/${eventId}/setlist/tracks`, { method: "GET", authMode: "admin" });
     const body = await res.json();
     return NextResponse.json(body, { status: res.status });
   } catch (error) {
