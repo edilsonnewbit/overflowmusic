@@ -160,6 +160,11 @@ export class AuthService implements OnModuleInit {
       };
     }
 
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
     const accessToken = this.signToken({
       sub: user.id,
       email: user.email,
