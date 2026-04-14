@@ -114,6 +114,49 @@ export class NotificationsService {
     }
   }
 
+  /** Send volunteer invite notification. */
+  async sendVolunteerInvite(
+    userId: string,
+    eventTitle: string,
+    volunteerArea: string,
+    volunteerId: string,
+  ): Promise<void> {
+    const tokens = await this.prisma.pushToken.findMany({
+      where: { userId },
+      select: { token: true },
+    });
+    if (tokens.length === 0) return;
+
+    const tokenList = tokens.map((t: { token: string }) => t.token);
+    const title = `Convite para voluntariar: ${volunteerArea}`;
+    const body = `Você foi escalado como voluntário de ${volunteerArea} em "${eventTitle}".`;
+
+    const enqueued = await this.queue.enqueuePush({
+      title,
+      body,
+      tokens: tokenList,
+      data: { type: "volunteer_invite", volunteerId, eventTitle, volunteerArea },
+    });
+    if (enqueued) return;
+
+    const messages = tokenList.map((to: string) => ({
+      to,
+      title,
+      body,
+      data: { type: "volunteer_invite", volunteerId, eventTitle, volunteerArea },
+    }));
+
+    try {
+      await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "Accept-Encoding": "gzip, deflate" },
+        body: JSON.stringify(messages),
+      });
+    } catch (err) {
+      this.logger.error("Failed to send volunteer invite push", err);
+    }
+  }
+
   /** Send a daily reminder to a pending musician. */
   async sendMusicianReminder(
     userId: string,

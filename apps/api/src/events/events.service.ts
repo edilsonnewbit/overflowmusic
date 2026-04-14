@@ -289,18 +289,31 @@ export class EventsService {
   }
 
   async getMyInvites(userId: string) {
-    const slots = await this.prisma.eventMusician.findMany({
-      where: { userId, status: "PENDING" },
-      include: {
-        event: {
-          select: { id: true, title: true, dateTime: true, location: true, eventType: true, status: true },
+    const [slots, volunteerSlots] = await Promise.all([
+      this.prisma.eventMusician.findMany({
+        where: { userId, status: "PENDING" },
+        include: {
+          event: {
+            select: { id: true, title: true, dateTime: true, location: true, eventType: true, status: true },
+          },
         },
-      },
-      orderBy: { event: { dateTime: "asc" } },
-    });
+        orderBy: { event: { dateTime: "asc" } },
+      }),
+      this.prisma.eventVolunteer.findMany({
+        where: { userId, status: "PENDING" },
+        include: {
+          event: {
+            select: { id: true, title: true, dateTime: true, location: true, eventType: true, status: true },
+          },
+        },
+        orderBy: { event: { dateTime: "asc" } },
+      }),
+    ]);
 
-    const invites = slots
-      .filter((s) => new Date(s.event.dateTime) >= new Date())
+    const now = new Date();
+
+    const musicianInvites = slots
+      .filter((s) => new Date(s.event.dateTime) >= now)
       .map((s) => ({
         slotId: s.id,
         eventId: s.event.id,
@@ -310,9 +323,25 @@ export class EventsService {
         eventType: s.event.eventType,
         instrumentRole: s.instrumentRole,
         notifiedAt: s.notifiedAt,
+        type: "musician" as const,
       }));
 
-    return { ok: true, invites };
+    const volunteerInvites = volunteerSlots
+      .filter((s) => new Date(s.event.dateTime) >= now)
+      .map((s) => ({
+        slotId: s.id,
+        eventId: s.event.id,
+        eventTitle: s.event.title,
+        eventDate: s.event.dateTime,
+        eventLocation: s.event.location,
+        eventType: s.event.eventType,
+        volunteerArea: s.volunteerArea,
+        volunteerRole: s.role,
+        notifiedAt: null,
+        type: "volunteer" as const,
+      }));
+
+    return { ok: true, invites: [...musicianInvites, ...volunteerInvites] };
   }
 
   async setInstrumentConfig(eventId: string, instrumentRole: string, requiredCount: number) {
@@ -459,6 +488,20 @@ export class EventsService {
     return { ok: true, volunteers };
   }
 
+  async respondVolunteer(volunteerId: string, userId: string, accept: boolean) {
+    const slot = await this.prisma.eventVolunteer.findUnique({ where: { id: volunteerId } });
+    if (!slot) throw new BadRequestException("volunteer slot not found");
+    if (slot.userId !== userId) throw new BadRequestException("unauthorized");
+    if (slot.status !== "PENDING") throw new BadRequestException("slot already responded");
+
+    await this.prisma.eventVolunteer.update({
+      where: { id: volunteerId },
+      data: { status: accept ? "CONFIRMED" : "DECLINED" },
+    });
+
+    return { ok: true };
+  }
+
   async addVolunteer(eventId: string, input: { userId: string; volunteerArea: string; role?: string }) {
     const existing = await this.prisma.eventVolunteer.findFirst({
       where: { eventId, userId: input.userId, volunteerArea: input.volunteerArea },
@@ -468,8 +511,17 @@ export class EventsService {
     }
     const volunteer = await this.prisma.eventVolunteer.create({
       data: { eventId, userId: input.userId, volunteerArea: input.volunteerArea, role: input.role ?? null },
-      include: { user: { select: { id: true, name: true, volunteerArea: true } } },
+      include: {
+        user: { select: { id: true, name: true, volunteerArea: true } },
+        event: { select: { title: true } },
+      },
     });
+    void this.notifications.sendVolunteerInvite(
+      input.userId,
+      volunteer.event.title,
+      input.volunteerArea,
+      volunteer.id,
+    );
     return { ok: true, volunteer };
   }
 

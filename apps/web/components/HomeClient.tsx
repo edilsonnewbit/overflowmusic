@@ -419,14 +419,6 @@ export function HomeClient() {
           </div>
         </Link>
 
-        <Link href="/checklists" className="dash-card">
-          <span style={dashIconStyle}>✅</span>
-          <div>
-            <p style={dashTagStyle}>Operations</p>
-            <h3 style={dashTitleStyle}>Checklists</h3>
-            <p style={dashDescStyle}>Templates e execução de checklist por evento.</p>
-          </div>
-        </Link>
 
         <Link href="/rehearsals" className="dash-card">
           <span style={dashIconStyle}>🎸</span>
