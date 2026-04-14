@@ -31,112 +31,119 @@ export type MultitrackEngine = {
 };
 
 export function useMultitrackEngine(): MultitrackEngine {
-  const ctxRef = useRef<AudioContext | null>(null);
-  const sourceNodesRef = useRef<Map<string, AudioBufferSourceNode>>(new Map());
-  const startTimeRef = useRef<number>(0);
-  const offsetRef = useRef<number>(0);
-  const rafRef = useRef<number>(0);
-  const isPlayingRef = useRef<boolean>(false);
-  const tracksRef = useRef<TrackState[]>([]);
-  const durationRef = useRef<number>(0);
+  // ── Refs (never cause re-renders) ─────────────────────────────────────────
+  const ctxRef          = useRef<AudioContext | null>(null);
+  const sourcesRef      = useRef<Map<string, AudioBufferSourceNode>>(new Map());
+  const startTimeRef    = useRef<number>(0);   // AudioContext.currentTime at last play/seek
+  const offsetRef       = useRef<number>(0);   // absolute position in seconds at last play/seek
+  const rafRef          = useRef<number>(0);
+  const isPlayingRef    = useRef<boolean>(false);
+  const tracksRef       = useRef<TrackState[]>([]);
+  const durationRef     = useRef<number>(0);
 
-  const [tracks, setTracks] = useState<TrackState[]>([]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  // ── State ─────────────────────────────────────────────────────────────────
+  const [tracks,      setTracks]      = useState<TrackState[]>([]);
+  const [isPlaying,   setIsPlaying]   = useState(false);
+  const [isLoading,   setIsLoading]   = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [duration,    setDuration]    = useState(0);
 
-  // Keep refs in sync with state
-  const setTracksSync = useCallback((t: TrackState[]) => {
-    tracksRef.current = t;
-    setTracks(t);
-  }, []);
+  // ── Sync helpers ──────────────────────────────────────────────────────────
+  function syncTracks(t: TrackState[])  { tracksRef.current = t; setTracks(t); }
+  function syncPlaying(v: boolean)      { isPlayingRef.current = v; setIsPlaying(v); }
+  function syncDuration(v: number)      { durationRef.current = v; setDuration(v); }
 
-  const setIsPlayingSync = useCallback((v: boolean) => {
-    isPlayingRef.current = v;
-    setIsPlaying(v);
-  }, []);
-
-  const setDurationSync = useCallback((v: number) => {
-    durationRef.current = v;
-    setDuration(v);
-  }, []);
-
-  // Lazy-init AudioContext on first user interaction
+  // ── AudioContext ───────────────────────────────────────────────────────────
   function getCtx(): AudioContext {
-    if (!ctxRef.current) {
-      ctxRef.current = new AudioContext();
-    }
-    if (ctxRef.current.state === "suspended") {
-      void ctxRef.current.resume();
-    }
+    if (!ctxRef.current) ctxRef.current = new AudioContext();
+    if (ctxRef.current.state === "suspended") void ctxRef.current.resume();
     return ctxRef.current;
   }
 
-  // Stop all source nodes without resetting offset
-  function stopSources() {
-    for (const [, node] of sourceNodesRef.current) {
+  // ── Source-node management ─────────────────────────────────────────────────
+  function stopAllSources() {
+    for (const [, node] of sourcesRef.current) {
       try { node.stop(); } catch { /* already stopped */ }
       node.disconnect();
     }
-    sourceNodesRef.current.clear();
+    sourcesRef.current.clear();
   }
 
-  // Start all source nodes from a given offset
-  function startSources(ctx: AudioContext, fromOffset: number) {
-    stopSources();
-    const startAt = ctx.currentTime;
+  function startAllSources(ctx: AudioContext, fromOffset: number) {
+    stopAllSources();
+    const startAt = ctx.currentTime + 0.01; // tiny future time for sync
     startTimeRef.current = startAt;
+    const dur = durationRef.current;
+
     for (const ts of tracksRef.current) {
-      if (!ts.buffer || !ts.gainNode) continue;
+      if (!ts.buffer || !ts.gainNode || ts.loadState !== "ready") continue;
+      // Don't start if offset is already past this buffer's duration
+      if (fromOffset >= ts.buffer.duration) continue;
       const source = ctx.createBufferSource();
       source.buffer = ts.buffer;
       source.connect(ts.gainNode);
       source.start(startAt, fromOffset);
-      sourceNodesRef.current.set(ts.id, source);
-      source.onended = () => { sourceNodesRef.current.delete(ts.id); };
+      sourcesRef.current.set(ts.id, source);
+      source.onended = () => {
+        sourcesRef.current.delete(ts.id);
+        // If all sources ended and we're still "playing", auto-stop
+        if (sourcesRef.current.size === 0 && isPlayingRef.current) {
+          handleNaturalEnd(dur);
+        }
+      };
     }
   }
 
-  // Ticker to update currentTime while playing
+  // Called when all source nodes have fired onended
+  function handleNaturalEnd(dur: number) {
+    cancelAnimationFrame(rafRef.current);
+    offsetRef.current = 0;
+    setCurrentTime(dur); // show full duration
+    syncPlaying(false);
+  }
+
+  // ── Ticker ─────────────────────────────────────────────────────────────────
   function startTicker() {
     cancelAnimationFrame(rafRef.current);
     function tick() {
-      if (!ctxRef.current) return;
-      const elapsed = ctxRef.current.currentTime - startTimeRef.current + offsetRef.current;
-      setCurrentTime(Math.min(elapsed, durationRef.current));
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      const elapsed = ctx.currentTime - startTimeRef.current + offsetRef.current;
+      const dur = durationRef.current;
+
+      if (dur > 0 && elapsed >= dur) {
+        // Reached end — auto-stop
+        cancelAnimationFrame(rafRef.current);
+        stopAllSources();
+        offsetRef.current = 0;
+        setCurrentTime(dur);
+        syncPlaying(false);
+        return;
+      }
+      setCurrentTime(Math.max(0, elapsed));
       rafRef.current = requestAnimationFrame(tick);
     }
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  // Load all tracks for a song
+  // ── loadSong ───────────────────────────────────────────────────────────────
   const loadSong = useCallback(async (songTracks: SongTrack[]) => {
-    stopSources();
+    stopAllSources();
     cancelAnimationFrame(rafRef.current);
     offsetRef.current = 0;
-    setIsPlayingSync(false);
+    syncPlaying(false);
     setCurrentTime(0);
-    setDurationSync(0);
+    syncDuration(0);
 
-    if (songTracks.length === 0) {
-      setTracksSync([]);
-      return;
-    }
+    if (songTracks.length === 0) { syncTracks([]); return; }
 
     const initStates: TrackState[] = songTracks.map((t) => ({
-      id: t.id,
-      label: t.label,
-      trackType: t.trackType,
-      driveFileId: t.driveFileId,
-      buffer: null,
-      gainNode: null,
-      analyserNode: null,
+      id: t.id, label: t.label, trackType: t.trackType, driveFileId: t.driveFileId,
+      buffer: null, gainNode: null, analyserNode: null,
       volume: t.trackType === "CLICK" ? 0.5 : 1,
-      muted: false,
-      loadState: "loading",
+      muted: false, loadState: "loading",
     }));
-    setTracksSync(initStates);
+    syncTracks(initStates);
     setIsLoading(true);
 
     const ctx = getCtx();
@@ -147,13 +154,11 @@ export function useMultitrackEngine(): MultitrackEngine {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const arrayBuffer = await res.arrayBuffer();
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-
         const gainNode = ctx.createGain();
         const analyserNode = ctx.createAnalyser();
         analyserNode.fftSize = 256;
         gainNode.connect(analyserNode);
         analyserNode.connect(ctx.destination);
-
         return { id: t.id, audioBuffer, gainNode, analyserNode };
       })
     );
@@ -170,47 +175,58 @@ export function useMultitrackEngine(): MultitrackEngine {
       return { ...ts, loadState: "error" as const };
     });
 
-    setTracksSync(updatedTracks);
-    setDurationSync(maxDuration);
+    syncTracks(updatedTracks);
+    syncDuration(maxDuration);
     setIsLoading(false);
-  }, [setTracksSync, setIsPlayingSync, setDurationSync]);
-
-  const play = useCallback(() => {
-    const ctx = getCtx();
-    startSources(ctx, offsetRef.current);
-    startTicker();
-    setIsPlayingSync(true);
-  }, [setIsPlayingSync]);
-
-  const pause = useCallback(() => {
-    if (!ctxRef.current) return;
-    offsetRef.current += ctxRef.current.currentTime - startTimeRef.current;
-    stopSources();
-    cancelAnimationFrame(rafRef.current);
-    setIsPlayingSync(false);
-  }, [setIsPlayingSync]);
-
-  const seek = useCallback((seconds: number) => {
-    const ctx = ctxRef.current;
-    stopSources();
-    cancelAnimationFrame(rafRef.current);
-    offsetRef.current = seconds;
-    setCurrentTime(seconds);
-
-    if (isPlayingRef.current && ctx) {
-      startSources(ctx, seconds);
-      startTicker();
-    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Transport ──────────────────────────────────────────────────────────────
+  const play = useCallback(() => {
+    const ctx = getCtx();
+    startAllSources(ctx, offsetRef.current);
+    startTicker();
+    syncPlaying(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const pause = useCallback(() => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    // Save absolute position before stopping
+    const elapsed = ctx.currentTime - startTimeRef.current + offsetRef.current;
+    offsetRef.current = Math.min(Math.max(0, elapsed), durationRef.current);
+    stopAllSources();
+    cancelAnimationFrame(rafRef.current);
+    syncPlaying(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const seek = useCallback((seconds: number) => {
+    const clamped = Math.min(Math.max(0, seconds), durationRef.current);
+    stopAllSources();
+    cancelAnimationFrame(rafRef.current);
+    offsetRef.current = clamped;
+    setCurrentTime(clamped);
+
+    if (isPlayingRef.current) {
+      const ctx = ctxRef.current ?? getCtx();
+      startAllSources(ctx, clamped);
+      startTicker();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Volume / Mute ─────────────────────────────────────────────────────────
   const setVolume = useCallback((trackId: string, value: number) => {
     const updated = tracksRef.current.map((ts) => {
       if (ts.id !== trackId) return ts;
       if (ts.gainNode) ts.gainNode.gain.value = ts.muted ? 0 : value;
       return { ...ts, volume: value };
     });
-    setTracksSync(updated);
-  }, [setTracksSync]);
+    syncTracks(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleMute = useCallback((trackId: string) => {
     const updated = tracksRef.current.map((ts) => {
@@ -219,16 +235,18 @@ export function useMultitrackEngine(): MultitrackEngine {
       if (ts.gainNode) ts.gainNode.gain.value = nextMuted ? 0 : ts.volume;
       return { ...ts, muted: nextMuted };
     });
-    setTracksSync(updated);
-  }, [setTracksSync]);
+    syncTracks(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Cleanup on unmount
+  // ── Cleanup ────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       cancelAnimationFrame(rafRef.current);
-      stopSources();
+      stopAllSources();
       void ctxRef.current?.close();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { tracks, isPlaying, isLoading, currentTime, duration, loadSong, play, pause, seek, setVolume, toggleMute };
