@@ -120,38 +120,71 @@ export class DriveService implements OnModuleInit {
 
   /** Lists audio files inside a Drive folder. Works with authenticated Drive or public API key. */
   async listFolderFiles(folderId: string): Promise<Array<{ id: string; name: string; mimeType: string }>> {
-    // Try authenticated Drive first
+    // Try API key first (works for folders shared "anyone with link" when GOOGLE_API_KEY is set)
+    const apiKey = (process.env.GOOGLE_API_KEY || "").trim();
+    if (apiKey) {
+      const result = await this.listFolderWithApiKey(folderId, apiKey);
+      if (result !== null) return result;
+    }
+
+    // Try authenticated Drive (OAuth or Service Account)
     if (this.drive) {
       const res = await this.drive.files.list({
         q: `'${folderId}' in parents and trashed = false`,
         fields: "files(id, name, mimeType)",
         orderBy: "name",
         pageSize: 100,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
       });
-      return (res.data.files ?? []).map((f) => ({
+
+      const files = res.data.files ?? [];
+
+      // If empty, verify the folder is actually accessible (not just a permission issue)
+      if (files.length === 0) {
+        try {
+          await this.drive.files.get({ fileId: folderId, fields: "id", supportsAllDrives: true });
+        } catch {
+          throw new Error(
+            "Pasta não acessível pela conta configurada. Compartilhe a pasta do Drive com a conta de serviço ou torne-a pública (Qualquer pessoa → Visualizador).",
+          );
+        }
+      }
+
+      return files.map((f) => ({
         id: f.id ?? "",
         name: f.name ?? "",
         mimeType: f.mimeType ?? "audio/mpeg",
       }));
     }
 
-    // Fallback: public API key (for folders shared "anyone with link")
-    const apiKey = (process.env.GOOGLE_API_KEY || "").trim();
-    if (!apiKey) {
-      throw new Error(
-        "Drive não disponível. Configure GOOGLE_API_KEY ou as credenciais OAuth/Service Account para importar pastas.",
-      );
+    throw new Error(
+      "Nenhuma credencial configurada. Adicione GOOGLE_API_KEY nas variáveis de ambiente do backend para importar pastas compartilhadas via link.",
+    );
+  }
+
+  private async listFolderWithApiKey(
+    folderId: string,
+    apiKey: string,
+  ): Promise<Array<{ id: string; name: string; mimeType: string }> | null> {
+    try {
+      const url =
+        `https://www.googleapis.com/drive/v3/files` +
+        `?q=${encodeURIComponent(`'${folderId}' in parents and trashed = false`)}` +
+        `&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&key=${apiKey}`;
+
+      const res = await fetch(url);
+      if (res.status === 403 || res.status === 401) {
+        // API key doesn't have access — fall through to authenticated drive
+        return null;
+      }
+      if (!res.ok) throw new Error(`Drive API retornou ${res.status}`);
+      const body = (await res.json()) as { files?: Array<{ id: string; name: string; mimeType: string }> };
+      return (body.files ?? []).map((f) => ({ id: f.id ?? "", name: f.name ?? "", mimeType: f.mimeType ?? "audio/mpeg" }));
+    } catch (err) {
+      this.logger.warn(`[DriveService] listFolderWithApiKey falhou: ${String(err)}`);
+      return null;
     }
-
-    const url =
-      `https://www.googleapis.com/drive/v3/files` +
-      `?q=${encodeURIComponent(`'${folderId}' in parents and trashed = false`)}` +
-      `&fields=files(id,name,mimeType)&orderBy=name&pageSize=100&key=${apiKey}`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Drive API retornou ${res.status}`);
-    const body = (await res.json()) as { files?: Array<{ id: string; name: string; mimeType: string }> };
-    return (body.files ?? []).map((f) => ({ id: f.id ?? "", name: f.name ?? "", mimeType: f.mimeType ?? "audio/mpeg" }));
   }
 
   private async streamPublicFile(fileId: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {

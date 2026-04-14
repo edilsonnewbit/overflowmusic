@@ -176,6 +176,16 @@ export class SongsController {
     return this.songsService.createTrack(id, body);
   }
 
+  @Post(":id/tracks/bulk")
+  async bulkCreateTracks(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { files: Array<{ fileId: string; name: string; mimeType?: string }> },
+  ) {
+    await this.assertWriteAccess(authorization);
+    return this.songsService.bulkCreateTracks(id, body.files);
+  }
+
   @Post(":id/tracks/import-folder")
   async importTracksFromFolder(
     @Headers("authorization") authorization: string | undefined,
