@@ -48,6 +48,8 @@ type SongOption = {
   defaultKey: string | null;
   zone: string | null;
   youtubeUrl: string | null;
+  spotifyUrl: string | null;
+  driveUrl: string | null;
 };
 
 type TeamUser = {
@@ -812,7 +814,7 @@ export default function EventDetailPage({ params }: PageProps) {
                         href={`/events/${eventId}/multitrack`}
                         style={{ color: "#818cf8", fontSize: 13, textDecoration: "none", border: "1px solid #818cf8", borderRadius: 8, padding: "4px 12px" }}
                       >
-                        🎛 VS ao Vivo
+                        🎛 VS
                       </Link>
                       <Link
                         href={`/events/${eventId}/present`}
@@ -968,7 +970,7 @@ export default function EventDetailPage({ params }: PageProps) {
                                 </div>
                               )}
                             </div>
-                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, flexShrink: 0 }}>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flexShrink: 0 }}>
                               <button
                                 style={deleteBtn}
                                 disabled={isBusy}
@@ -978,17 +980,45 @@ export default function EventDetailPage({ params }: PageProps) {
                                 {isDeleting ? "..." : "✕"}
                               </button>
                               {(() => {
-                                const yt = songs.find((s) => s.title.toLowerCase() === item.songTitle.toLowerCase())?.youtubeUrl;
-                                if (!yt) return null;
+                                const song = songs.find((s) => s.title.toLowerCase() === item.songTitle.toLowerCase());
+                                if (!song) return null;
                                 return (
-                                  <button
-                                    type="button"
-                                    title="Assistir no YouTube"
-                                    onClick={(e) => { e.stopPropagation(); setYoutubeSong({ title: item.songTitle, url: yt }); }}
-                                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 20, padding: 0, background: "#ff0000", border: "none", borderRadius: 4, cursor: "pointer" }}
-                                  >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.8 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
-                                  </button>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    {song.youtubeUrl && (
+                                      <button
+                                        type="button"
+                                        title="Assistir no YouTube"
+                                        onClick={(e) => { e.stopPropagation(); setYoutubeSong({ title: item.songTitle, url: song.youtubeUrl! }); }}
+                                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 20, padding: 0, background: "#ff0000", border: "none", borderRadius: 4, cursor: "pointer" }}
+                                      >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.8 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
+                                      </button>
+                                    )}
+                                    {song.spotifyUrl && (
+                                      <a
+                                        href={song.spotifyUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="Ouvir no Spotify"
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 20, background: "#1db954", borderRadius: 4, textDecoration: "none" }}
+                                      >
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                                      </a>
+                                    )}
+                                    {song.driveUrl && (
+                                      <a
+                                        href={song.driveUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="Ouvir no Google Drive (MP3)"
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 20, background: "#1e6fcc", borderRadius: 4, textDecoration: "none" }}
+                                      >
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M12 3a9 9 0 1 0 0 18A9 9 0 0 0 12 3zm-1 13V8l6 4-6 4z"/></svg>
+                                      </a>
+                                    )}
+                                  </div>
                                 );
                               })()}
                             </div>
