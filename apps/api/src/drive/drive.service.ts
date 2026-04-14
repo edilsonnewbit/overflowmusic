@@ -99,13 +99,50 @@ export class DriveService implements OnModuleInit {
   }
 
   async streamFile(fileId: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
-    if (!this.drive) throw new Error("Drive não disponível");
-    const meta = await this.drive.files.get({ fileId, fields: "mimeType" });
-    const mimeType = meta.data.mimeType ?? "audio/mpeg";
-    const res = await this.drive.files.get(
-      { fileId, alt: "media" },
-      { responseType: "stream" },
-    );
-    return { stream: res.data as unknown as NodeJS.ReadableStream, mimeType };
+    // Try Drive API first (requires credentials)
+    if (this.drive) {
+      try {
+        const meta = await this.drive.files.get({ fileId, fields: "mimeType" });
+        const mimeType = meta.data.mimeType ?? "audio/mpeg";
+        const res = await this.drive.files.get(
+          { fileId, alt: "media" },
+          { responseType: "stream" },
+        );
+        return { stream: res.data as unknown as NodeJS.ReadableStream, mimeType };
+      } catch (err) {
+        this.logger.warn(`[DriveService] API stream falhou, tentando download público: ${String(err)}`);
+      }
+    }
+
+    // Fallback: direct HTTP download for publicly shared files ("anyone with the link")
+    return this.streamPublicFile(fileId);
+  }
+
+  private async streamPublicFile(fileId: string): Promise<{ stream: NodeJS.ReadableStream; mimeType: string }> {
+    // Follow the redirect chain (Drive redirects large files to a confirmation page)
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+    const response = await fetch(downloadUrl, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      redirect: "follow",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Drive download falhou: HTTP ${response.status}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Drive download retornou body vazio");
+    }
+
+    const contentType = response.headers.get("content-type") ?? "audio/mpeg";
+
+    // Verify we got actual audio, not an HTML confirmation page
+    if (contentType.includes("text/html")) {
+      throw new Error("Drive exigiu confirmação — compartilhe o arquivo como 'qualquer pessoa com o link pode visualizar'");
+    }
+
+    const { Readable } = await import("node:stream");
+    const stream = Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]);
+    return { stream, mimeType: contentType };
   }
 }
