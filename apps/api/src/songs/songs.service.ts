@@ -324,13 +324,35 @@ export class SongsService {
       return filename.replace(/\.[^.]+$/, "").replace(/^\d+\s*/, "").trim();
     }
 
+    // Resolve real filename from Drive Content-Disposition header when name looks like a fileId
+    async function resolveFilename(fileId: string, providedName: string): Promise<string> {
+      const looksLikeId = /^[a-zA-Z0-9_-]{20,}$/.test(providedName);
+      if (!looksLikeId) return providedName;
+      try {
+        const url = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`;
+        const res = await fetch(url, { method: "HEAD", redirect: "follow" });
+        const disposition = res.headers.get("content-disposition") ?? "";
+        // Try filename*=UTF-8''encoded first, then filename="..."
+        const utf8Match = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+        if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1].trim());
+        const plainMatch = disposition.match(/filename\s*=\s*"?([^";]+)"?/i);
+        if (plainMatch?.[1]) return plainMatch[1].trim();
+      } catch { /* ignore */ }
+      return providedName;
+    }
+
     const existing = await this.prisma.songTrack.findMany({ where: { songId }, select: { order: true } });
     let nextOrder = existing.length > 0 ? Math.max(...existing.map((t) => t.order)) + 1 : 1;
 
+    // Resolve filenames in parallel
+    const resolved = await Promise.all(
+      files.map(async (f) => ({ ...f, resolvedName: await resolveFilename(f.fileId, f.name) }))
+    );
+
     const created = await Promise.all(
-      files.map(async (f) => {
-        const label = cleanName(f.name);
-        const trackType = inferTrackType(f.name);
+      resolved.map(async (f) => {
+        const label = cleanName(f.resolvedName);
+        const trackType = inferTrackType(f.resolvedName);
         const driveUrl = `https://drive.google.com/file/d/${f.fileId}/view`;
         return this.prisma.songTrack.create({
           data: { songId, label, trackType: trackType as any, driveFileId: f.fileId, driveUrl, order: nextOrder++ },
