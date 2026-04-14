@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { CSSProperties, useEffect, useState } from "react";
+import { CSSProperties, useEffect, useRef, useState } from "react";
+import { useMultitrackEngine } from "@/app/events/[eventId]/multitrack/useMultitrackEngine";
+import { TrackStrip } from "@/app/events/[eventId]/multitrack/TrackStrip";
+import { TransportBar } from "@/app/events/[eventId]/multitrack/TransportBar";
 import { AuthGate } from "@/components/AuthGate";
 import type { Song, SongSectionLine, SongTrack, TrackType } from "@/lib/types";
 
@@ -89,6 +92,10 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   const [importingLinks, setImportingLinks] = useState(false);
   const [linksMsg, setLinksMsg] = useState("");
 
+  const [activeTab, setActiveTab] = useState<"cifra" | "vs" | "players" | "faixas">("cifra");
+  const vsLoadedRef = useRef(false);
+  const engine = useMultitrackEngine();
+
   useEffect(() => {
     void params.then((p) => setSongId(p.songId));
   }, [params]);
@@ -105,6 +112,20 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
     setUrlSpotify(song.spotifyUrl ?? "");
     setUrlDrive(song.driveUrl ?? "");
   }, [song]);
+
+  // Carrega o engine VS quando a aba VS é ativada e as faixas estão prontas
+  useEffect(() => {
+    if (activeTab !== "vs" || tracks.length === 0) return;
+    if (vsLoadedRef.current) return;
+    vsLoadedRef.current = true;
+    void engine.loadSong(tracks);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, tracks.length]);
+
+  // Reseta o flag ao trocar de aba para recarregar se as faixas mudarem
+  useEffect(() => {
+    if (activeTab !== "vs") vsLoadedRef.current = false;
+  }, [activeTab]);
 
   async function loadSong(id: string) {
     setLoading(true);
@@ -337,10 +358,7 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
           {/* zone editor */}
           <div style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             {zoneEdit === null ? (
-              <button
-                onClick={() => setZoneEdit(song.zone ?? "")}
-                style={zoneEditBtnStyle}
-              >
+              <button onClick={() => setZoneEdit(song.zone ?? "")} style={zoneEditBtnStyle}>
                 {song.zone ? "✏ Alterar zona" : "+ Definir zona (Tabernaculo)"}
               </button>
             ) : (
@@ -369,297 +387,402 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
           </div>
         </div>
 
-        {/* chart version selector */}
-        {song.chordCharts.length > 1 && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-            {song.chordCharts.map((c, i) => (
-              <button
-                key={c.id}
-                onClick={() => setActiveChartIndex(i)}
-                style={versionBtnStyle(i === activeChartIndex)}
-              >
-                v{c.version}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* ── Abas ──────────────────────────────────────────────────────── */}
+        <div style={tabBarStyle}>
+          <TabButton id="cifra"   label="Cifra"       active={activeTab} onClick={setActiveTab} />
+          <TabButton id="vs"      label="VS ao Vivo"  active={activeTab} onClick={setActiveTab} badge={tracks.length > 0 ? String(tracks.length) : undefined} />
+          <TabButton id="players" label="Players"     active={activeTab} onClick={setActiveTab} />
+          <TabButton id="faixas"  label="Faixas"      active={activeTab} onClick={setActiveTab} />
+        </div>
 
-        {/* chord chart */}
-        {!chart && (
-          <p style={{ color: "#b3c6e0" }}>Nenhuma cifra disponível para esta música.</p>
-        )}
-
-        {chart && parsed && (
-          <div style={chartContainerStyle}>
-            {parsed.sections.map((section, si) => (
-              <div key={si} style={{ marginBottom: 28 }}>
-                <p style={sectionNameStyle}>[{section.name}]</p>
-                {section.lines.map((line, li) => (
-                  <pre key={li} style={lineStyle(line.type)}>
-                    {line.content || " "}
-                  </pre>
+        {/* ── Conteúdo: Cifra ───────────────────────────────────────────── */}
+        {activeTab === "cifra" && (
+          <div>
+            {/* chart version selector */}
+            {song.chordCharts.length > 1 && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+                {song.chordCharts.map((c, i) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setActiveChartIndex(i)}
+                    style={versionBtnStyle(i === activeChartIndex)}
+                  >
+                    v{c.version}
+                  </button>
                 ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* raw fallback */}
-        {chart && !parsed && chart.rawText && (
-          <pre style={{ ...chartContainerStyle, whiteSpace: "pre-wrap", color: "#d6e5f8", fontSize: 14 }}>
-            {chart.rawText}
-          </pre>
-        )}
+            {!chart && (
+              <p style={{ color: "#b3c6e0" }}>Nenhuma cifra disponível para esta música.</p>
+            )}
 
-        {/* chord dictionary */}
-        {parsed && Object.keys(parsed.chordDictionary).length > 0 && (
-          <div style={dictBoxStyle}>
-            <p style={sectionNameStyle}>Dicionário de Acordes</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              {Object.entries(parsed.chordDictionary).map(([chord, fingering]) => (
-                <div key={chord} style={chordDictItemStyle}>
-                  <span style={{ color: "#7cf2a2", fontWeight: 700 }}>{chord}</span>
-                  <span style={{ color: "#b3c6e0", marginLeft: 6, fontSize: 12 }}>{fingering}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* import link + edit link */}
-        <div style={{ marginTop: 28, display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <Link href="/songs/import" style={importLinkStyle}>
-            + Importar nova versão
-          </Link>
-          {chart && song && (
-            <Link
-              href={`/songs/${song.id}/charts/${chart.id}/edit`}
-              style={{ ...importLinkStyle, borderColor: "#fbbf24", color: "#fbbf24" }}
-            >
-              ✏ Editar cifra v{chart.version}
-            </Link>
-          )}
-        </div>
-
-        {/* ── Media Players ─────────────────────────────────────────────── */}
-        {(song.youtubeUrl || song.spotifyUrl || song.driveUrl) && (
-          <div style={mediaContainerStyle}>
-            <p style={mediaTitleStyle}>Players de Áudio</p>
-            <div style={mediaGridStyle}>
-              {song.youtubeUrl && (() => {
-                const embed = getYoutubeEmbedUrl(song.youtubeUrl!);
-                return embed ? (
-                  <div style={mediaCardStyle}>
-                    <p style={mediaLabelStyle}>YouTube</p>
-                    <iframe
-                      src={embed}
-                      style={iframeStyle}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      title="YouTube player"
-                    />
+            {chart && parsed && (
+              <div style={chartContainerStyle}>
+                {parsed.sections.map((section, si) => (
+                  <div key={si} style={{ marginBottom: 28 }}>
+                    <p style={sectionNameStyle}>[{section.name}]</p>
+                    {section.lines.map((line, li) => (
+                      <pre key={li} style={lineStyle(line.type)}>
+                        {line.content || " "}
+                      </pre>
+                    ))}
                   </div>
-                ) : (
-                  <div style={mediaCardStyle}>
-                    <p style={mediaLabelStyle}>YouTube</p>
-                    <a href={song.youtubeUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>
-                      ▶ Abrir no YouTube
-                    </a>
-                  </div>
-                );
-              })()}
-
-              {song.spotifyUrl && (() => {
-                const embed = getSpotifyEmbedUrl(song.spotifyUrl!);
-                return embed ? (
-                  <div style={mediaCardStyle}>
-                    <p style={mediaLabelStyle}>Spotify</p>
-                    <iframe
-                      src={embed}
-                      style={{ ...iframeStyle, height: 152, borderRadius: 12 }}
-                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                      loading="lazy"
-                      title="Spotify player"
-                    />
-                  </div>
-                ) : (
-                  <div style={mediaCardStyle}>
-                    <p style={mediaLabelStyle}>Spotify</p>
-                    <a href={song.spotifyUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>
-                      ▶ Abrir no Spotify
-                    </a>
-                  </div>
-                );
-              })()}
-
-              {song.driveUrl && (() => {
-                const embed = getDriveEmbedUrl(song.driveUrl!);
-                return embed ? (
-                  <div style={mediaCardStyle}>
-                    <p style={mediaLabelStyle}>Google Drive (MP3)</p>
-                    <iframe
-                      src={embed}
-                      style={{ ...iframeStyle, height: 80 }}
-                      allow="autoplay"
-                      title="Drive audio player"
-                    />
-                  </div>
-                ) : (
-                  <div style={mediaCardStyle}>
-                    <p style={mediaLabelStyle}>Google Drive</p>
-                    <a href={song.driveUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>
-                      ▶ Abrir no Drive
-                    </a>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
-        {/* ── Editar links de áudio ─────────────────────────────────────── */}
-        <div style={{ marginTop: song.youtubeUrl || song.spotifyUrl || song.driveUrl ? 0 : 16 }}>
-          {!urlsEditOpen ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <button onClick={() => setUrlsEditOpen(true)} style={zoneEditBtnStyle}>
-                {song.youtubeUrl || song.spotifyUrl || song.driveUrl ? "✏ Editar links de áudio" : "+ Adicionar links de áudio"}
-              </button>
-              {urlsSaveMsg && <span style={{ fontSize: 12, color: "#7cf2a2" }}>{urlsSaveMsg}</span>}
-            </div>
-          ) : (
-            <div style={urlsEditBoxStyle}>
-              <p style={mediaTitleStyle}>Links de áudio / vídeo</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <UrlField label="YouTube" value={urlYoutube} onChange={setUrlYoutube} placeholder="https://www.youtube.com/watch?v=..." disabled={savingUrls} />
-                <UrlField label="Spotify" value={urlSpotify} onChange={setUrlSpotify} placeholder="https://open.spotify.com/track/..." disabled={savingUrls} />
-                <UrlField label="Google Drive (MP3)" value={urlDrive} onChange={setUrlDrive} placeholder="https://drive.google.com/file/d/.../view" disabled={savingUrls} />
+                ))}
               </div>
-              {urlsSaveMsg && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#f87171" }}>{urlsSaveMsg}</p>}
-              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                <button onClick={() => void saveUrls()} disabled={savingUrls} style={zoneSaveBtnStyle}>
-                  {savingUrls ? "..." : "Salvar"}
-                </button>
-                <button onClick={() => { setUrlsEditOpen(false); setUrlsSaveMsg(""); }} disabled={savingUrls} style={zoneCancelBtnStyle}>
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* ── Faixas Multitrack ─────────────────────────────────────────── */}
-        <div style={urlsEditBoxStyle}>
-          <p style={mediaTitleStyle}>Faixas Multitrack (VS ao Vivo)</p>
+            {chart && !parsed && chart.rawText && (
+              <pre style={{ ...chartContainerStyle, whiteSpace: "pre-wrap", color: "#d6e5f8", fontSize: 14 }}>
+                {chart.rawText}
+              </pre>
+            )}
 
-          {/* lista de faixas existentes */}
-          {tracksLoading ? (
-            <p style={{ color: "#7a94b0", fontSize: 13 }}>Carregando faixas...</p>
-          ) : tracks.length === 0 ? (
-            <p style={{ color: "#475569", fontSize: 13, marginBottom: 12 }}>Nenhuma faixa cadastrada.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-              {tracks.map((t) => (
-                <div key={t.id} style={trackRowStyle}>
-                  <span style={{ color: "#7cf2a2", fontSize: 12, fontWeight: 700, minWidth: 90 }}>{t.trackType}</span>
-                  <span style={{ color: "#e8f2ff", fontSize: 13, flex: 1 }}>{t.label}</span>
-                  <a href={t.driveUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#818cf8", fontSize: 12 }}>Drive</a>
-                  <button
-                    onClick={() => void deleteTrack(t.id)}
-                    style={trackDeleteBtnStyle}
-                    title="Remover faixa"
-                  >
-                    ✕
-                  </button>
+            {parsed && Object.keys(parsed.chordDictionary).length > 0 && (
+              <div style={dictBoxStyle}>
+                <p style={sectionNameStyle}>Dicionário de Acordes</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {Object.entries(parsed.chordDictionary).map(([chord, fingering]) => (
+                    <div key={chord} style={chordDictItemStyle}>
+                      <span style={{ color: "#7cf2a2", fontWeight: 700 }}>{chord}</span>
+                      <span style={{ color: "#b3c6e0", marginLeft: 6, fontSize: 12 }}>{fingering}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* importar vários links de uma vez */}
-          <div style={{ background: "#081420", border: "1px dashed #2d4b6d", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
-            <p style={{ margin: "0 0 4px", color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
-              Importar múltiplos arquivos do Drive
-            </p>
-            <p style={{ margin: "0 0 8px", color: "#475569", fontSize: 12 }}>
-              No Google Drive: selecione todos os arquivos → clique direito → "Copiar links" → cole aqui (um por linha).
-            </p>
-            <textarea
-              rows={4}
-              placeholder={"https://drive.google.com/file/d/AAA.../view\nhttps://drive.google.com/file/d/BBB.../view\n..."}
-              value={multiLinks}
-              onChange={(e) => setMultiLinks(e.target.value)}
-              disabled={importingLinks}
-              style={{ ...urlInputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
-            />
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-              <button
-                onClick={() => void importMultiLinks()}
-                disabled={importingLinks || !multiLinks.trim()}
-                style={{ ...zoneSaveBtnStyle, background: "#818cf8" }}
-              >
-                {importingLinks ? "Importando..." : "Importar links"}
-              </button>
-              {linksMsg && (
-                <span style={{ fontSize: 12, color: linksMsg.includes("sucesso") || linksMsg.includes("importada") ? "#7cf2a2" : "#f87171" }}>
-                  {linksMsg}
-                </span>
+            <div style={{ marginTop: 28, display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <Link href="/songs/import" style={importLinkStyle}>
+                + Importar nova versão
+              </Link>
+              {chart && song && (
+                <Link
+                  href={`/songs/${song.id}/charts/${chart.id}/edit`}
+                  style={{ ...importLinkStyle, borderColor: "#fbbf24", color: "#fbbf24" }}
+                >
+                  ✏ Editar cifra v{chart.version}
+                </Link>
               )}
             </div>
           </div>
+        )}
 
-          {/* separador */}
-          <p style={{ margin: "0 0 8px", color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
-            Adicionar faixa individualmente
-          </p>
-
-          {/* formulário para adicionar nova faixa */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <select
-                value={newTrackType}
-                onChange={(e) => setNewTrackType(e.target.value as TrackType)}
-                style={{ ...zoneSelectStyle, minWidth: 130 }}
-                disabled={addingTrack}
-              >
-                {(["CLICK","GUIDE_VOCAL","FULL_BAND","PAD","BASS","STEM_KEYS","STEM_GUITAR","STEM_DRUMS","STEM_BACKING"] as TrackType[]).map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Nome da faixa (ex: Click, Vocal Guia)"
-                value={newTrackLabel}
-                onChange={(e) => setNewTrackLabel(e.target.value)}
-                disabled={addingTrack}
-                style={{ ...urlInputStyle, flex: 1, minWidth: 160 }}
-              />
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                type="url"
-                placeholder="Link do Google Drive (drive.google.com/file/d/.../view)"
-                value={newTrackUrl}
-                onChange={(e) => setNewTrackUrl(e.target.value)}
-                disabled={addingTrack}
-                style={{ ...urlInputStyle, flex: 1 }}
-              />
-              <button onClick={() => void addTrack()} disabled={addingTrack || !newTrackUrl.trim()} style={zoneSaveBtnStyle}>
-                {addingTrack ? "..." : "+ Adicionar"}
-              </button>
-            </div>
-            {trackMsg && (
-              <p style={{ margin: 0, fontSize: 12, color: trackMsg.startsWith("Faixa") ? "#7cf2a2" : "#f87171" }}>
-                {trackMsg}
-              </p>
+        {/* ── Conteúdo: VS ao Vivo ──────────────────────────────────────── */}
+        {activeTab === "vs" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0, background: "#0b1623", border: "1px solid #1e2d3d", borderRadius: 14, overflow: "hidden" }}>
+            {tracksLoading && (
+              <div style={{ padding: 32, textAlign: "center", color: "#7a94b0" }}>Carregando faixas...</div>
+            )}
+            {!tracksLoading && tracks.length === 0 && (
+              <div style={{ padding: 32, textAlign: "center" }}>
+                <p style={{ color: "#475569", marginBottom: 8 }}>Nenhuma faixa cadastrada para esta música.</p>
+                <button onClick={() => setActiveTab("faixas")} style={zoneEditBtnStyle}>
+                  + Adicionar faixas na aba Faixas
+                </button>
+              </div>
+            )}
+            {!tracksLoading && tracks.length > 0 && (
+              <>
+                {/* Track strips */}
+                <div style={{ padding: "8px 0" }}>
+                  {engine.isLoading && (
+                    <div style={{ padding: "16px 20px", color: "#7a94b0", fontSize: 13 }}>
+                      <span style={{ marginRight: 8 }}>⏳</span>Carregando áudio...
+                    </div>
+                  )}
+                  {engine.tracks.map((track) => (
+                    <TrackStrip
+                      key={track.id}
+                      track={track}
+                      isPlaying={engine.isPlaying}
+                      onVolumeChange={(v) => engine.setVolume(track.id, v)}
+                      onMuteToggle={() => engine.toggleMute(track.id)}
+                    />
+                  ))}
+                </div>
+                {/* Transport */}
+                <TransportBar
+                  isPlaying={engine.isPlaying}
+                  isLoading={engine.isLoading}
+                  currentTime={engine.currentTime}
+                  duration={engine.duration}
+                  songTitle={song.title}
+                  songKey={song.defaultKey ?? null}
+                  onPlay={engine.play}
+                  onPause={engine.pause}
+                  onSeek={engine.seek}
+                  onPrev={() => {}}
+                  onNext={() => {}}
+                  hasPrev={false}
+                  hasNext={false}
+                />
+              </>
             )}
           </div>
-        </div>
+        )}
+
+        {/* ── Conteúdo: Players ─────────────────────────────────────────── */}
+        {activeTab === "players" && (
+          <div>
+            {(song.youtubeUrl || song.spotifyUrl || song.driveUrl) ? (
+              <div style={mediaContainerStyle}>
+                <p style={mediaTitleStyle}>Players de Áudio</p>
+                <div style={mediaGridStyle}>
+                  {song.youtubeUrl && (() => {
+                    const embed = getYoutubeEmbedUrl(song.youtubeUrl!);
+                    return embed ? (
+                      <div style={mediaCardStyle}>
+                        <p style={mediaLabelStyle}>YouTube</p>
+                        <iframe
+                          src={embed}
+                          style={iframeStyle}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title="YouTube player"
+                        />
+                      </div>
+                    ) : (
+                      <div style={mediaCardStyle}>
+                        <p style={mediaLabelStyle}>YouTube</p>
+                        <a href={song.youtubeUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>▶ Abrir no YouTube</a>
+                      </div>
+                    );
+                  })()}
+                  {song.spotifyUrl && (() => {
+                    const embed = getSpotifyEmbedUrl(song.spotifyUrl!);
+                    return embed ? (
+                      <div style={mediaCardStyle}>
+                        <p style={mediaLabelStyle}>Spotify</p>
+                        <iframe
+                          src={embed}
+                          style={{ ...iframeStyle, height: 152, borderRadius: 12 }}
+                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                          loading="lazy"
+                          title="Spotify player"
+                        />
+                      </div>
+                    ) : (
+                      <div style={mediaCardStyle}>
+                        <p style={mediaLabelStyle}>Spotify</p>
+                        <a href={song.spotifyUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>▶ Abrir no Spotify</a>
+                      </div>
+                    );
+                  })()}
+                  {song.driveUrl && (() => {
+                    const embed = getDriveEmbedUrl(song.driveUrl!);
+                    return embed ? (
+                      <div style={mediaCardStyle}>
+                        <p style={mediaLabelStyle}>Google Drive (MP3)</p>
+                        <iframe src={embed} style={{ ...iframeStyle, height: 80 }} allow="autoplay" title="Drive audio player" />
+                      </div>
+                    ) : (
+                      <div style={mediaCardStyle}>
+                        <p style={mediaLabelStyle}>Google Drive</p>
+                        <a href={song.driveUrl!} target="_blank" rel="noopener noreferrer" style={externalLinkStyle}>▶ Abrir no Drive</a>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            ) : (
+              <p style={{ color: "#475569", marginBottom: 12 }}>Nenhum player configurado.</p>
+            )}
+
+            {/* Editar links */}
+            <div style={{ marginTop: 16 }}>
+              {!urlsEditOpen ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button onClick={() => setUrlsEditOpen(true)} style={zoneEditBtnStyle}>
+                    {song.youtubeUrl || song.spotifyUrl || song.driveUrl ? "✏ Editar links de áudio" : "+ Adicionar links de áudio"}
+                  </button>
+                  {urlsSaveMsg && <span style={{ fontSize: 12, color: "#7cf2a2" }}>{urlsSaveMsg}</span>}
+                </div>
+              ) : (
+                <div style={urlsEditBoxStyle}>
+                  <p style={mediaTitleStyle}>Links de áudio / vídeo</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <UrlField label="YouTube" value={urlYoutube} onChange={setUrlYoutube} placeholder="https://www.youtube.com/watch?v=..." disabled={savingUrls} />
+                    <UrlField label="Spotify" value={urlSpotify} onChange={setUrlSpotify} placeholder="https://open.spotify.com/track/..." disabled={savingUrls} />
+                    <UrlField label="Google Drive (MP3)" value={urlDrive} onChange={setUrlDrive} placeholder="https://drive.google.com/file/d/.../view" disabled={savingUrls} />
+                  </div>
+                  {urlsSaveMsg && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#f87171" }}>{urlsSaveMsg}</p>}
+                  <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                    <button onClick={() => void saveUrls()} disabled={savingUrls} style={zoneSaveBtnStyle}>
+                      {savingUrls ? "..." : "Salvar"}
+                    </button>
+                    <button onClick={() => { setUrlsEditOpen(false); setUrlsSaveMsg(""); }} disabled={savingUrls} style={zoneCancelBtnStyle}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Conteúdo: Faixas ──────────────────────────────────────────── */}
+        {activeTab === "faixas" && (
+          <div style={urlsEditBoxStyle}>
+            <p style={mediaTitleStyle}>Faixas Multitrack (VS ao Vivo)</p>
+
+            {tracksLoading ? (
+              <p style={{ color: "#7a94b0", fontSize: 13 }}>Carregando faixas...</p>
+            ) : tracks.length === 0 ? (
+              <p style={{ color: "#475569", fontSize: 13, marginBottom: 12 }}>Nenhuma faixa cadastrada.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                {tracks.map((t) => (
+                  <div key={t.id} style={trackRowStyle}>
+                    <span style={{ color: "#7cf2a2", fontSize: 12, fontWeight: 700, minWidth: 90 }}>{t.trackType}</span>
+                    <span style={{ color: "#e8f2ff", fontSize: 13, flex: 1 }}>{t.label}</span>
+                    <a href={t.driveUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#818cf8", fontSize: 12 }}>Drive</a>
+                    <button onClick={() => void deleteTrack(t.id)} style={trackDeleteBtnStyle} title="Remover faixa">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* importar múltiplos links */}
+            <div style={{ background: "#081420", border: "1px dashed #2d4b6d", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+              <p style={{ margin: "0 0 4px", color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
+                Importar múltiplos arquivos do Drive
+              </p>
+              <p style={{ margin: "0 0 8px", color: "#475569", fontSize: 12 }}>
+                No Google Drive: selecione os arquivos → clique direito → "Copiar links" → cole aqui (um por linha).
+              </p>
+              <textarea
+                rows={4}
+                placeholder={"https://drive.google.com/file/d/AAA.../view\nhttps://drive.google.com/file/d/BBB.../view\n..."}
+                value={multiLinks}
+                onChange={(e) => setMultiLinks(e.target.value)}
+                disabled={importingLinks}
+                style={{ ...urlInputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                <button
+                  onClick={() => void importMultiLinks()}
+                  disabled={importingLinks || !multiLinks.trim()}
+                  style={{ ...zoneSaveBtnStyle, background: "#818cf8" }}
+                >
+                  {importingLinks ? "Importando..." : "Importar links"}
+                </button>
+                {linksMsg && (
+                  <span style={{ fontSize: 12, color: linksMsg.includes("sucesso") || linksMsg.includes("importada") ? "#7cf2a2" : "#f87171" }}>
+                    {linksMsg}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p style={{ margin: "0 0 8px", color: "#7a94b0", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
+              Adicionar faixa individualmente
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <select
+                  value={newTrackType}
+                  onChange={(e) => setNewTrackType(e.target.value as TrackType)}
+                  style={{ ...zoneSelectStyle, minWidth: 130 }}
+                  disabled={addingTrack}
+                >
+                  {(["CLICK","GUIDE_VOCAL","FULL_BAND","PAD","BASS","STEM_KEYS","STEM_GUITAR","STEM_DRUMS","STEM_BACKING"] as TrackType[]).map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Nome da faixa (ex: Click, Vocal Guia)"
+                  value={newTrackLabel}
+                  onChange={(e) => setNewTrackLabel(e.target.value)}
+                  disabled={addingTrack}
+                  style={{ ...urlInputStyle, flex: 1, minWidth: 160 }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="url"
+                  placeholder="Link do Google Drive (drive.google.com/file/d/.../view)"
+                  value={newTrackUrl}
+                  onChange={(e) => setNewTrackUrl(e.target.value)}
+                  disabled={addingTrack}
+                  style={{ ...urlInputStyle, flex: 1 }}
+                />
+                <button onClick={() => void addTrack()} disabled={addingTrack || !newTrackUrl.trim()} style={zoneSaveBtnStyle}>
+                  {addingTrack ? "..." : "+ Adicionar"}
+                </button>
+              </div>
+              {trackMsg && (
+                <p style={{ margin: 0, fontSize: 12, color: trackMsg.startsWith("Faixa") ? "#7cf2a2" : "#f87171" }}>
+                  {trackMsg}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
 }
 
 // ── sub-components ─────────────────────────────────────────────────────────────────────────
+
+type TabId = "cifra" | "vs" | "players" | "faixas";
+
+function TabButton({
+  id,
+  label,
+  active,
+  onClick,
+  badge,
+}: {
+  id: TabId;
+  label: string;
+  active: TabId;
+  onClick: (id: TabId) => void;
+  badge?: string;
+}) {
+  const isActive = id === active;
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(id)}
+      style={{
+        background: isActive ? "#0f2a1e" : "transparent",
+        color: isActive ? "#7cf2a2" : "#7a94b0",
+        border: "none",
+        borderBottom: isActive ? "2px solid #7cf2a2" : "2px solid transparent",
+        padding: "10px 20px",
+        fontSize: 14,
+        fontWeight: isActive ? 700 : 400,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        transition: "color 0.15s",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+      {badge && (
+        <span style={{
+          background: "#1b3756",
+          color: "#7cf2a2",
+          borderRadius: 10,
+          fontSize: 11,
+          fontWeight: 700,
+          padding: "1px 7px",
+          minWidth: 18,
+          textAlign: "center",
+        }}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
 
 function MetaPill({ label, value }: { label: string; value: string }) {
   return (
@@ -706,6 +829,13 @@ const backLinkStyle: CSSProperties = {
   fontSize: 14,
   display: "inline-block",
   marginBottom: 16,
+};
+
+const tabBarStyle: CSSProperties = {
+  display: "flex",
+  borderBottom: "1px solid #1e2d3d",
+  marginBottom: 24,
+  overflowX: "auto",
 };
 
 const headerBoxStyle: CSSProperties = {
