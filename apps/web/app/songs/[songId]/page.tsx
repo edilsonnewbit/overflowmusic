@@ -276,14 +276,32 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
         });
       }
 
-      // Request Drive access token from the logged-in user
+      // Request Drive access token — try silent first, then with consent popup
       const accessToken = await new Promise<string>((resolve, reject) => {
+        let attempted = false;
         const client = (window as any).google.accounts.oauth2.initTokenClient({
           client_id: googleClientId,
           scope: "https://www.googleapis.com/auth/drive.readonly",
           callback: (resp: any) => {
-            if (resp.error) reject(new Error(resp.error));
-            else resolve(resp.access_token as string);
+            if (resp.error) {
+              if (!attempted && (resp.error === "interaction_required" || resp.error === "consent_required")) {
+                // Silent failed — retry with full consent UI
+                attempted = true;
+                client.requestAccessToken({ prompt: "consent" });
+              } else {
+                reject(new Error(resp.error));
+              }
+            } else {
+              resolve(resp.access_token as string);
+            }
+          },
+          error_callback: (err: any) => {
+            if (!attempted && err?.type === "popup_failed_to_open") {
+              attempted = true;
+              client.requestAccessToken({ prompt: "consent" });
+            } else {
+              reject(new Error(err?.type ?? "Erro ao abrir popup do Google"));
+            }
           },
         });
         client.requestAccessToken({ prompt: "none" }); // silent if already consented
@@ -309,11 +327,11 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
       setFolderUrl("");
       await loadTracks(songId);
     } catch (e: any) {
-      // If silent token request failed, retry with consent prompt
-      if (String(e).includes("interaction_required") || String(e).includes("consent")) {
-        setImportMsg("Permissão necessária. Clique novamente para autorizar o acesso ao Drive.");
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("popup_closed") || msg.includes("access_denied")) {
+        setImportMsg("Autorização cancelada. Clique novamente e permita o acesso ao Drive.");
       } else {
-        setImportMsg(e instanceof Error ? e.message : "Erro ao importar.");
+        setImportMsg(msg || "Erro ao importar.");
       }
     } finally {
       setImportingFolder(false);
