@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
-import type { Song, SongSectionLine } from "@/lib/types";
+import type { Song, SongSectionLine, SongTrack, TrackType } from "@/lib/types";
 
 // ── Tabernáculo de Moisés — 5 zonas de louvor ───────────────────────────────
 const TABERNACLE_ZONES = [
@@ -74,6 +74,15 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   const [savingUrls, setSavingUrls] = useState(false);
   const [urlsSaveMsg, setUrlsSaveMsg] = useState("");
 
+  // multitrack tracks
+  const [tracks, setTracks] = useState<SongTrack[]>([]);
+  const [tracksLoading, setTracksLoading] = useState(false);
+  const [newTrackType, setNewTrackType] = useState<TrackType>("CLICK");
+  const [newTrackLabel, setNewTrackLabel] = useState("");
+  const [newTrackUrl, setNewTrackUrl] = useState("");
+  const [addingTrack, setAddingTrack] = useState(false);
+  const [trackMsg, setTrackMsg] = useState("");
+
   useEffect(() => {
     void params.then((p) => setSongId(p.songId));
   }, [params]);
@@ -81,6 +90,7 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
   useEffect(() => {
     if (!songId) return;
     void loadSong(songId);
+    void loadTracks(songId);
   }, [songId]);
 
   useEffect(() => {
@@ -150,6 +160,68 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
       setUrlsSaveMsg(e instanceof Error ? e.message : "Erro ao salvar.");
     } finally {
       setSavingUrls(false);
+    }
+  }
+
+  async function loadTracks(id: string) {
+    setTracksLoading(true);
+    try {
+      const res = await fetch(`/api/songs/${id}/tracks`);
+      const body = (await res.json()) as { ok: boolean; tracks?: SongTrack[] };
+      setTracks(body.tracks ?? []);
+    } finally {
+      setTracksLoading(false);
+    }
+  }
+
+  function extractDriveFileId(url: string): string | null {
+    try {
+      const match = url.match(/\/file\/d\/([^/]+)/);
+      return match?.[1] ?? null;
+    } catch { return null; }
+  }
+
+  async function addTrack() {
+    if (!songId || !newTrackUrl.trim()) return;
+    const driveFileId = extractDriveFileId(newTrackUrl.trim());
+    if (!driveFileId) {
+      setTrackMsg("URL inválida. Use um link do Google Drive no formato: drive.google.com/file/d/.../view");
+      return;
+    }
+    setAddingTrack(true);
+    setTrackMsg("");
+    try {
+      const res = await fetch(`/api/songs/${songId}/tracks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: newTrackLabel.trim() || newTrackType,
+          trackType: newTrackType,
+          driveFileId,
+          driveUrl: newTrackUrl.trim(),
+          order: tracks.length + 1,
+        }),
+      });
+      const body = (await res.json()) as { ok: boolean; message?: string };
+      if (!body.ok) throw new Error(body.message || "Erro ao adicionar faixa.");
+      setNewTrackLabel("");
+      setNewTrackUrl("");
+      setTrackMsg("Faixa adicionada.");
+      await loadTracks(songId);
+    } catch (e) {
+      setTrackMsg(e instanceof Error ? e.message : "Erro ao adicionar.");
+    } finally {
+      setAddingTrack(false);
+    }
+  }
+
+  async function deleteTrack(trackId: string) {
+    if (!songId) return;
+    try {
+      await fetch(`/api/songs/${songId}/tracks?trackId=${trackId}`, { method: "DELETE" });
+      await loadTracks(songId);
+    } catch {
+      setTrackMsg("Erro ao remover faixa.");
     }
   }
 
@@ -410,6 +482,77 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
             </div>
           )}
         </div>
+
+        {/* ── Faixas Multitrack ─────────────────────────────────────────── */}
+        <div style={urlsEditBoxStyle}>
+          <p style={mediaTitleStyle}>Faixas Multitrack (VS ao Vivo)</p>
+
+          {/* lista de faixas existentes */}
+          {tracksLoading ? (
+            <p style={{ color: "#7a94b0", fontSize: 13 }}>Carregando faixas...</p>
+          ) : tracks.length === 0 ? (
+            <p style={{ color: "#475569", fontSize: 13, marginBottom: 12 }}>Nenhuma faixa cadastrada.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+              {tracks.map((t) => (
+                <div key={t.id} style={trackRowStyle}>
+                  <span style={{ color: "#7cf2a2", fontSize: 12, fontWeight: 700, minWidth: 90 }}>{t.trackType}</span>
+                  <span style={{ color: "#e8f2ff", fontSize: 13, flex: 1 }}>{t.label}</span>
+                  <a href={t.driveUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#818cf8", fontSize: 12 }}>Drive</a>
+                  <button
+                    onClick={() => void deleteTrack(t.id)}
+                    style={trackDeleteBtnStyle}
+                    title="Remover faixa"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* formulário para adicionar nova faixa */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <select
+                value={newTrackType}
+                onChange={(e) => setNewTrackType(e.target.value as TrackType)}
+                style={{ ...zoneSelectStyle, minWidth: 130 }}
+                disabled={addingTrack}
+              >
+                {(["CLICK","GUIDE_VOCAL","FULL_BAND","PAD","BASS","STEM_KEYS","STEM_GUITAR","STEM_DRUMS","STEM_BACKING"] as TrackType[]).map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Nome da faixa (ex: Click, Vocal Guia)"
+                value={newTrackLabel}
+                onChange={(e) => setNewTrackLabel(e.target.value)}
+                disabled={addingTrack}
+                style={{ ...urlInputStyle, flex: 1, minWidth: 160 }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="url"
+                placeholder="Link do Google Drive (drive.google.com/file/d/.../view)"
+                value={newTrackUrl}
+                onChange={(e) => setNewTrackUrl(e.target.value)}
+                disabled={addingTrack}
+                style={{ ...urlInputStyle, flex: 1 }}
+              />
+              <button onClick={() => void addTrack()} disabled={addingTrack || !newTrackUrl.trim()} style={zoneSaveBtnStyle}>
+                {addingTrack ? "..." : "+ Adicionar"}
+              </button>
+            </div>
+            {trackMsg && (
+              <p style={{ margin: 0, fontSize: 12, color: trackMsg.startsWith("Faixa") ? "#7cf2a2" : "#f87171" }}>
+                {trackMsg}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </main>
   );
@@ -662,4 +805,23 @@ const urlInputStyle: CSSProperties = {
   width: "100%",
   outline: "none",
   boxSizing: "border-box",
+};
+
+const trackRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  background: "#0d2035",
+  border: "1px solid #1e3650",
+  borderRadius: 8,
+  padding: "6px 12px",
+};
+
+const trackDeleteBtnStyle: CSSProperties = {
+  background: "transparent",
+  border: "none",
+  color: "#f87171",
+  cursor: "pointer",
+  fontSize: 13,
+  padding: "0 4px",
 };
