@@ -40,6 +40,9 @@ export function useMultitrackEngine(): MultitrackEngine {
   const isPlayingRef    = useRef<boolean>(false);
   const tracksRef       = useRef<TrackState[]>([]);
   const durationRef     = useRef<number>(0);
+  // Generation counter: incremented every time sources are stopped.
+  // Prevents stale onended handlers from corrupting state.
+  const generationRef   = useRef<number>(0);
   // Cache: driveFileId → decoded AudioBuffer (persists across song changes)
   const bufferCacheRef  = useRef<Map<string, AudioBuffer>>(new Map());
 
@@ -58,12 +61,27 @@ export function useMultitrackEngine(): MultitrackEngine {
   // ── AudioContext ───────────────────────────────────────────────────────────
   function getCtx(): AudioContext {
     if (!ctxRef.current) ctxRef.current = new AudioContext();
-    if (ctxRef.current.state === "suspended") void ctxRef.current.resume();
     return ctxRef.current;
+  }
+
+  async function ensureCtxRunning(): Promise<AudioContext> {
+    const ctx = getCtx();
+    if (ctx.state === "suspended") await ctx.resume();
+    return ctx;
+  }
+
+  // ── Disconnect old audio-graph nodes ───────────────────────────────────────
+  function disconnectTrackNodes() {
+    for (const ts of tracksRef.current) {
+      ts.gainNode?.disconnect();
+      ts.analyserNode?.disconnect();
+    }
   }
 
   // ── Source-node management ─────────────────────────────────────────────────
   function stopAllSources() {
+    // Increment generation so any pending onended from these sources is ignored
+    generationRef.current++;
     for (const [, node] of sourcesRef.current) {
       try { node.stop(); } catch { /* already stopped */ }
       node.disconnect();
@@ -73,6 +91,7 @@ export function useMultitrackEngine(): MultitrackEngine {
 
   function startAllSources(ctx: AudioContext, fromOffset: number) {
     stopAllSources();
+    const gen = generationRef.current; // capture generation for onended check
     const startAt = ctx.currentTime + 0.01; // tiny future time for sync
     startTimeRef.current = startAt;
     const dur = durationRef.current;
@@ -87,6 +106,8 @@ export function useMultitrackEngine(): MultitrackEngine {
       source.start(startAt, fromOffset);
       sourcesRef.current.set(ts.id, source);
       source.onended = () => {
+        // Ignore stale onended from a previous generation (seek, pause, song switch)
+        if (generationRef.current !== gen) return;
         sourcesRef.current.delete(ts.id);
         // If all sources ended and we're still "playing", auto-stop
         if (sourcesRef.current.size === 0 && isPlayingRef.current) {
@@ -132,6 +153,8 @@ export function useMultitrackEngine(): MultitrackEngine {
   const loadSong = useCallback(async (songTracks: SongTrack[]) => {
     stopAllSources();
     cancelAnimationFrame(rafRef.current);
+    // Disconnect old GainNode/AnalyserNode chains from ctx.destination
+    disconnectTrackNodes();
     offsetRef.current = 0;
     syncPlaying(false);
     setCurrentTime(0);
@@ -148,7 +171,7 @@ export function useMultitrackEngine(): MultitrackEngine {
     syncTracks(initStates);
     setIsLoading(true);
 
-    const ctx = getCtx();
+    const ctx = await ensureCtxRunning();
 
     const results = await Promise.allSettled(
       songTracks.map(async (t) => {
@@ -190,8 +213,8 @@ export function useMultitrackEngine(): MultitrackEngine {
   }, []);
 
   // ── Transport ──────────────────────────────────────────────────────────────
-  const play = useCallback(() => {
-    const ctx = getCtx();
+  const play = useCallback(async () => {
+    const ctx = await ensureCtxRunning();
     startAllSources(ctx, offsetRef.current);
     startTicker();
     syncPlaying(true);
@@ -199,6 +222,7 @@ export function useMultitrackEngine(): MultitrackEngine {
   }, []);
 
   const pause = useCallback(() => {
+    if (!isPlayingRef.current) return;
     const ctx = ctxRef.current;
     if (!ctx) return;
     // Save absolute position before stopping
@@ -252,6 +276,7 @@ export function useMultitrackEngine(): MultitrackEngine {
     return () => {
       cancelAnimationFrame(rafRef.current);
       stopAllSources();
+      disconnectTrackNodes();
       void ctxRef.current?.close();
       bufferCacheRef.current.clear();
     };
