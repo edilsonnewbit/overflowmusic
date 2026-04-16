@@ -5,27 +5,41 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { NotificationBell } from "@/components/NotificationBell";
+import {
+  canSeeSongsPage,
+  canSeeRehearsals,
+  canSeeChecklists,
+  canSeeAdminLinks,
+  canSeeAudicoes,
+} from "@/lib/permissions";
+import type { AuthUser } from "@/lib/types";
 
-const isAdmin = (role?: string) => role === "SUPER_ADMIN" || role === "ADMIN";
-const isLeader = (role?: string) => role === "LEADER";
+type NavLink = { href: string; label: string; icon: string };
 
-const NAV_LINKS = [
-  { href: "/events", label: "Eventos", icon: "📅" },
-  { href: "/songs", label: "Músicas", icon: "🎵" },
-  { href: "/rehearsals", label: "Ensaios", icon: "🎸" },
-];
+function buildLinks(user: AuthUser): NavLink[] {
+  const links: NavLink[] = [{ href: "/events", label: "Eventos", icon: "📅" }];
 
-// Exclusivo para ADMIN e SUPER_ADMIN (páginas protegidas por AuthGate)
-const ADMIN_LINKS = [
-  { href: "/admin/team", label: "Equipe", icon: "👥" },
-  { href: "/admin/users", label: "Aprovações", icon: "🔑" },
-  { href: "/admin/audicoes", label: "Audições", icon: "🎤" },
-];
+  if (canSeeSongsPage(user)) {
+    links.push({ href: "/songs", label: "Músicas", icon: "🎵" });
+  }
+  if (canSeeRehearsals(user)) {
+    links.push({ href: "/rehearsals", label: "Ensaios", icon: "🎸" });
+  }
+  if (canSeeChecklists(user)) {
+    links.push({ href: "/checklists", label: "Checklists", icon: "✅" });
+  }
+  if (canSeeAdminLinks(user)) {
+    links.push(
+      { href: "/admin/team", label: "Equipe", icon: "👥" },
+      { href: "/admin/users", label: "Aprovações", icon: "🔑" },
+      { href: "/admin/audicoes", label: "Audições", icon: "🎤" },
+    );
+  } else if (canSeeAudicoes(user)) {
+    links.push({ href: "/admin/audicoes", label: "Audições", icon: "🎤" });
+  }
 
-// Links adicionais para LEADER (somente leitura, sem acesso a /admin/users)
-const LEADER_LINKS = [
-  { href: "/admin/audicoes", label: "Audições", icon: "🎤" },
-];
+  return links;
+}
 
 export function GlobalHeader() {
   const pathname = usePathname();
@@ -47,13 +61,7 @@ export function GlobalHeader() {
     return pathname.startsWith(href);
   }
 
-  const links = user
-    ? [
-        ...NAV_LINKS,
-        ...(isAdmin(user.role) ? ADMIN_LINKS : []),
-        ...(isLeader(user.role) ? LEADER_LINKS : []),
-      ]
-    : [];
+  const links = user ? buildLinks(user) : [];
 
   return (
     <header className="global-header">

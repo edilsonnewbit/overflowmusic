@@ -5,7 +5,9 @@ import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useMultitrackEngine } from "@/app/events/[eventId]/multitrack/useMultitrackEngine";
 import { TrackStrip } from "@/app/events/[eventId]/multitrack/TrackStrip";
 import { TransportBar } from "@/app/events/[eventId]/multitrack/TransportBar";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthRequired } from "@/components/AuthRequired";
+import { useAuth } from "@/components/AuthProvider";
+import { canSeeSongsPage, canSeeFullSongDetail, canManageSongs } from "@/lib/permissions";
 import type { Song, SongSectionLine, SongTrack, TrackType } from "@/lib/types";
 
 // ── Tabernáculo de Moisés — 5 zonas de louvor ───────────────────────────────
@@ -55,13 +57,19 @@ function getDriveEmbedUrl(url: string): string | null {
 
 export default function SongDetailPage({ params }: { params: Promise<{ songId: string }> }) {
   return (
-    <AuthGate>
+    <AuthRequired>
       <SongDetailContent params={params} />
-    </AuthGate>
+    </AuthRequired>
   );
 }
 
 function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) {
+  const { user } = useAuth();
+  const canManage = user ? canManageSongs(user) : false;
+  const fullDetail = user ? canSeeFullSongDetail(user) : false;
+  // MIDIA/DANCA: veem apenas players (Spotify/YouTube/Drive)
+  const simplified = user ? (!fullDetail && canSeeSongsPage(user)) : false;
+
   const [songId, setSongId] = useState<string | null>(null);
   const [song, setSong] = useState<Song | null>(null);
   const [loading, setLoading] = useState(true);
@@ -355,45 +363,54 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
             )}
           </div>
 
-          {/* zone editor */}
-          <div style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {zoneEdit === null ? (
-              <button onClick={() => setZoneEdit(song.zone ?? "")} style={zoneEditBtnStyle}>
-                {song.zone ? "✏ Alterar zona" : "+ Definir zona (Tabernaculo)"}
-              </button>
-            ) : (
-              <>
-                <select
-                  value={zoneEdit}
-                  onChange={(e) => setZoneEdit(e.target.value)}
-                  disabled={savingZone}
-                  style={zoneSelectStyle}
-                  title={TABERNACLE_ZONES.find((z) => z.value === zoneEdit)?.description ?? ""}
-                >
-                  <option value="">Sem zona</option>
-                  {TABERNACLE_ZONES.map((z) => (
-                    <option key={z.value} value={z.value} title={z.description}>{z.label}</option>
-                  ))}
-                </select>
-                <button onClick={() => void saveZone()} disabled={savingZone} style={zoneSaveBtnStyle}>
-                  {savingZone ? "..." : "Salvar"}
+          {/* zone editor — apenas para quem gerencia */}
+          {canManage && (
+            <div style={{ marginTop: 14, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {zoneEdit === null ? (
+                <button onClick={() => setZoneEdit(song.zone ?? "")} style={zoneEditBtnStyle}>
+                  {song.zone ? "✏ Alterar zona" : "+ Definir zona (Tabernaculo)"}
                 </button>
-                <button onClick={() => { setZoneEdit(null); setZoneSaveMsg(""); }} disabled={savingZone} style={zoneCancelBtnStyle}>
-                  Cancelar
-                </button>
-              </>
-            )}
-            {zoneSaveMsg && <span style={{ fontSize: 12, color: "#7cf2a2" }}>{zoneSaveMsg}</span>}
-          </div>
+              ) : (
+                <>
+                  <select
+                    value={zoneEdit}
+                    onChange={(e) => setZoneEdit(e.target.value)}
+                    disabled={savingZone}
+                    style={zoneSelectStyle}
+                    title={TABERNACLE_ZONES.find((z) => z.value === zoneEdit)?.description ?? ""}
+                  >
+                    <option value="">Sem zona</option>
+                    {TABERNACLE_ZONES.map((z) => (
+                      <option key={z.value} value={z.value} title={z.description}>{z.label}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => void saveZone()} disabled={savingZone} style={zoneSaveBtnStyle}>
+                    {savingZone ? "..." : "Salvar"}
+                  </button>
+                  <button onClick={() => { setZoneEdit(null); setZoneSaveMsg(""); }} disabled={savingZone} style={zoneCancelBtnStyle}>
+                    Cancelar
+                  </button>
+                </>
+              )}
+              {zoneSaveMsg && <span style={{ fontSize: 12, color: "#7cf2a2" }}>{zoneSaveMsg}</span>}
+            </div>
+          )}
         </div>
 
         {/* ── Abas ──────────────────────────────────────────────────────── */}
-        <div style={tabBarStyle}>
-          <TabButton id="cifra"   label="Cifra"       active={activeTab} onClick={setActiveTab} />
-          <TabButton id="vs"      label="VS ao Vivo"  active={activeTab} onClick={setActiveTab} badge={tracks.length > 0 ? String(tracks.length) : undefined} />
-          <TabButton id="players" label="Players"     active={activeTab} onClick={setActiveTab} />
-          <TabButton id="faixas"  label="Faixas"      active={activeTab} onClick={setActiveTab} />
-        </div>
+        {simplified ? (
+          /* View simplificada: apenas Players */
+          <div style={tabBarStyle}>
+            <TabButton id="players" label="Players" active={activeTab} onClick={setActiveTab} />
+          </div>
+        ) : (
+          <div style={tabBarStyle}>
+            <TabButton id="cifra"   label="Cifra"       active={activeTab} onClick={setActiveTab} />
+            <TabButton id="vs"      label="VS ao Vivo"  active={activeTab} onClick={setActiveTab} badge={tracks.length > 0 ? String(tracks.length) : undefined} />
+            <TabButton id="players" label="Players"     active={activeTab} onClick={setActiveTab} />
+            <TabButton id="faixas"  label="Faixas"      active={activeTab} onClick={setActiveTab} />
+          </div>
+        )}
 
         {/* ── Conteúdo: Cifra ───────────────────────────────────────────── */}
         {activeTab === "cifra" && (
@@ -452,24 +469,26 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
               </div>
             )}
 
-            <div style={{ marginTop: 28, display: "flex", gap: 16, flexWrap: "wrap" }}>
-              <Link href="/songs/import" style={importLinkStyle}>
-                + Importar nova versão
-              </Link>
-              {chart && song && (
-                <Link
-                  href={`/songs/${song.id}/charts/${chart.id}/edit`}
-                  style={{ ...importLinkStyle, borderColor: "#fbbf24", color: "#fbbf24" }}
-                >
-                  ✏ Editar cifra v{chart.version}
+            {canManage && (
+              <div style={{ marginTop: 28, display: "flex", gap: 16, flexWrap: "wrap" }}>
+                <Link href="/songs/import" style={importLinkStyle}>
+                  + Importar nova versão
                 </Link>
-              )}
-            </div>
+                {chart && song && (
+                  <Link
+                    href={`/songs/${song.id}/charts/${chart.id}/edit`}
+                    style={{ ...importLinkStyle, borderColor: "#fbbf24", color: "#fbbf24" }}
+                  >
+                    ✏ Editar cifra v{chart.version}
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Conteúdo: VS ao Vivo ──────────────────────────────────────── */}
-        {activeTab === "vs" && (
+        {/* ── Conteúdo: VS ao Vivo — apenas para acesso completo ───────── */}
+        {activeTab === "vs" && fullDetail && (
           <div style={{ display: "flex", flexDirection: "column", gap: 0, background: "#0b1623", border: "1px solid #1e2d3d", borderRadius: 14, overflow: "hidden" }}>
             {tracksLoading && (
               <div style={{ padding: 32, textAlign: "center", color: "#7a94b0" }}>Carregando faixas...</div>
@@ -589,40 +608,42 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
               <p style={{ color: "#475569", marginBottom: 12 }}>Nenhum player configurado.</p>
             )}
 
-            {/* Editar links */}
-            <div style={{ marginTop: 16 }}>
-              {!urlsEditOpen ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => setUrlsEditOpen(true)} style={zoneEditBtnStyle}>
-                    {song.youtubeUrl || song.spotifyUrl || song.driveUrl ? "✏ Editar links de áudio" : "+ Adicionar links de áudio"}
-                  </button>
-                  {urlsSaveMsg && <span style={{ fontSize: 12, color: "#7cf2a2" }}>{urlsSaveMsg}</span>}
-                </div>
-              ) : (
-                <div style={urlsEditBoxStyle}>
-                  <p style={mediaTitleStyle}>Links de áudio / vídeo</p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <UrlField label="YouTube" value={urlYoutube} onChange={setUrlYoutube} placeholder="https://www.youtube.com/watch?v=..." disabled={savingUrls} />
-                    <UrlField label="Spotify" value={urlSpotify} onChange={setUrlSpotify} placeholder="https://open.spotify.com/track/..." disabled={savingUrls} />
-                    <UrlField label="Google Drive (MP3)" value={urlDrive} onChange={setUrlDrive} placeholder="https://drive.google.com/file/d/.../view" disabled={savingUrls} />
-                  </div>
-                  {urlsSaveMsg && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#f87171" }}>{urlsSaveMsg}</p>}
-                  <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                    <button onClick={() => void saveUrls()} disabled={savingUrls} style={zoneSaveBtnStyle}>
-                      {savingUrls ? "..." : "Salvar"}
+            {/* Editar links — apenas para quem gerencia */}
+            {canManage && (
+              <div style={{ marginTop: 16 }}>
+                {!urlsEditOpen ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <button onClick={() => setUrlsEditOpen(true)} style={zoneEditBtnStyle}>
+                      {song.youtubeUrl || song.spotifyUrl || song.driveUrl ? "✏ Editar links de áudio" : "+ Adicionar links de áudio"}
                     </button>
-                    <button onClick={() => { setUrlsEditOpen(false); setUrlsSaveMsg(""); }} disabled={savingUrls} style={zoneCancelBtnStyle}>
-                      Cancelar
-                    </button>
+                    {urlsSaveMsg && <span style={{ fontSize: 12, color: "#7cf2a2" }}>{urlsSaveMsg}</span>}
                   </div>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div style={urlsEditBoxStyle}>
+                    <p style={mediaTitleStyle}>Links de áudio / vídeo</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <UrlField label="YouTube" value={urlYoutube} onChange={setUrlYoutube} placeholder="https://www.youtube.com/watch?v=..." disabled={savingUrls} />
+                      <UrlField label="Spotify" value={urlSpotify} onChange={setUrlSpotify} placeholder="https://open.spotify.com/track/..." disabled={savingUrls} />
+                      <UrlField label="Google Drive (MP3)" value={urlDrive} onChange={setUrlDrive} placeholder="https://drive.google.com/file/d/.../view" disabled={savingUrls} />
+                    </div>
+                    {urlsSaveMsg && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#f87171" }}>{urlsSaveMsg}</p>}
+                    <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                      <button onClick={() => void saveUrls()} disabled={savingUrls} style={zoneSaveBtnStyle}>
+                        {savingUrls ? "..." : "Salvar"}
+                      </button>
+                      <button onClick={() => { setUrlsEditOpen(false); setUrlsSaveMsg(""); }} disabled={savingUrls} style={zoneCancelBtnStyle}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Conteúdo: Faixas ──────────────────────────────────────────── */}
-        {activeTab === "faixas" && (
+        {/* ── Conteúdo: Faixas — apenas para acesso completo ───────────── */}
+        {activeTab === "faixas" && fullDetail && (
           <div style={urlsEditBoxStyle}>
             <p style={mediaTitleStyle}>Faixas Multitrack (VS ao Vivo)</p>
 

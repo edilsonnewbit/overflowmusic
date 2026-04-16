@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { CSSProperties, FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
+import { AuthRequired } from "@/components/AuthRequired";
+import { canSeeRehearsals, canManageRehearsals } from "@/lib/permissions";
 
 type Rehearsal = {
   id: string;
@@ -30,9 +34,28 @@ function wazeUrl(address: string) {
 }
 
 export default function RehearsalsPage() {
+  return (
+    <AuthRequired>
+      <RehearsalsContent />
+    </AuthRequired>
+  );
+}
+
+function RehearsalsContent() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
+
+  const canManage = user ? canManageRehearsals(user) : false;
+
+  useEffect(() => {
+    if (!user) return;
+    if (!canSeeRehearsals(user)) {
+      router.replace("/events");
+    }
+  }, [user, router]);
 
   // create / edit form
   const [showForm, setShowForm] = useState(false);
@@ -146,9 +169,11 @@ export default function RehearsalsPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <Link href="/" style={backLink}>← Home</Link>
           <h1 style={title}>Ensaios</h1>
-          <div style={{ marginLeft: "auto" }}>
-            <button style={primaryBtn} onClick={openCreate}>+ Novo ensaio</button>
-          </div>
+          {canManage && (
+            <div style={{ marginLeft: "auto" }}>
+              <button style={primaryBtn} onClick={openCreate}>+ Novo ensaio</button>
+            </div>
+          )}
         </div>
 
       {status && (
@@ -216,7 +241,7 @@ export default function RehearsalsPage() {
       ) : rehearsals.length === 0 ? (
         <div style={empty}>
           <p style={{ color: "#5a7a9a", fontSize: 15 }}>Nenhum ensaio cadastrado ainda.</p>
-          <button style={primaryBtn} onClick={openCreate}>Criar primeiro ensaio</button>
+          {canManage && <button style={primaryBtn} onClick={openCreate}>Criar primeiro ensaio</button>}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -238,16 +263,18 @@ export default function RehearsalsPage() {
                 )}
                 {r.description && <p style={{ margin: "4px 0 0", color: "#7a94b0", fontSize: 12, fontStyle: "italic" }}>{r.description}</p>}
               </div>
-              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button style={secondaryBtn} onClick={() => openEdit(r)}>Editar</button>
-                <button
-                  style={{ ...secondaryBtn, color: "#f87171", borderColor: "#f8717133" }}
-                  onClick={() => void handleDelete(r.id)}
-                  disabled={deletingId === r.id}
-                >
-                  {deletingId === r.id ? "..." : "Remover"}
-                </button>
-              </div>
+              {canManage && (
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button style={secondaryBtn} onClick={() => openEdit(r)}>Editar</button>
+                  <button
+                    style={{ ...secondaryBtn, color: "#f87171", borderColor: "#f8717133" }}
+                    onClick={() => void handleDelete(r.id)}
+                    disabled={deletingId === r.id}
+                  >
+                    {deletingId === r.id ? "..." : "Remover"}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
