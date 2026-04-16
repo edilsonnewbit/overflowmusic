@@ -179,11 +179,126 @@ export class SetlistService {
     return { ok: true, items };
   }
 
+  // ── Rehearsal setlist methods ─────────────────────────────────────────────
+
+  async getByRehearsal(rehearsalId: string) {
+    const setlist = await this.prisma.setlist.findUnique({
+      where: { rehearsalId },
+      include: { items: { orderBy: { order: "asc" } } },
+    });
+    return { ok: true, setlist: setlist ?? null };
+  }
+
+  async upsertByRehearsal(rehearsalId: string, input: UpsertSetlistInput) {
+    await this.assertRehearsalExists(rehearsalId);
+
+    const setlist = await this.prisma.setlist.upsert({
+      where: { rehearsalId },
+      create: { rehearsalId, title: input.title?.trim() || null, notes: input.notes?.trim() || null },
+      update: { title: input.title?.trim() || null, notes: input.notes?.trim() || null },
+      include: { items: { orderBy: { order: "asc" } } },
+    });
+    return { ok: true, setlist };
+  }
+
+  async addItemToRehearsal(rehearsalId: string, input: CreateSetlistItemInput) {
+    const setlist = await this.getOrCreateRehearsalSetlist(rehearsalId);
+
+    const songTitle = (input.songTitle || "").trim();
+    if (!songTitle) throw new BadRequestException("songTitle is required");
+
+    const lastItem = await this.prisma.setlistItem.findFirst({
+      where: { setlistId: setlist.id },
+      orderBy: { order: "desc" },
+    });
+
+    const order = typeof input.order === "number" ? input.order : (lastItem?.order || 0) + 1;
+
+    const item = await this.prisma.setlistItem.create({
+      data: {
+        setlistId: setlist.id,
+        order,
+        songTitle,
+        key: input.key?.trim() || null,
+        leaderName: input.leaderName?.trim() || null,
+        zone: input.zone?.trim() || null,
+        transitionNotes: input.transitionNotes?.trim() || null,
+      },
+    });
+    return { ok: true, item };
+  }
+
+  async updateItemInRehearsal(rehearsalId: string, itemId: string, input: UpdateSetlistItemInput) {
+    const setlist = await this.getOrCreateRehearsalSetlist(rehearsalId);
+    const item = await this.prisma.setlistItem.findFirst({ where: { id: itemId, setlistId: setlist.id } });
+    if (!item) throw new BadRequestException("setlist item not found");
+
+    const data: Record<string, unknown> = {};
+    if (typeof input.songTitle === "string") {
+      const t = input.songTitle.trim();
+      if (!t) throw new BadRequestException("songTitle cannot be empty");
+      data.songTitle = t;
+    }
+    if (typeof input.key === "string") data.key = input.key.trim() || null;
+    if (typeof input.leaderName === "string") data.leaderName = input.leaderName.trim() || null;
+    if (typeof input.zone === "string") data.zone = input.zone.trim() || null;
+    if (typeof input.transitionNotes === "string") data.transitionNotes = input.transitionNotes.trim() || null;
+    if (typeof input.order === "number") data.order = input.order;
+
+    const updated = await this.prisma.setlistItem.update({ where: { id: itemId }, data });
+    return { ok: true, item: updated };
+  }
+
+  async removeItemFromRehearsal(rehearsalId: string, itemId: string) {
+    const setlist = await this.getOrCreateRehearsalSetlist(rehearsalId);
+    const item = await this.prisma.setlistItem.findFirst({ where: { id: itemId, setlistId: setlist.id } });
+    if (!item) throw new BadRequestException("setlist item not found");
+    await this.prisma.setlistItem.delete({ where: { id: itemId } });
+    return { ok: true };
+  }
+
+  async reorderRehearsal(rehearsalId: string, input: ReorderInput) {
+    const setlist = await this.getOrCreateRehearsalSetlist(rehearsalId);
+
+    if (!Array.isArray(input.items) || input.items.length === 0) {
+      throw new BadRequestException("items is required");
+    }
+
+    const ids = input.items.map((it) => it.id);
+    const existing = await this.prisma.setlistItem.findMany({
+      where: { setlistId: setlist.id, id: { in: ids } },
+      select: { id: true },
+    });
+
+    if (existing.length !== ids.length) {
+      throw new BadRequestException("one or more items do not belong to this setlist");
+    }
+
+    await this.prisma.$transaction(
+      input.items.map((it) =>
+        this.prisma.setlistItem.update({ where: { id: it.id }, data: { order: it.order } }),
+      ),
+    );
+
+    const items = await this.prisma.setlistItem.findMany({
+      where: { setlistId: setlist.id },
+      orderBy: { order: "asc" },
+    });
+    return { ok: true, items };
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+
   private async assertEventExists(eventId: string) {
     const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
     if (!event) {
       throw new BadRequestException("event not found");
     }
+  }
+
+  private async assertRehearsalExists(rehearsalId: string) {
+    const rehearsal = await this.prisma.rehearsal.findUnique({ where: { id: rehearsalId }, select: { id: true } });
+    if (!rehearsal) throw new BadRequestException("rehearsal not found");
   }
 
   private async getOrCreateSetlist(eventId: string) {
@@ -192,6 +307,15 @@ export class SetlistService {
     return this.prisma.setlist.upsert({
       where: { eventId },
       create: { eventId },
+      update: {},
+    });
+  }
+
+  private async getOrCreateRehearsalSetlist(rehearsalId: string) {
+    await this.assertRehearsalExists(rehearsalId);
+    return this.prisma.setlist.upsert({
+      where: { rehearsalId },
+      create: { rehearsalId },
       update: {},
     });
   }

@@ -268,14 +268,16 @@ model EventVolunteer {
 }
 
 model Setlist {
-  id        String        @id @default(uuid())
-  eventId   String        @unique
-  title     String?
-  notes     String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  event     Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  items     SetlistItem[]
+  id          String        @id @default(uuid())
+  eventId     String?       @unique
+  rehearsalId String?       @unique
+  title       String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  event       Event?        @relation(fields: [eventId],     references: [id], onDelete: Cascade)
+  rehearsal   Rehearsal?    @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  items       SetlistItem[]
 }
 
 model SetlistItem {
@@ -411,6 +413,7 @@ model Rehearsal {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   events          EventRehearsal[]
+  setlist         Setlist?
 
   @@index([dateTime])
 }

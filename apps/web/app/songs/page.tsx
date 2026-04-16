@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/AuthRequired";
+import { useAuth } from "@/components/AuthProvider";
+import { canSeeSongsPage, canManageSongs, canSeeFullSongDetail } from "@/lib/permissions";
 import type { Song } from "@/lib/types";
 
 export default function SongsPage() {
@@ -14,12 +17,26 @@ export default function SongsPage() {
 }
 
 function SongsContent() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [keyFilter, setKeyFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
+
+  const canManage = user ? canManageSongs(user) : false;
+  const fullDetail = user ? canSeeFullSongDetail(user) : false;
+  // MIDIA e DANCA veem versão simplificada (sem cifras, sem edição)
+  const simplified = user ? (!fullDetail && canSeeSongsPage(user)) : false;
+
+  useEffect(() => {
+    if (!user) return;
+    if (!canSeeSongsPage(user)) {
+      router.replace("/events");
+    }
+  }, [user, router]);
 
   useEffect(() => {
     void loadSongs();
@@ -62,11 +79,15 @@ function SongsContent() {
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <Link href="/" style={backLinkStyle}>← Home</Link>
-          <h1 style={{ margin: 0, fontSize: 26 }}>Biblioteca de Músicas</h1>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
-            <Link href="/songs/new" style={importBtnStyle}>+ Nova Música</Link>
-            <Link href="/songs/import" style={importBtnStyle}>+ Importar .txt</Link>
-          </div>
+          <h1 style={{ margin: 0, fontSize: 26 }}>
+            {simplified ? "Repertório" : "Biblioteca de Músicas"}
+          </h1>
+          {canManage && (
+            <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+              <Link href="/songs/new" style={importBtnStyle}>+ Nova Música</Link>
+              <Link href="/songs/import" style={importBtnStyle}>+ Importar .txt</Link>
+            </div>
+          )}
         </div>
 
         {/* search */}
@@ -78,8 +99,8 @@ function SongsContent() {
           style={searchStyle}
         />
 
-        {/* filters */}
-        {!loading && (allKeys.length > 0 || allTags.length > 0) && (
+        {/* filters — apenas na view completa */}
+        {!simplified && !loading && (allKeys.length > 0 || allTags.length > 0) && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
             {allKeys.length > 0 && (
               <select
@@ -124,21 +145,25 @@ function SongsContent() {
 
         {/* grid */}
         <div style={gridStyle}>
-          {filtered.map((song) => (
-            <Link key={song.id} href={`/songs/${song.id}`} style={cardStyle}>
-              <p style={tagStyle}>Music</p>
-              <h2 style={{ margin: "4px 0 6px", fontSize: 17 }}>{song.title}</h2>
-              {song.artist && <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>{song.artist}</p>}
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                {song.defaultKey && (
-                  <span style={pillStyle("#1b3756", "#7cf2a2")}>Tom: {song.defaultKey}</span>
-                )}
-                {song.chordCharts.length > 0 && (
-                  <span style={pillStyle("#1a2b3c", "#b3c6e0")}>{song.chordCharts.length} cifra(s)</span>
-                )}
-              </div>
-            </Link>
-          ))}
+          {filtered.map((song) =>
+            simplified ? (
+              <SimplifiedSongCard key={song.id} song={song} />
+            ) : (
+              <Link key={song.id} href={`/songs/${song.id}`} style={cardStyle}>
+                <p style={tagStyle}>Music</p>
+                <h2 style={{ margin: "4px 0 6px", fontSize: 17 }}>{song.title}</h2>
+                {song.artist && <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>{song.artist}</p>}
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  {song.defaultKey && (
+                    <span style={pillStyle("#1b3756", "#7cf2a2")}>Tom: {song.defaultKey}</span>
+                  )}
+                  {song.chordCharts.length > 0 && (
+                    <span style={pillStyle("#1a2b3c", "#b3c6e0")}>{song.chordCharts.length} cifra(s)</span>
+                  )}
+                </div>
+              </Link>
+            )
+          )}
         </div>
 
         {!loading && filtered.length > 0 && (
@@ -149,6 +174,58 @@ function SongsContent() {
       </div>
     </main>
   );
+}
+
+// ── Card simplificado (MIDIA / DANCA) ────────────────────────────────────────
+
+function SimplifiedSongCard({ song }: { song: Song }) {
+  const zone = (song as Song & { zone?: string | null }).zone;
+  return (
+    <div style={cardStyle}>
+      <p style={tagStyle}>Música</p>
+      <h2 style={{ margin: "4px 0 6px", fontSize: 17 }}>{song.title}</h2>
+      {song.artist && <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>{song.artist}</p>}
+      {zone && (
+        <p style={{ margin: "6px 0 0", color: "#7cf2a2", fontSize: 12 }}>Zona: {zone}</p>
+      )}
+      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+        {(song as Song & { spotifyUrl?: string | null }).spotifyUrl && (
+          <a
+            href={(song as Song & { spotifyUrl?: string | null }).spotifyUrl!}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={externalLinkStyle("#1db954")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            Spotify
+          </a>
+        )}
+        {(song as Song & { youtubeUrl?: string | null }).youtubeUrl && (
+          <a
+            href={(song as Song & { youtubeUrl?: string | null }).youtubeUrl!}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={externalLinkStyle("#ff4444")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            YouTube
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function externalLinkStyle(color: string): CSSProperties {
+  return {
+    color,
+    fontSize: 12,
+    textDecoration: "none",
+    border: `1px solid ${color}44`,
+    borderRadius: 6,
+    padding: "3px 8px",
+    fontWeight: 600,
+  };
 }
 
 // ── styles ────────────────────────────────────────────────────────────────────

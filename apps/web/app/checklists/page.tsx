@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/AuthRequired";
+import { useAuth } from "@/components/AuthProvider";
+import { canSeeChecklists, canManageChecklistTemplates } from "@/lib/permissions";
 import type { ChecklistTemplate, ChecklistRunItem, ChecklistRun } from "@/lib/types";
 
 type ApiResult<T> = {
@@ -20,6 +23,25 @@ async function parseJson<T>(response: Response): Promise<ApiResult<T>> {
 }
 
 export default function ChecklistsPage() {
+  return (
+    <AuthRequired>
+      <ChecklistsContent />
+    </AuthRequired>
+  );
+}
+
+function ChecklistsContent() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const canManageTemplates = user ? canManageChecklistTemplates(user) : false;
+
+  useEffect(() => {
+    if (!user) return;
+    if (!canSeeChecklists(user)) {
+      router.replace("/events");
+    }
+  }, [user, router]);
+
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [eventId, setEventId] = useState("");
   const [activeChecklist, setActiveChecklist] = useState<ChecklistRun | null>(null);
@@ -202,7 +224,6 @@ export default function ChecklistsPage() {
   return (
     <main style={{ minHeight: "100vh", padding: "24px 24px 36px" }}>
       <section style={{ maxWidth: 1180, margin: "0 auto" }}>
-        <AuthRequired>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
             <Link href="/" style={{ color: "#7cf2a2", textDecoration: "none", fontSize: 14 }}>← Home</Link>
             <h1 style={{ margin: 0, fontSize: 26 }}>Checklists</h1>
@@ -210,6 +231,8 @@ export default function ChecklistsPage() {
           </div>
 
           <section style={gridStyle}>
+            {/* Templates — apenas Admin/Super Admin */}
+            {canManageTemplates && (
             <article style={cardStyle}>
               <h2 style={{ marginTop: 0 }}>Checklist Templates</h2>
               <form onSubmit={createTemplate} style={{ display: "grid", gap: 10 }}>
@@ -254,6 +277,7 @@ export default function ChecklistsPage() {
                 </div>
               </div>
             </article>
+            )}
 
             <article style={cardStyle}>
               <h2 style={{ marginTop: 0 }}>Event Checklist</h2>
@@ -305,7 +329,6 @@ export default function ChecklistsPage() {
               </div>
             </article>
           </section>
-        </AuthRequired>
       </section>
     </main>
   );

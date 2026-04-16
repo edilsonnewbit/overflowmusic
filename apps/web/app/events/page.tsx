@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import { AuthRequired } from "@/components/AuthRequired";
+import { useAuth } from "@/components/AuthProvider";
+import { canManageEvents } from "@/lib/permissions";
 
 type Event = {
   id: string;
@@ -31,9 +33,12 @@ async function parseJson<T>(response: Response): Promise<ApiResult<T>> {
 }
 
 export default function EventsPage() {
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Carregando...");
+
+  const canCreate = user ? canManageEvents(user) : false;
 
   // form state
   const [formTitle, setFormTitle] = useState("");
@@ -117,14 +122,16 @@ export default function EventsPage() {
             <Link href="/" style={{ color: "#7cf2a2", textDecoration: "none", fontSize: 14 }}>← Home</Link>
             <h1 style={{ margin: 0, fontSize: 26 }}>Eventos</h1>
             <span style={{ color: "#8fa9c8", fontSize: 13, marginLeft: 4 }}>{status}</span>
-            <div style={{ marginLeft: "auto" }}>
-              <button style={primaryBtn} onClick={() => setShowForm((v) => !v)}>
-                {showForm ? "Cancelar" : "+ Novo Evento"}
-              </button>
-            </div>
+            {canCreate && (
+              <div style={{ marginLeft: "auto" }}>
+                <button style={primaryBtn} onClick={() => setShowForm((v) => !v)}>
+                  {showForm ? "Cancelar" : "+ Novo Evento"}
+                </button>
+              </div>
+            )}
           </div>
 
-          {showForm && (
+          {canCreate && showForm && (
             <form onSubmit={(e) => void handleCreate(e)} style={formStyle}>
               <h3 style={{ margin: "0 0 14px", fontSize: 16 }}>Novo Evento</h3>
 
