@@ -278,6 +278,21 @@ model Setlist {
   event       Event?        @relation(fields: [eventId],     references: [id], onDelete: Cascade)
   rehearsal   Rehearsal?    @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
   items       SetlistItem[]
+  logs        SetlistLog[]
+}
+
+model SetlistLog {
+  id        String   @id @default(uuid())
+  setlistId String
+  userId    String?
+  userName  String
+  action    String   // ITEM_ADDED | ITEM_REMOVED | ITEM_UPDATED | REORDERED
+  songTitle String?
+  details   Json?
+  createdAt DateTime @default(now())
+  setlist   Setlist  @relation(fields: [setlistId], references: [id], onDelete: Cascade)
+
+  @@index([setlistId, createdAt(sort: Desc)])
 }
 
 model SetlistItem {
