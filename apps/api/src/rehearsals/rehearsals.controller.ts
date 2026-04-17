@@ -116,7 +116,8 @@ export class RehearsalsController {
     @Body() body: CreateSetlistItemBody,
   ) {
     await this.authService.assertAdminKeyOrContentManager(authorization);
-    return this.setlistService.addItemToRehearsal(id, body);
+    const actor = await this.authService.getActorFromAuth(authorization);
+    return this.setlistService.addItemToRehearsal(id, body, actor);
   }
 
   @Patch(":id/setlist/items/:itemId")
@@ -127,7 +128,8 @@ export class RehearsalsController {
     @Body() body: UpdateSetlistItemBody,
   ) {
     await this.authService.assertAdminKeyOrContentManager(authorization);
-    return this.setlistService.updateItemInRehearsal(id, itemId, body);
+    const actor = await this.authService.getActorFromAuth(authorization);
+    return this.setlistService.updateItemInRehearsal(id, itemId, body, actor);
   }
 
   @Delete(":id/setlist/items/:itemId")
@@ -137,7 +139,8 @@ export class RehearsalsController {
     @Param("itemId") itemId: string,
   ) {
     await this.authService.assertAdminKeyOrContentManager(authorization);
-    return this.setlistService.removeItemFromRehearsal(id, itemId);
+    const actor = await this.authService.getActorFromAuth(authorization);
+    return this.setlistService.removeItemFromRehearsal(id, itemId, actor);
   }
 
   @Post(":id/setlist/reorder")
@@ -147,6 +150,21 @@ export class RehearsalsController {
     @Body() body: ReorderBody,
   ) {
     await this.authService.assertAdminKeyOrContentManager(authorization);
-    return this.setlistService.reorderRehearsal(id, body);
+    const actor = await this.authService.getActorFromAuth(authorization);
+    return this.setlistService.reorderRehearsal(id, body, actor);
+  }
+
+  @Get(":id/setlist/logs")
+  async getSetlistLogs(
+    @Param("id") id: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+  ) {
+    return this.setlistService.getRehearsalLogs(id, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
+    });
   }
 }

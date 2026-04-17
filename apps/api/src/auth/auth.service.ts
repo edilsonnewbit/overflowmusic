@@ -773,6 +773,22 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+  /** Extrai {userId, userName} do token para fins de log de auditoria.
+   *  Nunca lança — se não conseguir identificar, retorna "Sistema". */
+  async getActorFromAuth(authorization: string | undefined): Promise<{ userId: string | null; userName: string }> {
+    const token = (authorization || "").replace(/^Bearer\s+/i, "").trim();
+    if (!token || (this.adminApiKey && token === this.adminApiKey)) {
+      return { userId: null, userName: "Sistema" };
+    }
+    try {
+      const payload = this.verifyToken(token);
+      const user = await this.prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, name: true } });
+      return { userId: user?.id ?? null, userName: user?.name ?? "Desconhecido" };
+    } catch {
+      return { userId: null, userName: "Desconhecido" };
+    }
+  }
+
   private readonly adminApiKey = process.env.ADMIN_API_KEY || "";
 
   private async seedAdminUsers(): Promise<void> {

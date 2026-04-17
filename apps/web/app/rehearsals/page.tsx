@@ -37,6 +37,16 @@ type Setlist = {
 
 type SongSuggestion = { id: string; title: string; artist: string | null; defaultKey: string | null };
 
+type SetlistLog = {
+  id: string;
+  userId: string | null;
+  userName: string;
+  action: string;
+  songTitle: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
     weekday: "short", day: "2-digit", month: "2-digit", year: "numeric",
@@ -328,6 +338,9 @@ function RehearsalsContent() {
 // ── Setlist section ───────────────────────────────────────────────────────────
 
 function RehearsalSetlistSection({ rehearsalId, canManage }: { rehearsalId: string; canManage: boolean }) {
+  const [activeTab, setActiveTab] = useState<"setlist" | "logs">("setlist");
+
+  // ── setlist state ─────────────────────────────────────────────────────────
   const [setlist, setSetlist] = useState<Setlist | null>(null);
   const [loadingSetlist, setLoadingSetlist] = useState(true);
   const [songSearch, setSongSearch] = useState("");
@@ -347,9 +360,43 @@ function RehearsalSetlistSection({ rehearsalId, canManage }: { rehearsalId: stri
   const [msg, setMsg] = useState("");
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── logs state ───────────────────────────────────────────────────────────
+  const [logs, setLogs] = useState<SetlistLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsPages, setLogsPages] = useState(0);
+  const [logsSearch, setLogsSearch] = useState("");
+  const [logsSearchInput, setLogsSearchInput] = useState("");
+
   const sortedItems = [...(setlist?.items || [])].sort((a, b) => a.order - b.order);
 
   useEffect(() => { void loadSetlist(); }, [rehearsalId]);
+
+  useEffect(() => {
+    if (activeTab === "logs") void loadLogs(logsPage, logsSearch);
+  }, [activeTab, logsPage, logsSearch, rehearsalId]);
+
+  async function loadLogs(page: number, search: string) {
+    setLogsLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: "15" });
+      if (search) params.set("search", search);
+      const res = await fetch(`/api/rehearsals/${rehearsalId}/setlist/logs?${params.toString()}`);
+      const body = (await res.json()) as {
+        ok: boolean;
+        logs: SetlistLog[];
+        total: number;
+        page: number;
+        pages: number;
+      };
+      setLogs(body.logs ?? []);
+      setLogsTotal(body.total ?? 0);
+      setLogsPages(body.pages ?? 0);
+    } finally {
+      setLogsLoading(false);
+    }
+  }
 
   async function loadSetlist() {
     setLoadingSetlist(true);
@@ -462,8 +509,46 @@ function RehearsalSetlistSection({ rehearsalId, canManage }: { rehearsalId: stri
 
   return (
     <div style={{ padding: "16px 20px" }}>
-      <p style={{ margin: "0 0 12px", fontSize: 14, color: "#7cf2a2", fontWeight: 700 }}>
-        🎵 Setlist do ensaio {sortedItems.length > 0 && <span style={{ color: "#5a7a9a", fontWeight: 400 }}>({sortedItems.length} música{sortedItems.length !== 1 ? "s" : ""})</span>}
+      {/* Abas */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid #1e3650", paddingBottom: 0 }}>
+        {(["setlist", "logs"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              padding: "6px 16px", fontSize: 13, fontWeight: 600,
+              color: activeTab === tab ? "#7cf2a2" : "#5a7a9a",
+              borderBottom: activeTab === tab ? "2px solid #7cf2a2" : "2px solid transparent",
+              marginBottom: -1,
+            }}
+          >
+            {tab === "setlist"
+              ? `🎵 Setlist${sortedItems.length > 0 ? ` (${sortedItems.length})` : ""}`
+              : "📋 Logs"}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Aba Logs ─────────────────────────────────────────────────── */}
+      {activeTab === "logs" && (
+        <LogsPanel
+          logs={logs}
+          loading={logsLoading}
+          total={logsTotal}
+          page={logsPage}
+          pages={logsPages}
+          searchInput={logsSearchInput}
+          onSearchChange={(v) => setLogsSearchInput(v)}
+          onSearchSubmit={() => { setLogsPage(1); setLogsSearch(logsSearchInput); }}
+          onPageChange={(p) => setLogsPage(p)}
+        />
+      )}
+
+      {/* ── Aba Setlist ───────────────────────────────────────────────── */}
+      {activeTab === "setlist" && (<>
+      <p style={{ margin: "0 0 12px", fontSize: 13, color: "#5a7a9a" }}>
+        {sortedItems.length === 0 ? "Nenhuma música no setlist ainda." : `${sortedItems.length} música${sortedItems.length !== 1 ? "s" : ""}`}
       </p>
 
       {/* Lista de músicas */}
@@ -572,6 +657,211 @@ function RehearsalSetlistSection({ rehearsalId, canManage }: { rehearsalId: stri
             {adding ? "Adicionando..." : "Adicionar"}
           </button>
         </form>
+      )}
+    </>)}
+    </div>
+  );
+}
+
+// ── LogsPanel component ───────────────────────────────────────────────────────
+
+type LogAction = "ITEM_ADDED" | "ITEM_REMOVED" | "ITEM_UPDATED" | "REORDERED";
+
+type LogChange = { campo: string; de: unknown; para: unknown };
+
+function formatLogEntry(log: SetlistLog): string {
+  const who = log.userName;
+  const song = log.songTitle ? `"${log.songTitle}"` : "";
+
+  switch (log.action as LogAction) {
+    case "ITEM_ADDED": {
+      const d = (log.details ?? {}) as Record<string, unknown>;
+      const extras: string[] = [];
+      if (d.tom) extras.push(`Tom: ${d.tom}`);
+      if (d.lider) extras.push(`Líder: ${d.lider}`);
+      if (d.zona) extras.push(`Zona: ${d.zona}`);
+      if (d.notas) extras.push(`Notas: ${d.notas}`);
+      const suffix = extras.length > 0 ? ` (${extras.join(", ")})` : "";
+      return `${who} adicionou ${song}${suffix}`;
+    }
+    case "ITEM_REMOVED":
+      return `${who} removeu ${song}`;
+    case "ITEM_UPDATED": {
+      const d = (log.details ?? {}) as { alteracoes?: LogChange[] };
+      const changes = d.alteracoes ?? [];
+      if (changes.length === 0) return `${who} editou ${song}`;
+      const desc = changes
+        .map((c) => {
+          const from = c.de != null ? String(c.de) : "—";
+          const to = c.para != null ? String(c.para) : "—";
+          return `${c.campo}: ${from} → ${to}`;
+        })
+        .join(", ");
+      return `${who} editou ${song} — ${desc}`;
+    }
+    case "REORDERED": {
+      const d = (log.details ?? {}) as { novaOrdem?: string[] };
+      const order = d.novaOrdem ?? [];
+      const preview = order.slice(0, 3).join(", ");
+      const suffix = order.length > 3 ? ` e mais ${order.length - 3}` : "";
+      return `${who} reordenou o setlist: ${preview}${suffix}`;
+    }
+    default:
+      return `${who} — ${log.action}${song ? ` (${song})` : ""}`;
+  }
+}
+
+function formatLogTime(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function actionBadgeColor(action: string): string {
+  switch (action) {
+    case "ITEM_ADDED": return "#7cf2a2";
+    case "ITEM_REMOVED": return "#f87171";
+    case "ITEM_UPDATED": return "#60a5fa";
+    case "REORDERED": return "#f5a623";
+    default: return "#8fa9c8";
+  }
+}
+
+function actionLabel(action: string): string {
+  switch (action) {
+    case "ITEM_ADDED": return "Adicionou";
+    case "ITEM_REMOVED": return "Removeu";
+    case "ITEM_UPDATED": return "Editou";
+    case "REORDERED": return "Reordenou";
+    default: return action;
+  }
+}
+
+function LogsPanel({
+  logs,
+  loading,
+  total,
+  page,
+  pages,
+  searchInput,
+  onSearchChange,
+  onSearchSubmit,
+  onPageChange,
+}: {
+  logs: SetlistLog[];
+  loading: boolean;
+  total: number;
+  page: number;
+  pages: number;
+  searchInput: string;
+  onSearchChange: (v: string) => void;
+  onSearchSubmit: () => void;
+  onPageChange: (p: number) => void;
+}) {
+  return (
+    <div>
+      {/* Search bar */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); onSearchSubmit(); }}
+        style={{ display: "flex", gap: 8, marginBottom: 14 }}
+      >
+        <input
+          style={{ ...setlistInput, flex: 1 }}
+          placeholder="Pesquisar por música ou usuário..."
+          value={searchInput}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+        <button type="submit" style={smallPrimary}>Buscar</button>
+        {searchInput && (
+          <button
+            type="button"
+            style={smallSecondary}
+            onClick={() => { onSearchChange(""); onSearchSubmit(); }}
+          >
+            Limpar
+          </button>
+        )}
+      </form>
+
+      {/* Total count */}
+      {!loading && (
+        <p style={{ margin: "0 0 10px", fontSize: 12, color: "#5a7a9a" }}>
+          {total === 0 ? "Nenhum registro encontrado." : `${total} registro${total !== 1 ? "s" : ""} encontrado${total !== 1 ? "s" : ""}.`}
+        </p>
+      )}
+
+      {/* Log entries */}
+      {loading ? (
+        <p style={{ color: "#5a7a9a", fontSize: 13 }}>Carregando logs...</p>
+      ) : logs.length === 0 ? (
+        <p style={{ color: "#5a7a9a", fontSize: 13 }}>Nenhuma atividade registrada ainda.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+          {logs.map((log) => (
+            <div
+              key={log.id}
+              style={{
+                background: "#060d17",
+                border: "1px solid #1e3650",
+                borderRadius: 10,
+                padding: "10px 14px",
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+              }}
+            >
+              {/* Badge */}
+              <span style={{
+                flexShrink: 0,
+                background: `${actionBadgeColor(log.action)}22`,
+                color: actionBadgeColor(log.action),
+                border: `1px solid ${actionBadgeColor(log.action)}55`,
+                borderRadius: 6,
+                padding: "2px 8px",
+                fontSize: 11,
+                fontWeight: 700,
+                marginTop: 1,
+                whiteSpace: "nowrap",
+              }}>
+                {actionLabel(log.action)}
+              </span>
+
+              {/* Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#e2f0ff", lineHeight: 1.4 }}>
+                  {formatLogEntry(log)}
+                </p>
+                <p style={{ margin: "3px 0 0", fontSize: 11, color: "#4a6a8a" }}>
+                  {formatLogTime(log.createdAt)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pages > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+          <button
+            style={smallSecondary}
+            disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}
+          >
+            ← Anterior
+          </button>
+          <span style={{ fontSize: 12, color: "#5a7a9a" }}>
+            {page} / {pages}
+          </span>
+          <button
+            style={smallSecondary}
+            disabled={page >= pages}
+            onClick={() => onPageChange(page + 1)}
+          >
+            Próximo →
+          </button>
+        </div>
       )}
     </div>
   );
