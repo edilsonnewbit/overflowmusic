@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from "@nestjs/common";
 import { SkipThrottle } from "@nestjs/throttler";
 import { SetlistService } from "./setlist.service";
@@ -63,7 +64,8 @@ export class SetlistController {
     @Body() body: CreateSetlistItemBody,
   ) {
     await this.authService.assertAdminKeyOrContentManager(authorization);
-    return this.setlistService.addItem(eventId, body);
+    const actor = await this.authService.getActorFromAuth(authorization);
+    return this.setlistService.addItem(eventId, body, actor);
   }
 
   @Patch("items/:itemId")
@@ -74,7 +76,8 @@ export class SetlistController {
     @Body() body: UpdateSetlistItemBody,
   ) {
     await this.authService.assertAdminKeyOrContentManager(authorization);
-    return this.setlistService.updateItem(eventId, itemId, body);
+    const actor = await this.authService.getActorFromAuth(authorization);
+    return this.setlistService.updateItem(eventId, itemId, body, actor);
   }
 
   @Delete("items/:itemId")
@@ -84,7 +87,8 @@ export class SetlistController {
     @Param("itemId") itemId: string,
   ) {
     await this.authService.assertAdminKeyOrContentManager(authorization);
-    return this.setlistService.removeItem(eventId, itemId);
+    const actor = await this.authService.getActorFromAuth(authorization);
+    return this.setlistService.removeItem(eventId, itemId, actor);
   }
 
   @Post("reorder")
@@ -94,7 +98,22 @@ export class SetlistController {
     @Body() body: ReorderBody,
   ) {
     await this.authService.assertAdminKeyOrContentManager(authorization);
-    return this.setlistService.reorder(eventId, body);
+    const actor = await this.authService.getActorFromAuth(authorization);
+    return this.setlistService.reorder(eventId, body, actor);
+  }
+
+  @Get("logs")
+  async getLogs(
+    @Param("eventId") eventId: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+  ) {
+    return this.setlistService.getEventLogs(eventId, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
+    });
   }
 
   @Get("tracks")
