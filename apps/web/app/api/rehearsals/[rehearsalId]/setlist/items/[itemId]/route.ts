@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { serverApiFetch } from "@/lib/server-api";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth-cookie";
 
-type Params = { params: Promise<{ eventId: string; itemId: string }> };
+type Params = { params: Promise<{ rehearsalId: string; itemId: string }> };
 
 function getAuth(request: NextRequest) {
   const token = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? "";
@@ -13,15 +13,15 @@ function getAuth(request: NextRequest) {
 
 export async function PATCH(request: NextRequest, context: Params) {
   try {
-    const { eventId, itemId } = await context.params;
+    const { rehearsalId, itemId } = await context.params;
     const payload = await request.json();
-    const response = await serverApiFetch(`events/${eventId}/setlist/items/${itemId}`, {
+    const res = await serverApiFetch(`rehearsals/${rehearsalId}/setlist/items/${itemId}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
       ...getAuth(request),
     });
-    const body = await response.json();
-    return NextResponse.json(body, { status: response.status });
+    const body = await res.json();
+    return NextResponse.json(body, { status: res.status });
   } catch (error) {
     const message = error instanceof Error ? error.message : "internal error";
     return NextResponse.json({ ok: false, message }, { status: 500 });
@@ -30,13 +30,13 @@ export async function PATCH(request: NextRequest, context: Params) {
 
 export async function DELETE(request: NextRequest, context: Params) {
   try {
-    const { eventId, itemId } = await context.params;
-    const response = await serverApiFetch(`events/${eventId}/setlist/items/${itemId}`, {
+    const { rehearsalId, itemId } = await context.params;
+    const res = await serverApiFetch(`rehearsals/${rehearsalId}/setlist/items/${itemId}`, {
       method: "DELETE",
       ...getAuth(request),
     });
-    const body = await response.json();
-    return NextResponse.json(body, { status: response.status });
+    const body = await res.json();
+    return NextResponse.json(body, { status: res.status });
   } catch (error) {
     const message = error instanceof Error ? error.message : "internal error";
     return NextResponse.json({ ok: false, message }, { status: 500 });
