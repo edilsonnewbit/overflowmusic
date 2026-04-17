@@ -64,6 +64,16 @@ type ApiResult<T> = {
   message?: string;
 } & T;
 
+type EventSetlistLog = {
+  id: string;
+  userId: string | null;
+  userName: string;
+  action: string;
+  songTitle: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+};
+
 async function parseJson<T>(response: Response): Promise<ApiResult<T>> {
   const body = (await response.json()) as ApiResult<T>;
   if (!response.ok) {
@@ -165,6 +175,16 @@ export default function EventDetailPage({ params }: PageProps) {
   const [editItemZone, setEditItemZone] = useState("");
   const [editItemNotes, setEditItemNotes] = useState("");
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
+
+  // setlist sub-tabs (setlist | logs)
+  const [setlistSubTab, setSetlistSubTab] = useState<"setlist" | "logs">("setlist");
+  const [eventLogs, setEventLogs] = useState<EventSetlistLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsPages, setLogsPages] = useState(0);
+  const [logsSearch, setLogsSearch] = useState("");
+  const [logsSearchInput, setLogsSearchInput] = useState("");
 
   useEffect(() => {
     void params.then(({ eventId: id }) => {
@@ -369,6 +389,13 @@ export default function EventDetailPage({ params }: PageProps) {
     }
   }, [eventId, loadEvent]);
 
+  useEffect(() => {
+    if (activeTab === "setlist" && setlistSubTab === "logs") {
+      void loadEventLogs(logsPage, logsSearch);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, setlistSubTab, logsPage, logsSearch, eventId]);
+
   async function addSetlistItem(e: FormEvent) {
     e.preventDefault();
     if (!addSongTitle.trim() || !eventId) return;
@@ -512,6 +539,22 @@ export default function EventDetailPage({ params }: PageProps) {
       setStatus(err instanceof Error ? err.message : "Erro ao reordenar.");
     } finally {
       setReorderingId(null);
+    }
+  }
+
+  async function loadEventLogs(page: number, search: string) {
+    if (!eventId) return;
+    setLogsLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: "15" });
+      if (search) params.set("search", search);
+      const res = await fetch(`/api/events/${eventId}/setlist/logs?${params.toString()}`);
+      const body = (await res.json()) as { ok: boolean; logs: EventSetlistLog[]; total: number; pages: number };
+      setEventLogs(body.logs ?? []);
+      setLogsTotal(body.total ?? 0);
+      setLogsPages(body.pages ?? 0);
+    } finally {
+      setLogsLoading(false);
     }
   }
 
@@ -844,6 +887,41 @@ export default function EventDetailPage({ params }: PageProps) {
                   )}
                 </div>
 
+                {/* Sub-tabs: Setlist | Logs */}
+                <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #1e3650", marginBottom: 16 }}>
+                  {(["setlist", "logs"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setSetlistSubTab(t)}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        padding: "6px 16px", fontSize: 13, fontWeight: 600,
+                        color: setlistSubTab === t ? "#7cf2a2" : "#5a7a9a",
+                        borderBottom: setlistSubTab === t ? "2px solid #7cf2a2" : "2px solid transparent",
+                        marginBottom: -1,
+                      }}
+                    >
+                      {t === "setlist" ? `🎵 Setlist${sortedItems.length > 0 ? ` (${sortedItems.length})` : ""}` : "📋 Logs"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Painel de Logs */}
+                {setlistSubTab === "logs" && (
+                  <EventLogsPanel
+                    logs={eventLogs}
+                    loading={logsLoading}
+                    total={logsTotal}
+                    page={logsPage}
+                    pages={logsPages}
+                    searchInput={logsSearchInput}
+                    onSearchChange={(v) => setLogsSearchInput(v)}
+                    onSearchSubmit={() => { setLogsPage(1); setLogsSearch(logsSearchInput); }}
+                    onPageChange={(p) => setLogsPage(p)}
+                  />
+                )}
+
+                {setlistSubTab === "setlist" && (<>
                 {sortedItems.length === 0 ? (
                   <p style={{ color: "#8fa9c8", fontSize: 14 }}>Nenhuma música no setlist ainda.</p>
                 ) : (
@@ -1133,6 +1211,7 @@ export default function EventDetailPage({ params }: PageProps) {
                 {status !== "OK" && status !== "Carregando evento..." && (
                   <p style={{ color: "#fbbf24", fontSize: 13, marginBottom: 12 }}>{status}</p>
                 )}
+                </>)}
               </section>
 
               {/* Checklist Link */}
@@ -1342,6 +1421,119 @@ export default function EventDetailPage({ params }: PageProps) {
         </div>
       )}
     </AuthGate>
+  );
+}
+
+// ── EventLogsPanel ──────────────────────────────────────────────────────────
+
+type LogChange = { campo: string; de: unknown; para: unknown };
+
+function formatEventLogEntry(log: EventSetlistLog): string {
+  const who = log.userName;
+  const song = log.songTitle ? `"${log.songTitle}"` : "";
+  switch (log.action) {
+    case "ITEM_ADDED": {
+      const d = (log.details ?? {}) as Record<string, unknown>;
+      const extras: string[] = [];
+      if (d.tom) extras.push(`Tom: ${d.tom}`);
+      if (d.lider) extras.push(`Líder: ${d.lider}`);
+      if (d.zona) extras.push(`Zona: ${d.zona}`);
+      if (d.notas) extras.push(`Notas: ${d.notas}`);
+      return `${who} adicionou ${song}${extras.length ? ` (${extras.join(", ")})` : ""}`;
+    }
+    case "ITEM_REMOVED":
+      return `${who} removeu ${song}`;
+    case "ITEM_UPDATED": {
+      const d = (log.details ?? {}) as { alteracoes?: LogChange[] };
+      const changes = (d.alteracoes ?? []).map((c) => `${c.campo}: ${c.de ?? "—"} → ${c.para ?? "—"}`).join(", ");
+      return `${who} editou ${song}${changes ? ` — ${changes}` : ""}`;
+    }
+    case "REORDERED": {
+      const d = (log.details ?? {}) as { novaOrdem?: string[] };
+      const order = d.novaOrdem ?? [];
+      const preview = order.slice(0, 3).join(", ");
+      return `${who} reordenou o setlist: ${preview}${order.length > 3 ? ` e mais ${order.length - 3}` : ""}`;
+    }
+    default:
+      return `${who} — ${log.action}${song ? ` (${song})` : ""}`;
+  }
+}
+
+function logBadgeColor(action: string): string {
+  return { ITEM_ADDED: "#7cf2a2", ITEM_REMOVED: "#f87171", ITEM_UPDATED: "#60a5fa", REORDERED: "#f5a623" }[action] ?? "#8fa9c8";
+}
+
+function logActionLabel(action: string): string {
+  return { ITEM_ADDED: "Adicionou", ITEM_REMOVED: "Removeu", ITEM_UPDATED: "Editou", REORDERED: "Reordenou" }[action] ?? action;
+}
+
+function EventLogsPanel({
+  logs, loading, total, page, pages, searchInput, onSearchChange, onSearchSubmit, onPageChange,
+}: {
+  logs: EventSetlistLog[];
+  loading: boolean;
+  total: number;
+  page: number;
+  pages: number;
+  searchInput: string;
+  onSearchChange: (v: string) => void;
+  onSearchSubmit: () => void;
+  onPageChange: (p: number) => void;
+}) {
+  return (
+    <div>
+      <form onSubmit={(e) => { e.preventDefault(); onSearchSubmit(); }} style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <input
+          style={{ ...inputStyle, flex: 1 }}
+          placeholder="Pesquisar por música ou usuário..."
+          value={searchInput}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+        <button type="submit" style={{ ...primaryBtn, alignSelf: "auto" }}>Buscar</button>
+        {searchInput && (
+          <button type="button" style={{ ...primaryBtn, background: "transparent", color: "#8fa9c8", border: "1px solid #2d4b6d", alignSelf: "auto" }}
+            onClick={() => { onSearchChange(""); onSearchSubmit(); }}>
+            Limpar
+          </button>
+        )}
+      </form>
+
+      {!loading && (
+        <p style={{ margin: "0 0 10px", fontSize: 12, color: "#5a7a9a" }}>
+          {total === 0 ? "Nenhum registro encontrado." : `${total} registro${total !== 1 ? "s" : ""} encontrado${total !== 1 ? "s" : ""}.`}
+        </p>
+      )}
+
+      {loading ? (
+        <p style={{ color: "#5a7a9a", fontSize: 13 }}>Carregando logs...</p>
+      ) : logs.length === 0 ? (
+        <p style={{ color: "#5a7a9a", fontSize: 13 }}>Nenhuma atividade registrada ainda.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+          {logs.map((log) => (
+            <div key={log.id} style={{ background: "rgba(15,33,55,0.8)", border: "1px solid #2d4b6d", borderRadius: 10, padding: "10px 14px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ flexShrink: 0, background: `${logBadgeColor(log.action)}22`, color: logBadgeColor(log.action), border: `1px solid ${logBadgeColor(log.action)}55`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                {logActionLabel(log.action)}
+              </span>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#e2f0ff", lineHeight: 1.4 }}>{formatEventLogEntry(log)}</p>
+                <p style={{ margin: "3px 0 0", fontSize: 11, color: "#4a6a8a" }}>
+                  {new Date(log.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {pages > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+          <button style={{ ...primaryBtn, background: "transparent", color: "#8fa9c8", border: "1px solid #2d4b6d", alignSelf: "auto" }} disabled={page <= 1} onClick={() => onPageChange(page - 1)}>← Anterior</button>
+          <span style={{ fontSize: 12, color: "#5a7a9a" }}>{page} / {pages}</span>
+          <button style={{ ...primaryBtn, background: "transparent", color: "#8fa9c8", border: "1px solid #2d4b6d", alignSelf: "auto" }} disabled={page >= pages} onClick={() => onPageChange(page + 1)}>Próximo →</button>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -16,6 +16,8 @@ type FakeItem = {
   transitionNotes: string | null;
 };
 
+const TEST_ACTOR = { userId: null, userName: "Test" };
+
 function makeSetlistPrisma(items: FakeItem[] = []) {
   const setlist = { id: "sl1", eventId: "ev1", title: null, notes: null, items };
 
@@ -50,6 +52,9 @@ function makeSetlistPrisma(items: FakeItem[] = []) {
         return { ...item, ...data };
       },
       delete: async () => ({}),
+    },
+    setlistLog: {
+      create: async () => ({}),
     },
     $transaction: async (ops: unknown[]) => Promise.all(ops),
   };
@@ -88,7 +93,7 @@ test("SetlistService.reorder: reordena itens corretamente", async () => {
       { id: "i2", order: 1 },
       { id: "i3", order: 3 },
     ],
-  });
+  }, TEST_ACTOR);
 
   assert.equal(result.ok, true);
   assert.equal(updatedOrders.length, 3);
@@ -104,7 +109,7 @@ test("SetlistService.reorder: rejeita items vazio", async () => {
   ]);
 
   await assert.rejects(
-    () => service.reorder("ev1", { items: [] }),
+    () => service.reorder("ev1", { items: [] }, TEST_ACTOR),
     (err: unknown) => {
       assert.ok(err instanceof BadRequestException);
       return true;
@@ -119,7 +124,7 @@ test("SetlistService.reorder: rejeita item que não pertence ao setlist", async 
 
   const service = makeService(items);
   await assert.rejects(
-    () => service.reorder("ev1", { items: [{ id: "i_foreign", order: 1 }] }),
+    () => service.reorder("ev1", { items: [{ id: "i_foreign", order: 1 }] }, TEST_ACTOR),
     (err: unknown) => {
       assert.ok(err instanceof BadRequestException);
       return true;
@@ -147,17 +152,18 @@ test("SetlistService.addItem: adiciona item com order auto-incrementado", async 
   };
 
   const service = new SetlistService(prisma as any);
-  const result = await service.addItem("ev1", { songTitle: "Song B" });
+  const result = await service.addItem("ev1", { songTitle: "Song B" }, TEST_ACTOR);
 
   assert.equal(result.ok, true);
-  assert.equal(createdData?.songTitle, "Song B");
-  assert.equal(createdData?.order, 4);
+  assert.ok(createdData !== null);
+  assert.equal((createdData as Record<string, unknown>).songTitle, "Song B");
+  assert.equal((createdData as Record<string, unknown>).order, 4);
 });
 
 test("SetlistService.addItem: rejeita songTitle vazio", async () => {
   const service = makeService();
   await assert.rejects(
-    () => service.addItem("ev1", { songTitle: "  " }),
+    () => service.addItem("ev1", { songTitle: "  " }, TEST_ACTOR),
     (err: unknown) => {
       assert.ok(err instanceof BadRequestException);
       return true;
