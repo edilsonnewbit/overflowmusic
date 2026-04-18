@@ -5,6 +5,7 @@ import { styles } from "../../src/styles";
 
 export default function ChecklistTab() {
   const {
+    events,
     eventId,
     setEventId,
     templates,
@@ -19,6 +20,7 @@ export default function ChecklistTab() {
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.container}>
         <ChecklistScreen
+          events={events}
           eventId={eventId}
           onChangeEventId={setEventId}
           templates={templates}

@@ -1,6 +1,8 @@
 import { Tabs, useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { NotificationBell } from "../../src/components/NotificationBell";
+import { useSession } from "../../src/context/SessionContext";
+import { canSeeRehearsals, canSeeSongsPage, canSeeChecklists } from "../../src/lib/permissions";
 
 function TabIcon({ emoji }: { emoji: string }) {
   return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
@@ -8,6 +10,11 @@ function TabIcon({ emoji }: { emoji: string }) {
 
 export default function TabLayout() {
   const router = useRouter();
+  const { user } = useSession();
+
+  const showRehearsals = user ? canSeeRehearsals(user) : true;
+  const showSongs = user ? canSeeSongsPage(user) : true;
+  const showChecklist = user ? canSeeChecklists(user) : true;
 
   return (
     <Tabs
@@ -59,6 +66,7 @@ export default function TabLayout() {
         options={{
           title: "Checklist",
           tabBarIcon: () => <TabIcon emoji="☑️" />,
+          href: showChecklist ? undefined : null,
         }}
       />
       <Tabs.Screen
@@ -66,6 +74,7 @@ export default function TabLayout() {
         options={{
           title: "Ensaios",
           tabBarIcon: () => <TabIcon emoji="🎸" />,
+          href: showRehearsals ? undefined : null,
         }}
       />
       <Tabs.Screen
@@ -73,6 +82,7 @@ export default function TabLayout() {
         options={{
           title: "Músicas",
           tabBarIcon: () => <TabIcon emoji="🎵" />,
+          href: showSongs ? undefined : null,
         }}
       />
       <Tabs.Screen
