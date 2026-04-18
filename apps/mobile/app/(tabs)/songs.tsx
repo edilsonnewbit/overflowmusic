@@ -5,6 +5,7 @@ import { styles } from "../../src/styles";
 
 export default function SongsTab() {
   const {
+    user,
     songPreview,
     songImportResult,
     loadSongPreview,
@@ -19,6 +20,7 @@ export default function SongsTab() {
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.container}>
         <SongsScreen
+          user={user}
           preview={songPreview}
           importResult={songImportResult}
           onPreview={loadSongPreview}

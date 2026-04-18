@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "../../src/context/SessionContext";
+import { canManageRehearsals, canSeeRehearsals } from "../../src/lib/permissions";
 import {
   addRehearsalSetlistItem,
   createRehearsal,
@@ -102,7 +103,7 @@ function toForm(r: Rehearsal): FormState {
 
 export default function RehearsalsScreen() {
   const insets = useSafeAreaInsets();
-  const { accessToken } = useSession();
+  const { accessToken, user } = useSession();
 
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -315,7 +316,26 @@ export default function RehearsalsScreen() {
     ]);
   }
 
-  const canEdit = !!accessToken;
+  const canSee = user ? canSeeRehearsals(user) : !!accessToken;
+  const canEdit = user ? canManageRehearsals(user) : false;
+
+  if (!canSee) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>🎸 Ensaios</Text>
+        </View>
+        <View style={styles.center}>
+          <Text style={{ color: "#f87171", fontSize: 15, fontWeight: "600", textAlign: "center" }}>
+            Acesso restrito
+          </Text>
+          <Text style={{ color: "#4a6278", fontSize: 13, textAlign: "center", marginTop: 8, paddingHorizontal: 24 }}>
+            Sua área de atuação não tem acesso aos ensaios.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -736,9 +756,29 @@ const LOG_ACTION_COLOR: Record<string, string> = {
   REORDERED: "#60a5fa",
 };
 
+type Alteracao = { campo: string; de: string | null; para: string | null };
+
+function formatRehearsalLogDetails(log: SetlistLog): string | null {
+  if (!log.details) return null;
+  if (log.action === "ITEM_UPDATED") {
+    const alteracoes = (log.details as { alteracoes?: Alteracao[] }).alteracoes;
+    if (!Array.isArray(alteracoes) || alteracoes.length === 0) return null;
+    return alteracoes
+      .map((a) => `${a.campo}: ${a.de ?? "—"} → ${a.para ?? "—"}`)
+      .join(" · ");
+  }
+  if (log.action === "REORDERED") {
+    const novaOrdem = (log.details as { novaOrdem?: string[] }).novaOrdem;
+    if (!Array.isArray(novaOrdem)) return null;
+    return novaOrdem.map((t, i) => `${i + 1}. ${t}`).join(", ");
+  }
+  return null;
+}
+
 function RehearsalLogEntry({ log }: { log: SetlistLog }) {
   const color = LOG_ACTION_COLOR[log.action] ?? "#8fa9c8";
   const label = LOG_ACTION_LABEL[log.action] ?? log.action;
+  const detail = formatRehearsalLogDetails(log);
   let timeStr = "";
   try {
     timeStr = new Date(log.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -757,6 +797,11 @@ function RehearsalLogEntry({ log }: { log: SetlistLog }) {
           </Text>
         ) : null}
       </View>
+      {detail ? (
+        <Text style={{ color: "#7a9dc0", fontSize: 11, marginBottom: 4 }} numberOfLines={3}>
+          {detail}
+        </Text>
+      ) : null}
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={{ color: "#7a9dc0", fontSize: 12 }}>{log.userName}</Text>
         <Text style={{ color: "#4a6278", fontSize: 11 }}>{timeStr}</Text>

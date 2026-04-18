@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useSession } from "../context/SessionContext";
+import { canSeeRehearsals } from "../lib/permissions";
 import { styles } from "../styles";
 import type { MusicEvent } from "../types";
 
@@ -31,7 +32,8 @@ function daysUntil(iso: string): number {
 
 export function HomeScreen() {
   const router = useRouter();
-  const { events, loadingEvents, loadEventsList, eventSetlist, activeEventId, selectEvent, pendingInvite, handleRespondInvite } = useSession();
+  const { events, loadingEvents, loadEventsList, eventSetlist, activeEventId, selectEvent, pendingInvite, handleRespondInvite, user } = useSession();
+  const showRehearsals = user ? canSeeRehearsals(user) : false;
   const nextEvent = getNextEvent(events);
   const setlistCount = eventSetlist?.items?.length ?? 0;
 
@@ -116,6 +118,17 @@ export function HomeScreen() {
             <Text style={shortcutSub}>Biblioteca</Text>
           )}
         </Pressable>
+
+        {showRehearsals && (
+          <Pressable
+            style={({ pressed }) => [shortcutCard, pressed && { opacity: 0.75 }]}
+            onPress={() => router.push("/(tabs)/rehearsals")}
+          >
+            <Text style={{ fontSize: 28 }}>🎸</Text>
+            <Text style={shortcutLabel}>Ensaios</Text>
+            <Text style={shortcutSub}>Setlist</Text>
+          </Pressable>
+        )}
 
         <Pressable
           style={({ pressed }) => [shortcutCard, pressed && { opacity: 0.75 }]}

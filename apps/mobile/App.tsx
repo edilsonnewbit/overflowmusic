@@ -537,6 +537,7 @@ export default function App() {
     if (activeTab === "songs") {
       return (
         <SongsScreen
+          user={user}
           preview={songPreview}
           importResult={songImportResult}
           onPreview={loadSongPreview}
