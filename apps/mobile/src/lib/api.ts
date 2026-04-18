@@ -327,7 +327,7 @@ export async function createEvent(
 
 export async function updateEvent(
   id: string,
-  input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string },
+  input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string; generateSlug?: boolean },
   accessToken?: string | null,
 ): Promise<{ ok: boolean; event?: MusicEvent; message?: string }> {
   const bearerToken = (accessToken || "").trim();
@@ -601,6 +601,87 @@ export async function fetchRehearsals(): Promise<{ ok: boolean; rehearsals: Rehe
   return { ok: true, rehearsals: body.rehearsals as Rehearsal[] };
 }
 
+// ── Event chat ────────────────────────────────────────────────────────────────
+
+export type EventChatMessage = {
+  id: string;
+  eventId: string;
+  userId: string;
+  userName: string;
+  userPhoto: string | null;
+  text: string;
+  isPrivate: boolean;
+  toUserId: string | null;
+  toUserName: string | null;
+  createdAt: string;
+};
+
+export async function fetchEventChat(
+  eventId: string,
+  accessToken?: string | null,
+): Promise<{ ok: boolean; messages: EventChatMessage[]; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  const response = await fetch(`${API_BASE}/events/${encodeURIComponent(eventId)}/chat`, {
+    method: "GET",
+    headers: bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined,
+  });
+  const body = await parseJson(response);
+  if (!response.ok || !Array.isArray(body.messages)) {
+    return {
+      ok: false,
+      messages: [],
+      message: typeof body.message === "string" ? body.message : "Falha ao carregar chat.",
+    };
+  }
+  return { ok: true, messages: body.messages as EventChatMessage[] };
+}
+
+export async function sendEventChatMessage(
+  eventId: string,
+  input: { text: string; isPrivate?: boolean; toUserId?: string },
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(`${API_BASE}/events/${encodeURIComponent(eventId)}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+    body: JSON.stringify(input),
+  });
+  const body = await parseJson(response);
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: typeof body.message === "string" ? body.message : "Falha ao enviar mensagem.",
+    };
+  }
+  return { ok: true };
+}
+
+export async function deleteEventChatMessage(
+  eventId: string,
+  messageId: string,
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(
+    `${API_BASE}/events/${encodeURIComponent(eventId)}/chat/${encodeURIComponent(messageId)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${bearerToken}` },
+    },
+  );
+  const body = await parseJson(response);
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: typeof body.message === "string" ? body.message : "Falha ao excluir mensagem.",
+    };
+  }
+  return { ok: true };
+}
+
 export async function fetchEventMusicians(
   eventId: string,
 ): Promise<{ ok: boolean; musicians: EventMusician[] }> {
@@ -675,4 +756,173 @@ export async function deleteRehearsal(
     return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao excluir ensaio." };
   }
   return { ok: true };
+}
+
+// ── Rehearsal Setlist ─────────────────────────────────────────────────────────
+
+export type RehearsalSetlistItem = {
+  id: string;
+  order: number;
+  songTitle: string;
+  key: string | null;
+  leaderName: string | null;
+  zone: string | null;
+  transitionNotes: string | null;
+};
+
+export type RehearsalSetlist = {
+  id: string;
+  rehearsalId: string;
+  title: string | null;
+  items: RehearsalSetlistItem[];
+} | null;
+
+export async function fetchRehearsalSetlist(rehearsalId: string): Promise<{ ok: boolean; setlist: RehearsalSetlist; message?: string }> {
+  const response = await fetch(`${API_BASE}/rehearsals/${encodeURIComponent(rehearsalId)}/setlist`, { method: "GET" });
+  const body = await parseJson(response);
+  if (!response.ok) {
+    return { ok: false, setlist: null, message: typeof body.message === "string" ? body.message : "Falha ao carregar setlist." };
+  }
+  return { ok: true, setlist: (body.setlist ?? null) as RehearsalSetlist };
+}
+
+export async function addRehearsalSetlistItem(
+  rehearsalId: string,
+  input: { songTitle: string; key?: string },
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(
+    `${API_BASE}/rehearsals/${encodeURIComponent(rehearsalId)}/setlist/items`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+      body: JSON.stringify(input),
+    },
+  );
+  const body = await parseJson(response);
+  if (!response.ok) return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao adicionar música." };
+  return { ok: true };
+}
+
+export async function removeRehearsalSetlistItem(
+  rehearsalId: string,
+  itemId: string,
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(
+    `${API_BASE}/rehearsals/${encodeURIComponent(rehearsalId)}/setlist/items/${encodeURIComponent(itemId)}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${bearerToken}` } },
+  );
+  if (!response.ok) {
+    const body = await parseJson(response);
+    return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao remover música." };
+  }
+  return { ok: true };
+}
+
+export async function updateRehearsalSetlistItem(
+  rehearsalId: string,
+  itemId: string,
+  input: { key?: string; leaderName?: string; zone?: string; transitionNotes?: string },
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(
+    `${API_BASE}/rehearsals/${encodeURIComponent(rehearsalId)}/setlist/items/${encodeURIComponent(itemId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+      body: JSON.stringify(input),
+    },
+  );
+  const body = await parseJson(response);
+  if (!response.ok) return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao editar item." };
+  return { ok: true };
+}
+
+export async function reorderRehearsalSetlist(
+  rehearsalId: string,
+  items: { id: string; order: number }[],
+  accessToken?: string | null,
+): Promise<{ ok: boolean; message?: string }> {
+  const bearerToken = (accessToken || "").trim();
+  if (!bearerToken) return { ok: false, message: "Token de autenticação ausente." };
+  const response = await authFetch(
+    `${API_BASE}/rehearsals/${encodeURIComponent(rehearsalId)}/setlist/reorder`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${bearerToken}` },
+      body: JSON.stringify({ items }),
+    },
+  );
+  const body = await parseJson(response);
+  if (!response.ok) return { ok: false, message: typeof body.message === "string" ? body.message : "Falha ao reordenar setlist." };
+  return { ok: true };
+}
+
+// ── Setlist Logs ──────────────────────────────────────────────────────────────
+
+export type SetlistLog = {
+  id: string;
+  userId: string | null;
+  userName: string;
+  action: string;
+  songTitle: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+type LogsResult = { ok: boolean; logs: SetlistLog[]; total: number; page: number; pages: number; message?: string };
+
+export async function fetchEventSetlistLogs(
+  eventId: string,
+  params: { page?: number; limit?: number; search?: string } = {},
+): Promise<LogsResult> {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
+  if (params.search) qs.set("search", params.search);
+  const query = qs.toString();
+  const response = await fetch(
+    `${API_BASE}/events/${encodeURIComponent(eventId)}/setlist/logs${query ? `?${query}` : ""}`,
+    { method: "GET" },
+  );
+  const body = await parseJson(response);
+  if (!response.ok) return { ok: false, logs: [], total: 0, page: 1, pages: 1, message: typeof body.message === "string" ? body.message : "Falha ao carregar logs." };
+  return {
+    ok: true,
+    logs: Array.isArray(body.logs) ? (body.logs as SetlistLog[]) : [],
+    total: typeof body.total === "number" ? body.total : 0,
+    page: typeof body.page === "number" ? body.page : 1,
+    pages: typeof body.pages === "number" ? body.pages : 1,
+  };
+}
+
+export async function fetchRehearsalSetlistLogs(
+  rehearsalId: string,
+  params: { page?: number; limit?: number; search?: string } = {},
+): Promise<LogsResult> {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
+  if (params.search) qs.set("search", params.search);
+  const query = qs.toString();
+  const response = await fetch(
+    `${API_BASE}/rehearsals/${encodeURIComponent(rehearsalId)}/setlist/logs${query ? `?${query}` : ""}`,
+    { method: "GET" },
+  );
+  const body = await parseJson(response);
+  if (!response.ok) return { ok: false, logs: [], total: 0, page: 1, pages: 1, message: typeof body.message === "string" ? body.message : "Falha ao carregar logs." };
+  return {
+    ok: true,
+    logs: Array.isArray(body.logs) ? (body.logs as SetlistLog[]) : [],
+    total: typeof body.total === "number" ? body.total : 0,
+    page: typeof body.page === "number" ? body.page : 1,
+    pages: typeof body.pages === "number" ? body.pages : 1,
+  };
 }
