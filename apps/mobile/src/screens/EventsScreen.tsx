@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, Share, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Image, Linking, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { EventMusician, EventSetlist, MusicEvent, SetlistItem } from "../types";
 import { styles } from "../styles";
-import { fetchEventMusicians, fetchEventRehearsals, type Rehearsal } from "../lib/api";
+import {
+  deleteEventChatMessage,
+  fetchEventChat,
+  fetchEventMusicians,
+  fetchEventRehearsals,
+  fetchEventSetlistLogs,
+  sendEventChatMessage,
+  type EventChatMessage,
+  type Rehearsal,
+  type SetlistLog,
+} from "../lib/api";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Rascunho", ACTIVE: "Ativo", PUBLISHED: "Publicado", FINISHED: "Encerrado", ARCHIVED: "Arquivado",
@@ -19,6 +29,9 @@ const SLOT_LABEL: Record<string, string> = {
   PENDING: "Aguardando", CONFIRMED: "Confirmado", DECLINED: "Recusou", EXPIRED: "Expirado",
 };
 type Props = {
+  accessToken?: string | null;
+  currentUserId?: string | null;
+  currentUserRole?: string | null;
   events: MusicEvent[];
   loading: boolean;
   activeEventId: string | null;
@@ -32,7 +45,7 @@ type Props = {
   statusText: string;
   onCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
   creatingEvent: boolean;
-  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string }) => Promise<void>;
+  onUpdateEvent: (id: string, input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string; generateSlug?: boolean }) => Promise<void>;
   onDeleteEvent: (id: string) => Promise<void>;
   focusMode?: boolean;
   onExitFocusMode?: () => void;
@@ -43,6 +56,9 @@ function formatDate(iso: string) {
 }
 
 export function EventsScreen({
+  accessToken = null,
+  currentUserId = null,
+  currentUserRole = null,
   events,
   loading,
   activeEventId,
@@ -181,8 +197,72 @@ export function EventsScreen({
   const [eventRehearsals, setEventRehearsals] = useState<Rehearsal[]>([]);
   const [loadingRehearsals, setLoadingRehearsals] = useState(false);
 
+  // Setlist sub-tabs (Setlist | Logs)
+  const [setlistSubTab, setSetlistSubTab] = useState<"setlist" | "logs">("setlist");
+  const [eventLogs, setEventLogs] = useState<SetlistLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsPages, setLogsPages] = useState(1);
+  const [logsSearch, setLogsSearch] = useState("");
+  const [logsSearchInput, setLogsSearchInput] = useState("");
+  const prevActiveEventIdRef = useRef<string | null>(null);
+
+  const [chatMessages, setChatMessages] = useState<EventChatMessage[]>([]);
+  const [loadingChat, setLoadingChat] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [chatPrivate, setChatPrivate] = useState(false);
+  const [chatToUserId, setChatToUserId] = useState("");
+  const [chatError, setChatError] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
+  const [generatingDecisionSlug, setGeneratingDecisionSlug] = useState(false);
+
+  async function loadChatMessages(targetEventId: string, silent = false) {
+    if (!silent) setLoadingChat(true);
+    const result = await fetchEventChat(targetEventId, accessToken);
+    if (result.ok) {
+      setChatMessages(result.messages);
+      setChatError("");
+    } else if (!silent) {
+      setChatError(result.message ?? "Falha ao carregar chat.");
+    }
+    if (!silent) setLoadingChat(false);
+  }
+
+  async function loadEventLogs(page: number, search: string) {
+    if (!activeEventId) return;
+    setLogsLoading(true);
+    const result = await fetchEventSetlistLogs(activeEventId, { page, limit: 20, search: search || undefined });
+    if (result.ok) {
+      setEventLogs(result.logs);
+      setLogsTotal(result.total);
+      setLogsPage(result.page);
+      setLogsPages(result.pages);
+    }
+    setLogsLoading(false);
+  }
+
   useEffect(() => {
-    if (!activeEventId) { setEventMusicians([]); setEventRehearsals([]); return; }
+    if (!activeEventId) {
+      setEventMusicians([]);
+      setEventRehearsals([]);
+      setChatMessages([]);
+      setEventLogs([]);
+      setSetlistSubTab("setlist");
+      setLogsSearch("");
+      setLogsSearchInput("");
+      prevActiveEventIdRef.current = null;
+      return;
+    }
+    // Reset sub-tab when switching events
+    if (prevActiveEventIdRef.current !== activeEventId) {
+      setSetlistSubTab("setlist");
+      setLogsSearch("");
+      setLogsSearchInput("");
+      setEventLogs([]);
+      prevActiveEventIdRef.current = activeEventId;
+    }
     setLoadingMusicians(true);
     void fetchEventMusicians(activeEventId).then(({ musicians }) => {
       setEventMusicians(musicians);
@@ -193,7 +273,103 @@ export function EventsScreen({
       setEventRehearsals(rehearsals);
       setLoadingRehearsals(false);
     });
+    void loadChatMessages(activeEventId);
   }, [activeEventId]);
+
+  useEffect(() => {
+    if (activeEventId && setlistSubTab === "logs") {
+      void loadEventLogs(1, logsSearch);
+    }
+  }, [activeEventId, setlistSubTab]);
+
+  useEffect(() => {
+    if (!activeEventId) return;
+    const interval = setInterval(() => {
+      void loadChatMessages(activeEventId, true);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [activeEventId, accessToken]);
+
+  async function handleSendChatMessage() {
+    if (!activeEventId) return;
+    const text = chatText.trim();
+    if (!text) return;
+    setSendingChat(true);
+    const result = await sendEventChatMessage(
+      activeEventId,
+      {
+        text,
+        isPrivate: chatPrivate || undefined,
+        toUserId: chatPrivate && chatToUserId ? chatToUserId : undefined,
+      },
+      accessToken,
+    );
+    setSendingChat(false);
+    if (!result.ok) {
+      setChatError(result.message ?? "Falha ao enviar mensagem.");
+      return;
+    }
+    setChatText("");
+    setChatPrivate(false);
+    setChatToUserId("");
+    await loadChatMessages(activeEventId, true);
+  }
+
+  function canDeleteMessage(msg: EventChatMessage): boolean {
+    if (!currentUserId) return false;
+    if (msg.userId === currentUserId) return true;
+    return currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN";
+  }
+
+  async function confirmDeleteMessage(messageId: string) {
+    if (!activeEventId) return;
+    Alert.alert("Excluir mensagem", "Deseja remover esta mensagem do chat?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: () => {
+          setDeletingChatId(messageId);
+          void deleteEventChatMessage(activeEventId, messageId, accessToken).then(async (result) => {
+            setDeletingChatId(null);
+            if (!result.ok) {
+              setChatError(result.message ?? "Falha ao excluir mensagem.");
+              return;
+            }
+            await loadChatMessages(activeEventId, true);
+          });
+        },
+      },
+    ]);
+  }
+
+  const chatMembers = useMemo(
+    () => eventMusicians
+      .map((m) => m.user)
+      .filter((u): u is NonNullable<EventMusician["user"]> => Boolean(u))
+      .filter((u, idx, arr) => arr.findIndex((x) => x.id === u.id) === idx),
+    [eventMusicians],
+  );
+
+  const activeEvent = useMemo(
+    () => events.find((e) => e.id === activeEventId) ?? null,
+    [events, activeEventId],
+  );
+
+  const decisionUrl = activeEvent?.slug
+    ? `https://music.overflowmvmt.com/e/${activeEvent.slug}/decisao`
+    : null;
+
+  const decisionQrUrl = decisionUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(decisionUrl)}`
+    : null;
+
+  async function handleGenerateDecisionSlug() {
+    if (!activeEventId) return;
+    setGeneratingDecisionSlug(true);
+    await onUpdateEvent(activeEventId, { generateSlug: true });
+    setGeneratingDecisionSlug(false);
+  }
 
   return (
     <View style={styles.card}>
@@ -502,8 +678,98 @@ export function EventsScreen({
 
       {activeEventId && (
         <View style={{ marginTop: 16 }}>
-          <Text style={styles.cardTitle}>Setlist</Text>
-          {loadingSetlist ? (
+          {/* Cabeçalho + sub-abas */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <Text style={styles.cardTitle}>Setlist</Text>
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              {(["setlist", "logs"] as const).map((tab) => (
+                <Pressable
+                  key={tab}
+                  onPress={() => setSetlistSubTab(tab)}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: setlistSubTab === tab ? "#1ecad3" : "#2d4b6d",
+                    backgroundColor: setlistSubTab === tab ? "#0d2a3a" : "transparent",
+                  }}
+                >
+                  <Text style={{ color: setlistSubTab === tab ? "#1ecad3" : "#7a9dc0", fontSize: 12, fontWeight: "700" }}>
+                    {tab === "setlist" ? "Setlist" : "Logs"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* Aba: Logs */}
+          {setlistSubTab === "logs" && (
+            <View>
+              {/* Busca */}
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+                <TextInput
+                  style={[formInputStyle, { flex: 1 }]}
+                  placeholder="Buscar nos logs..."
+                  placeholderTextColor="#6a8a9a"
+                  value={logsSearchInput}
+                  onChangeText={setLogsSearchInput}
+                  onSubmitEditing={() => {
+                    setLogsSearch(logsSearchInput);
+                    void loadEventLogs(1, logsSearchInput);
+                  }}
+                  returnKeyType="search"
+                />
+                <Pressable
+                  style={[formInputStyle, { paddingHorizontal: 14, justifyContent: "center" }]}
+                  onPress={() => {
+                    setLogsSearch(logsSearchInput);
+                    void loadEventLogs(1, logsSearchInput);
+                  }}
+                >
+                  <Text style={{ color: "#1ecad3", fontSize: 13, fontWeight: "700" }}>🔍</Text>
+                </Pressable>
+              </View>
+
+              {logsLoading ? (
+                <ActivityIndicator color="#1ecad3" style={{ marginTop: 8 }} />
+              ) : eventLogs.length === 0 ? (
+                <Text style={[styles.helper, { textAlign: "center", marginTop: 8 }]}>
+                  {logsSearch ? "Nenhum log encontrado para esta busca." : "Nenhuma alteração registrada ainda."}
+                </Text>
+              ) : (
+                eventLogs.map((log) => (
+                  <LogEntry key={log.id} log={log} />
+                ))
+              )}
+
+              {/* Paginação */}
+              {logsPages > 1 && (
+                <View style={{ flexDirection: "row", justifyContent: "center", gap: 8, marginTop: 12 }}>
+                  <Pressable
+                    disabled={logsPage <= 1}
+                    onPress={() => void loadEventLogs(logsPage - 1, logsSearch)}
+                    style={{ opacity: logsPage <= 1 ? 0.35 : 1, borderWidth: 1, borderColor: "#2d4b6d", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
+                  >
+                    <Text style={{ color: "#7a9dc0", fontSize: 13 }}>← Anterior</Text>
+                  </Pressable>
+                  <View style={{ justifyContent: "center" }}>
+                    <Text style={{ color: "#7a9dc0", fontSize: 12 }}>{logsPage}/{logsPages}</Text>
+                  </View>
+                  <Pressable
+                    disabled={logsPage >= logsPages}
+                    onPress={() => void loadEventLogs(logsPage + 1, logsSearch)}
+                    style={{ opacity: logsPage >= logsPages ? 0.35 : 1, borderWidth: 1, borderColor: "#2d4b6d", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
+                  >
+                    <Text style={{ color: "#7a9dc0", fontSize: 13 }}>Próximo →</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Aba: Setlist */}
+          {setlistSubTab === "setlist" && (loadingSetlist ? (
             <ActivityIndicator color="#7cf2a2" style={{ marginTop: 8 }} />
           ) : !setlist ? (
             <Text style={styles.listItem}>Sem setlist para este evento.</Text>
@@ -690,7 +956,7 @@ export function EventsScreen({
               </>
             )}
             </>
-          )}
+          ))}
           {/* Equipe de Músicos */}
           <View style={{ marginTop: 16 }}>
             <Text style={styles.cardTitle}>Equipe de Músicos</Text>
@@ -778,8 +1044,236 @@ export function EventsScreen({
               ))
             )}
           </View>
+
+          {/* Decisões */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.cardTitle}>Decisões</Text>
+            {decisionUrl ? (
+              <>
+                <Text style={[styles.helper, { marginTop: 4 }]}>
+                  Mostre o QR abaixo durante o evento para registrar decisões.
+                </Text>
+                {decisionQrUrl ? (
+                  <View style={{ marginTop: 10, alignItems: "center" }}>
+                    <View style={{ backgroundColor: "#fff", padding: 8, borderRadius: 10 }}>
+                      <Image
+                        source={{ uri: decisionQrUrl }}
+                        style={{ width: 180, height: 180 }}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  </View>
+                ) : null}
+                <Text style={[styles.helper, { marginTop: 10 }]} numberOfLines={2}>
+                  🔗 {decisionUrl}
+                </Text>
+                <View style={{ marginTop: 8, flexDirection: "row", gap: 8 }}>
+                  <Pressable
+                    style={[styles.secondaryButton, { flex: 1 }]}
+                    onPress={() => void Linking.openURL(decisionUrl)}
+                  >
+                    <Text style={styles.secondaryButtonText}>Abrir formulário</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.primaryButton, { flex: 1 }]}
+                    onPress={() => void Share.share({ message: decisionUrl })}
+                  >
+                    <Text style={styles.primaryButtonText}>Compartilhar link</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.helper, { marginTop: 4 }]}>
+                  Este evento ainda não tem link de decisões.
+                </Text>
+                <Pressable
+                  style={[styles.primaryButton, { marginTop: 8, backgroundColor: generatingDecisionSlug ? "#2a3a2a" : "#1e5a7a" }]}
+                  onPress={() => void handleGenerateDecisionSlug()}
+                  disabled={generatingDecisionSlug}
+                >
+                  {generatingDecisionSlug
+                    ? <ActivityIndicator color="#7cf2a2" />
+                    : <Text style={styles.primaryButtonText}>Gerar QR Code</Text>}
+                </Pressable>
+              </>
+            )}
+          </View>
+
+          {/* Chat */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={styles.cardTitle}>Chat do Evento</Text>
+            {loadingChat ? (
+              <ActivityIndicator color="#7cf2a2" style={{ marginTop: 8 }} />
+            ) : chatMessages.length === 0 ? (
+              <Text style={[styles.helper, { marginTop: 4 }]}>Nenhuma mensagem ainda.</Text>
+            ) : (
+              chatMessages.map((msg) => {
+                const isMine = msg.userId === currentUserId;
+                return (
+                  <View
+                    key={msg.id}
+                    style={{
+                      marginTop: 8,
+                      alignSelf: isMine ? "flex-end" : "flex-start",
+                      width: "92%",
+                      backgroundColor: msg.isPrivate ? "#2d1e00" : isMine ? "#0e2c1e" : "#0d1d2e",
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: msg.isPrivate ? "#5c3600" : "#1e3a54",
+                      padding: 10,
+                    }}
+                  >
+                    {!isMine ? (
+                      <Text style={{ color: "#1ecad3", fontSize: 12, fontWeight: "700", marginBottom: 2 }}>
+                        {msg.userName}
+                      </Text>
+                    ) : null}
+                    {msg.isPrivate ? (
+                      <Text style={{ color: "#fbbf24", fontSize: 11, marginBottom: 3 }}>
+                        🔒 Privado{msg.toUserName ? ` → ${msg.toUserName}` : ""}
+                      </Text>
+                    ) : null}
+                    <Text style={{ color: "#e8f2ff", fontSize: 13, lineHeight: 19 }}>{msg.text}</Text>
+                    <View style={{ marginTop: 6, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={{ color: "#6a8a9a", fontSize: 11 }}>
+                        {new Date(msg.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </Text>
+                      {canDeleteMessage(msg) ? (
+                        <Pressable
+                          onPress={() => confirmDeleteMessage(msg.id)}
+                          disabled={deletingChatId === msg.id}
+                          style={{ borderWidth: 1, borderColor: "#5a2a2a", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}
+                        >
+                          <Text style={{ color: "#f28c8c", fontSize: 11 }}>
+                            {deletingChatId === msg.id ? "..." : "Excluir"}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+
+            {chatError ? <Text style={{ color: "#f28c8c", fontSize: 12, marginTop: 8 }}>{chatError}</Text> : null}
+
+            <View style={{ marginTop: 10, gap: 6 }}>
+              <TextInput
+                style={formInputStyle}
+                placeholder="Mensagem..."
+                placeholderTextColor="#6a8a9a"
+                value={chatText}
+                onChangeText={setChatText}
+                editable={!sendingChat}
+              />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <Pressable
+                  onPress={() => setChatPrivate((v) => !v)}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: chatPrivate ? "#fbbf24" : "#2d4b6d",
+                    borderRadius: 999,
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    backgroundColor: chatPrivate ? "#2d1e00" : "transparent",
+                  }}
+                >
+                  <Text style={{ color: chatPrivate ? "#fbbf24" : "#8fa9c8", fontSize: 12 }}>
+                    🔒 Privado
+                  </Text>
+                </Pressable>
+                {chatPrivate ? (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                    {chatMembers
+                      .filter((m) => m.id !== currentUserId)
+                      .map((m) => (
+                        <Pressable
+                          key={m.id}
+                          onPress={() => setChatToUserId(chatToUserId === m.id ? "" : m.id)}
+                          style={{
+                            borderWidth: 1,
+                            borderColor: chatToUserId === m.id ? "#1ecad3" : "#2d4b6d",
+                            borderRadius: 20,
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            backgroundColor: chatToUserId === m.id ? "#0d2a3a" : "transparent",
+                          }}
+                        >
+                          <Text style={{ color: chatToUserId === m.id ? "#1ecad3" : "#8fa9c8", fontSize: 11 }}>
+                            {m.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                  </View>
+                ) : null}
+              </View>
+              <Pressable
+                style={[styles.primaryButton, { backgroundColor: sendingChat ? "#2a3a2a" : "#1e7a3e" }]}
+                onPress={() => void handleSendChatMessage()}
+                disabled={sendingChat}
+              >
+                {sendingChat
+                  ? <ActivityIndicator color="#7cf2a2" />
+                  : <Text style={styles.primaryButtonText}>Enviar mensagem</Text>}
+              </Pressable>
+            </View>
+          </View>
         </View>
       )}
+    </View>
+  );
+}
+
+// ── Log Entry component ────────────────────────────────────────────────────────
+
+const ACTION_LABEL: Record<string, string> = {
+  ITEM_ADDED: "Adicionada",
+  ITEM_REMOVED: "Removida",
+  ITEM_UPDATED: "Editada",
+  REORDERED: "Reordenada",
+};
+const ACTION_COLOR: Record<string, string> = {
+  ITEM_ADDED: "#7cf2a2",
+  ITEM_REMOVED: "#f87171",
+  ITEM_UPDATED: "#fbbf24",
+  REORDERED: "#60a5fa",
+};
+
+function formatLogTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
+}
+
+function LogEntry({ log }: { log: SetlistLog }) {
+  const color = ACTION_COLOR[log.action] ?? "#8fa9c8";
+  const label = ACTION_LABEL[log.action] ?? log.action;
+  return (
+    <View style={{
+      marginBottom: 8,
+      padding: 10,
+      backgroundColor: "#0d1d2e",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#1e3a54",
+    }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <View style={{ borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: color + "22", borderWidth: 1, borderColor: color }}>
+          <Text style={{ color, fontSize: 11, fontWeight: "700" }}>{label}</Text>
+        </View>
+        {log.songTitle ? (
+          <Text style={{ color: "#e8f2ff", fontSize: 13, fontWeight: "600", flex: 1 }} numberOfLines={1}>
+            {log.songTitle}
+          </Text>
+        ) : null}
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ color: "#7a9dc0", fontSize: 12 }}>{log.userName}</Text>
+        <Text style={{ color: "#4a6278", fontSize: 11 }}>{formatLogTime(log.createdAt)}</Text>
+      </View>
     </View>
   );
 }

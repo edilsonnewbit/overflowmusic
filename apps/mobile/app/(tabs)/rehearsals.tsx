@@ -17,11 +17,20 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "../../src/context/SessionContext";
 import {
+  addRehearsalSetlistItem,
   createRehearsal,
   deleteRehearsal,
+  fetchRehearsalSetlist,
+  fetchRehearsalSetlistLogs,
   fetchRehearsals,
+  removeRehearsalSetlistItem,
+  reorderRehearsalSetlist,
   updateRehearsal,
+  updateRehearsalSetlistItem,
   type Rehearsal,
+  type RehearsalSetlist,
+  type RehearsalSetlistItem,
+  type SetlistLog,
 } from "../../src/lib/api";
 
 function formatDate(iso: string): string {
@@ -104,6 +113,126 @@ export default function RehearsalsScreen() {
   const [form, setForm] = useState<FormState>(blankForm());
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // ── Setlist de ensaio ──────────────────────────────────────────────────────
+  const [activeRehearsalId, setActiveRehearsalId] = useState<string | null>(null);
+  const [rehearsalSetlist, setRehearsalSetlist] = useState<RehearsalSetlist>(null);
+  const [loadingSetlist, setLoadingSetlist] = useState(false);
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [setlistSubTab, setSetlistSubTab] = useState<"setlist" | "logs">("setlist");
+
+  // Adicionar música ao setlist
+  const [addSongTitle, setAddSongTitle] = useState("");
+  const [addSongKey, setAddSongKey] = useState("");
+  const [addingSong, setAddingSong] = useState(false);
+
+  // Editar item do setlist
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [itemEditKey, setItemEditKey] = useState("");
+  const [itemEditLeader, setItemEditLeader] = useState("");
+  const [itemEditZone, setItemEditZone] = useState("");
+  const [itemEditNotes, setItemEditNotes] = useState("");
+  const [itemEditSaving, setItemEditSaving] = useState(false);
+
+  // Logs
+  const [rehearsalLogs, setRehearsalLogs] = useState<SetlistLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsPages, setLogsPages] = useState(1);
+  const [logsSearch, setLogsSearch] = useState("");
+  const [logsSearchInput, setLogsSearchInput] = useState("");
+
+  const sortedItems = [...(rehearsalSetlist?.items ?? [])].sort((a, b) => a.order - b.order);
+
+  async function loadRehearsalSetlist(rehearsalId: string) {
+    setLoadingSetlist(true);
+    const res = await fetchRehearsalSetlist(rehearsalId);
+    setRehearsalSetlist(res.setlist);
+    setLoadingSetlist(false);
+  }
+
+  async function loadLogs(rehearsalId: string, page: number, search: string) {
+    setLogsLoading(true);
+    const res = await fetchRehearsalSetlistLogs(rehearsalId, { page, limit: 20, search: search || undefined });
+    if (res.ok) {
+      setRehearsalLogs(res.logs);
+      setLogsPage(res.page);
+      setLogsPages(res.pages);
+    }
+    setLogsLoading(false);
+  }
+
+  function toggleRehearsalSetlist(rehearsalId: string) {
+    if (activeRehearsalId === rehearsalId) {
+      setActiveRehearsalId(null);
+      setRehearsalSetlist(null);
+      setSetlistSubTab("setlist");
+      setRehearsalLogs([]);
+      setLogsSearch("");
+      setLogsSearchInput("");
+      return;
+    }
+    setActiveRehearsalId(rehearsalId);
+    setSetlistSubTab("setlist");
+    setRehearsalLogs([]);
+    setLogsSearch("");
+    setLogsSearchInput("");
+    void loadRehearsalSetlist(rehearsalId);
+  }
+
+  async function handleAddSong(rehearsalId: string) {
+    if (!addSongTitle.trim()) return;
+    setAddingSong(true);
+    await addRehearsalSetlistItem(rehearsalId, { songTitle: addSongTitle.trim(), key: addSongKey.trim() || undefined }, accessToken);
+    setAddSongTitle("");
+    setAddSongKey("");
+    setAddingSong(false);
+    await loadRehearsalSetlist(rehearsalId);
+  }
+
+  async function handleRemoveItem(rehearsalId: string, itemId: string) {
+    setReorderingId(itemId);
+    await removeRehearsalSetlistItem(rehearsalId, itemId, accessToken);
+    setReorderingId(null);
+    await loadRehearsalSetlist(rehearsalId);
+  }
+
+  async function handleMoveItem(rehearsalId: string, item: RehearsalSetlistItem, direction: "up" | "down") {
+    if (reorderingId) return;
+    const idx = sortedItems.findIndex((s) => s.id === item.id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sortedItems.length) return;
+    setReorderingId(item.id);
+    const newOrder = sortedItems.map((s, i) => ({ id: s.id, order: i + 1 }));
+    const tmp = newOrder[idx].order;
+    newOrder[idx].order = newOrder[swapIdx].order;
+    newOrder[swapIdx].order = tmp;
+    await reorderRehearsalSetlist(rehearsalId, newOrder, accessToken);
+    await loadRehearsalSetlist(rehearsalId);
+    setReorderingId(null);
+  }
+
+  function startItemEdit(item: RehearsalSetlistItem) {
+    setEditingItemId(item.id);
+    setItemEditKey(item.key ?? "");
+    setItemEditLeader(item.leaderName ?? "");
+    setItemEditZone(item.zone ?? "");
+    setItemEditNotes(item.transitionNotes ?? "");
+  }
+
+  async function submitItemEdit(rehearsalId: string) {
+    if (!editingItemId) return;
+    setItemEditSaving(true);
+    await updateRehearsalSetlistItem(rehearsalId, editingItemId, {
+      key: itemEditKey.trim() || undefined,
+      leaderName: itemEditLeader.trim() || undefined,
+      zone: itemEditZone.trim() || undefined,
+      transitionNotes: itemEditNotes.trim() || undefined,
+    }, accessToken);
+    setItemEditSaving(false);
+    setEditingItemId(null);
+    await loadRehearsalSetlist(rehearsalId);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -264,6 +393,271 @@ export default function RehearsalsScreen() {
               {r.notes ? (
                 <Text style={styles.cardNotes}>📝 {r.notes}</Text>
               ) : null}
+
+              {/* Botão Setlist */}
+              <Pressable
+                style={[
+                  styles.setlistBtn,
+                  activeRehearsalId === r.id && styles.setlistBtnActive,
+                ]}
+                onPress={() => toggleRehearsalSetlist(r.id)}
+              >
+                <Text style={[styles.setlistBtnText, activeRehearsalId === r.id && styles.setlistBtnTextActive]}>
+                  {activeRehearsalId === r.id ? "▲ Fechar Setlist" : "♪ Ver Setlist"}
+                </Text>
+              </Pressable>
+
+              {/* Painel de Setlist expandido */}
+              {activeRehearsalId === r.id && (
+                <View style={styles.setlistPanel}>
+                  {/* Sub-abas */}
+                  <View style={styles.subTabRow}>
+                    {(["setlist", "logs"] as const).map((tab) => (
+                      <Pressable
+                        key={tab}
+                        onPress={() => {
+                          setSetlistSubTab(tab);
+                          if (tab === "logs" && rehearsalLogs.length === 0) {
+                            void loadLogs(r.id, 1, "");
+                          }
+                        }}
+                        style={[styles.subTab, setlistSubTab === tab && styles.subTabActive]}
+                      >
+                        <Text style={[styles.subTabText, setlistSubTab === tab && styles.subTabTextActive]}>
+                          {tab === "setlist" ? "Setlist" : "Logs"}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  {/* Aba Logs */}
+                  {setlistSubTab === "logs" && (
+                    <View>
+                      <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+                        <TextInput
+                          style={[styles.input, { flex: 1 }]}
+                          placeholder="Buscar nos logs..."
+                          placeholderTextColor="#4a6278"
+                          value={logsSearchInput}
+                          onChangeText={setLogsSearchInput}
+                          onSubmitEditing={() => {
+                            setLogsSearch(logsSearchInput);
+                            void loadLogs(r.id, 1, logsSearchInput);
+                          }}
+                          returnKeyType="search"
+                        />
+                        <Pressable
+                          style={[styles.input, { paddingHorizontal: 14, justifyContent: "center" }]}
+                          onPress={() => {
+                            setLogsSearch(logsSearchInput);
+                            void loadLogs(r.id, 1, logsSearchInput);
+                          }}
+                        >
+                          <Text style={{ color: "#1ecad3", fontSize: 13 }}>🔍</Text>
+                        </Pressable>
+                      </View>
+                      {logsLoading ? (
+                        <ActivityIndicator color="#1ecad3" />
+                      ) : rehearsalLogs.length === 0 ? (
+                        <Text style={styles.emptyText}>
+                          {logsSearch ? "Nenhum log encontrado." : "Nenhuma alteração registrada."}
+                        </Text>
+                      ) : (
+                        rehearsalLogs.map((log) => <RehearsalLogEntry key={log.id} log={log} />)
+                      )}
+                      {logsPages > 1 && (
+                        <View style={{ flexDirection: "row", justifyContent: "center", gap: 8, marginTop: 10 }}>
+                          <Pressable
+                            disabled={logsPage <= 1}
+                            onPress={() => void loadLogs(r.id, logsPage - 1, logsSearch)}
+                            style={{ opacity: logsPage <= 1 ? 0.35 : 1, borderWidth: 1, borderColor: "#1e3a52", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
+                          >
+                            <Text style={{ color: "#7a9dc0", fontSize: 12 }}>← Anterior</Text>
+                          </Pressable>
+                          <View style={{ justifyContent: "center" }}>
+                            <Text style={{ color: "#7a9dc0", fontSize: 12 }}>{logsPage}/{logsPages}</Text>
+                          </View>
+                          <Pressable
+                            disabled={logsPage >= logsPages}
+                            onPress={() => void loadLogs(r.id, logsPage + 1, logsSearch)}
+                            style={{ opacity: logsPage >= logsPages ? 0.35 : 1, borderWidth: 1, borderColor: "#1e3a52", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
+                          >
+                            <Text style={{ color: "#7a9dc0", fontSize: 12 }}>Próximo →</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Aba Setlist */}
+                  {setlistSubTab === "setlist" && (
+                    <>
+                      {loadingSetlist ? (
+                        <ActivityIndicator color="#7cf2a2" />
+                      ) : (
+                        <>
+                          {/* Adicionar música */}
+                          {canEdit && (
+                            <View style={{ gap: 6, marginBottom: 12 }}>
+                              <TextInput
+                                style={styles.input}
+                                placeholder="Título da música *"
+                                placeholderTextColor="#4a6278"
+                                value={addSongTitle}
+                                onChangeText={setAddSongTitle}
+                                editable={!addingSong}
+                              />
+                              <TextInput
+                                style={styles.input}
+                                placeholder="Tom (ex: C, D#)"
+                                placeholderTextColor="#4a6278"
+                                value={addSongKey}
+                                onChangeText={setAddSongKey}
+                                editable={!addingSong}
+                                autoCapitalize="characters"
+                              />
+                              <Pressable
+                                style={[styles.addBtn, { borderRadius: 8 }, addingSong && { opacity: 0.6 }]}
+                                onPress={() => void handleAddSong(r.id)}
+                                disabled={addingSong}
+                              >
+                                {addingSong
+                                  ? <ActivityIndicator color="#07101d" size="small" />
+                                  : <Text style={styles.addBtnText}>+ Adicionar</Text>}
+                              </Pressable>
+                            </View>
+                          )}
+
+                          {/* Lista de itens */}
+                          {sortedItems.length === 0 ? (
+                            <Text style={styles.emptyText}>Setlist vazio.</Text>
+                          ) : (
+                            sortedItems.map((item, idx) => {
+                              const isFirst = idx === 0;
+                              const isLast = idx === sortedItems.length - 1;
+                              const isMoving = reorderingId === item.id;
+                              const isBusy = reorderingId !== null || loadingSetlist;
+                              return (
+                                <View
+                                  key={item.id}
+                                  style={[styles.setlistItem, isMoving && { opacity: 0.5 }]}
+                                >
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                    {/* Botões de ordem */}
+                                    <View style={{ gap: 2 }}>
+                                      <Pressable
+                                        disabled={isBusy || isFirst}
+                                        onPress={() => void handleMoveItem(r.id, item, "up")}
+                                        style={[styles.orderBtn, (isBusy || isFirst) && { opacity: 0.25 }]}
+                                      >
+                                        <Text style={{ color: "#7cf2a2", fontSize: 11 }}>▲</Text>
+                                      </Pressable>
+                                      <Pressable
+                                        disabled={isBusy || isLast}
+                                        onPress={() => void handleMoveItem(r.id, item, "down")}
+                                        style={[styles.orderBtn, (isBusy || isLast) && { opacity: 0.25 }]}
+                                      >
+                                        <Text style={{ color: "#7cf2a2", fontSize: 11 }}>▼</Text>
+                                      </Pressable>
+                                    </View>
+                                    {/* Conteúdo */}
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={{ color: "#e0eaf5", fontSize: 14, fontWeight: "600" }}>
+                                        {idx + 1}. {item.songTitle}
+                                      </Text>
+                                      <Text style={{ color: "#7a9dc0", fontSize: 12, marginTop: 2 }}>
+                                        {[
+                                          item.key && `Tom: ${item.key}`,
+                                          item.leaderName && `Líder: ${item.leaderName}`,
+                                          item.zone && `Zona: ${item.zone}`,
+                                        ].filter(Boolean).join("  ·  ")}
+                                      </Text>
+                                      {item.transitionNotes ? (
+                                        <Text style={{ color: "#7a9dc0", fontSize: 12, fontStyle: "italic" }}>
+                                          {item.transitionNotes}
+                                        </Text>
+                                      ) : null}
+                                    </View>
+                                    {/* Ações */}
+                                    {canEdit && (
+                                      <View style={{ gap: 4 }}>
+                                        <Pressable
+                                          disabled={isBusy}
+                                          onPress={() => void handleRemoveItem(r.id, item.id)}
+                                          style={[styles.orderBtn, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
+                                        >
+                                          <Text style={{ color: "#f87171", fontSize: 11 }}>✕</Text>
+                                        </Pressable>
+                                        <Pressable
+                                          onPress={() => editingItemId === item.id ? setEditingItemId(null) : startItemEdit(item)}
+                                          style={[styles.orderBtn, { borderColor: editingItemId === item.id ? "#f87171" : "#2d4b6d" }]}
+                                        >
+                                          <Text style={{ color: editingItemId === item.id ? "#f87171" : "#7cf2a2", fontSize: 11 }}>
+                                            {editingItemId === item.id ? "✕" : "✏"}
+                                          </Text>
+                                        </Pressable>
+                                      </View>
+                                    )}
+                                  </View>
+
+                                  {/* Formulário de edição inline */}
+                                  {editingItemId === item.id && (
+                                    <View style={{ marginTop: 8, gap: 6 }}>
+                                      <TextInput
+                                        style={styles.input}
+                                        placeholder="Tom (ex: C, D#)"
+                                        placeholderTextColor="#4a6278"
+                                        value={itemEditKey}
+                                        onChangeText={setItemEditKey}
+                                        editable={!itemEditSaving}
+                                        autoCapitalize="characters"
+                                      />
+                                      <TextInput
+                                        style={styles.input}
+                                        placeholder="Líder vocal"
+                                        placeholderTextColor="#4a6278"
+                                        value={itemEditLeader}
+                                        onChangeText={setItemEditLeader}
+                                        editable={!itemEditSaving}
+                                      />
+                                      <TextInput
+                                        style={styles.input}
+                                        placeholder="Zona (ex: Z1, Z3)"
+                                        placeholderTextColor="#4a6278"
+                                        value={itemEditZone}
+                                        onChangeText={setItemEditZone}
+                                        editable={!itemEditSaving}
+                                        autoCapitalize="characters"
+                                      />
+                                      <TextInput
+                                        style={styles.input}
+                                        placeholder="Notas de transição"
+                                        placeholderTextColor="#4a6278"
+                                        value={itemEditNotes}
+                                        onChangeText={setItemEditNotes}
+                                        editable={!itemEditSaving}
+                                      />
+                                      <Pressable
+                                        style={[styles.saveBtn, itemEditSaving && { opacity: 0.6 }]}
+                                        onPress={() => void submitItemEdit(r.id)}
+                                        disabled={itemEditSaving}
+                                      >
+                                        {itemEditSaving
+                                          ? <ActivityIndicator color="#07101d" size="small" />
+                                          : <Text style={styles.saveBtnText}>Salvar</Text>}
+                                      </Pressable>
+                                    </View>
+                                  )}
+                                </View>
+                              );
+                            })
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+                </View>
+              )}
             </View>
           ))}
         </ScrollView>
@@ -327,6 +721,50 @@ export default function RehearsalsScreen() {
   );
 }
 
+// ─── Log Entry component ──────────────────────────────────────────────────────
+
+const LOG_ACTION_LABEL: Record<string, string> = {
+  ITEM_ADDED: "Adicionada",
+  ITEM_REMOVED: "Removida",
+  ITEM_UPDATED: "Editada",
+  REORDERED: "Reordenada",
+};
+const LOG_ACTION_COLOR: Record<string, string> = {
+  ITEM_ADDED: "#7cf2a2",
+  ITEM_REMOVED: "#f87171",
+  ITEM_UPDATED: "#fbbf24",
+  REORDERED: "#60a5fa",
+};
+
+function RehearsalLogEntry({ log }: { log: SetlistLog }) {
+  const color = LOG_ACTION_COLOR[log.action] ?? "#8fa9c8";
+  const label = LOG_ACTION_LABEL[log.action] ?? log.action;
+  let timeStr = "";
+  try {
+    timeStr = new Date(log.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    timeStr = log.createdAt;
+  }
+  return (
+    <View style={styles.logEntry}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <View style={{ borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: color + "22", borderWidth: 1, borderColor: color }}>
+          <Text style={{ color, fontSize: 11, fontWeight: "700" }}>{label}</Text>
+        </View>
+        {log.songTitle ? (
+          <Text style={{ color: "#e0eaf5", fontSize: 13, fontWeight: "600", flex: 1 }} numberOfLines={1}>
+            {log.songTitle}
+          </Text>
+        ) : null}
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ color: "#7a9dc0", fontSize: 12 }}>{log.userName}</Text>
+        <Text style={{ color: "#4a6278", fontSize: 11 }}>{timeStr}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -349,7 +787,7 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  emptyText: { color: "#4a6278", fontSize: 15 },
+  emptyText: { color: "#4a6278", fontSize: 14, textAlign: "center", marginTop: 8 },
   list: { padding: 16, gap: 14 },
   card: {
     backgroundColor: "#0d1f2e",
@@ -379,6 +817,65 @@ const styles = StyleSheet.create({
   },
   wazeBtn: { backgroundColor: "#1a1f00", borderColor: "#c8e60033" },
   mapBtnText: { color: "#7cf2a2", fontSize: 12, fontWeight: "600" },
+  // Setlist
+  setlistBtn: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#1e3a52",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+  },
+  setlistBtnActive: {
+    borderColor: "#1ecad3",
+    backgroundColor: "#0d2a3a",
+  },
+  setlistBtnText: { color: "#7a9dc0", fontSize: 12, fontWeight: "600" },
+  setlistBtnTextActive: { color: "#1ecad3" },
+  setlistPanel: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#1e3a52",
+    paddingTop: 12,
+  },
+  subTabRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  subTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#1e3a52",
+  },
+  subTabActive: { borderColor: "#1ecad3", backgroundColor: "#0d2a3a" },
+  subTabText: { color: "#7a9dc0", fontSize: 12, fontWeight: "700" },
+  subTabTextActive: { color: "#1ecad3" },
+  setlistItem: {
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: "#071623",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#1e3a52",
+  },
+  orderBtn: {
+    width: 26,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: "#0d1f2e",
+    borderWidth: 1,
+    borderColor: "#2d4b6d",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logEntry: {
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: "#071623",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#1e3a52",
+  },
   // Modal
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
   modal: {
