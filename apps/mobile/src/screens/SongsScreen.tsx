@@ -12,9 +12,10 @@ import {
 } from "react-native";
 import WebView from "react-native-webview";
 import { fetchSongById, fetchSongs } from "../lib/api";
+import { canManageSongs, canSeeFullSongDetail, canSeeSongsPage } from "../lib/permissions";
 import { CACHE_SONGS, getCache, setCache } from "../lib/cache";
 import { styles } from "../styles";
-import type { Song, SongImportResult, SongPreview, SongSection } from "../types";
+import type { AuthUser, Song, SongImportResult, SongPreview, SongSection } from "../types";
 
 // ── Helpers para URLs de embed ────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ function getSpotifyEmbedUrl(url: string): string | null {
 type Tab = "browse" | "import";
 
 type Props = {
+  user: AuthUser | null;
   preview: SongPreview | null;
   importResult: SongImportResult | null;
   onPreview: (content: string) => Promise<void>;
@@ -54,6 +56,7 @@ type Props = {
 };
 
 export function SongsScreen({
+  user,
   preview,
   importResult,
   onPreview,
@@ -65,9 +68,26 @@ export function SongsScreen({
 }: Props) {
   const [tab, setTab] = useState<Tab>("browse");
 
+  // Sem usuário logado ou sem permissão para ver músicas
+  if (!user || !canSeeSongsPage(user)) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <Text style={{ color: "#f87171", fontSize: 15, textAlign: "center", fontWeight: "600" }}>
+          Acesso restrito
+        </Text>
+        <Text style={{ color: "#4a6278", fontSize: 13, textAlign: "center", marginTop: 8 }}>
+          Sua área de atuação não tem acesso ao catálogo de músicas.
+        </Text>
+      </View>
+    );
+  }
+
+  const canManage = canManageSongs(user);
+  const fullDetail = canSeeFullSongDetail(user);
+
   return (
     <View style={{ flex: 1 }}>
-      {/* inner tab bar */}
+      {/* inner tab bar — Import só para quem pode gerenciar */}
       <View style={innerTabBarStyle}>
         <Pressable
           style={[innerTabStyle, tab === "browse" ? innerTabActiveStyle : null]}
@@ -77,18 +97,24 @@ export function SongsScreen({
             Biblioteca
           </Text>
         </Pressable>
-        <Pressable
-          style={[innerTabStyle, tab === "import" ? innerTabActiveStyle : null]}
-          onPress={() => setTab("import")}
-        >
-          <Text style={[innerTabTextStyle, tab === "import" ? innerTabTextActiveStyle : null]}>
-            Importar TXT
-          </Text>
-        </Pressable>
+        {canManage && (
+          <Pressable
+            style={[innerTabStyle, tab === "import" ? innerTabActiveStyle : null]}
+            onPress={() => setTab("import")}
+          >
+            <Text style={[innerTabTextStyle, tab === "import" ? innerTabTextActiveStyle : null]}>
+              Importar TXT
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {tab === "browse" ? (
-        <BrowseTab activeEventId={activeEventId} onAddToSetlist={onAddToSetlist} />
+        <BrowseTab
+          activeEventId={activeEventId}
+          onAddToSetlist={onAddToSetlist}
+          fullDetail={fullDetail}
+        />
       ) : (
         <ImportTab
           preview={preview}
@@ -108,9 +134,11 @@ export function SongsScreen({
 function BrowseTab({
   activeEventId,
   onAddToSetlist,
+  fullDetail,
 }: {
   activeEventId: string | null;
   onAddToSetlist: (songTitle: string, key?: string) => Promise<void>;
+  fullDetail: boolean;
 }) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,6 +203,7 @@ function BrowseTab({
       <SongDetail
         song={selected}
         onBack={() => setSelected(null)}
+        fullDetail={fullDetail}
       />
     );
   }
@@ -323,7 +352,7 @@ function BrowseTab({
 
 // ── Song Detail ───────────────────────────────────────────────────────────────
 
-function SongDetail({ song, onBack }: { song: Song; onBack: () => void }) {
+function SongDetail({ song, onBack, fullDetail }: { song: Song; onBack: () => void; fullDetail: boolean }) {
   const [chartIndex, setChartIndex] = useState(0);
   const chart = song.chordCharts[chartIndex] ?? null;
   const parsed = chart?.parsedJson ?? null;
@@ -343,16 +372,25 @@ function SongDetail({ song, onBack }: { song: Song; onBack: () => void }) {
         ) : null}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
           {song.defaultKey ? <MetaPill label="Tom" value={song.defaultKey} /> : null}
-          {meta?.suggestedKey && meta.suggestedKey !== song.defaultKey ? (
+          {fullDetail && meta?.suggestedKey && meta.suggestedKey !== song.defaultKey ? (
             <MetaPill label="Tom cifra" value={meta.suggestedKey} />
           ) : null}
-          {meta?.bpm ? <MetaPill label="BPM" value={String(meta.bpm)} /> : null}
-          {meta?.capo ? <MetaPill label="Capo" value={String(meta.capo)} /> : null}
+          {fullDetail && meta?.bpm ? <MetaPill label="BPM" value={String(meta.bpm)} /> : null}
+          {fullDetail && meta?.capo ? <MetaPill label="Capo" value={String(meta.capo)} /> : null}
         </View>
       </View>
 
-      {/* version picker */}
-      {song.chordCharts.length > 1 && (
+      {/* Aviso para acesso simplificado (MIDIA/DANCA) */}
+      {!fullDetail && (
+        <View style={{ marginHorizontal: 14, marginBottom: 12, padding: 10, backgroundColor: "#1a1f00", borderRadius: 8, borderWidth: 1, borderColor: "#3a4a00" }}>
+          <Text style={{ color: "#c8e600", fontSize: 12 }}>
+            ℹ Visualização simplificada — cifras disponíveis apenas para a equipe de música.
+          </Text>
+        </View>
+      )}
+
+      {/* version picker — só para acesso completo */}
+      {fullDetail && song.chordCharts.length > 1 && (
         <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 14, marginBottom: 12, flexWrap: "wrap" }}>
           {song.chordCharts.map((c, i) => (
             <Pressable
@@ -374,8 +412,8 @@ function SongDetail({ song, onBack }: { song: Song; onBack: () => void }) {
         </View>
       )}
 
-      {/* sections */}
-      {parsed ? (
+      {/* sections — cifras só para acesso completo */}
+      {fullDetail && (parsed ? (
         <View style={chartBoxStyle}>
           {parsed.sections.map((section: SongSection, si: number) => (
             <View key={si} style={{ marginBottom: 20 }}>
@@ -411,10 +449,10 @@ function SongDetail({ song, onBack }: { song: Song; onBack: () => void }) {
         </View>
       ) : (
         <Text style={{ color: "#b3c6e0", margin: 16 }}>Nenhuma cifra disponível.</Text>
-      )}
+      ))}
 
-      {/* chord dictionary */}
-      {parsed && Object.keys(parsed.chordDictionary).length > 0 && (
+      {/* chord dictionary — só para acesso completo */}
+      {fullDetail && parsed && Object.keys(parsed.chordDictionary).length > 0 && (
         <View style={dictBoxStyle}>
           <Text style={sectionNameStyle}>Dicionário de Acordes</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>

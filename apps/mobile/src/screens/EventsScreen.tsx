@@ -1248,9 +1248,29 @@ function formatLogTime(iso: string): string {
   }
 }
 
+type Alteracao = { campo: string; de: string | null; para: string | null };
+
+function formatLogDetails(log: SetlistLog): string | null {
+  if (!log.details) return null;
+  if (log.action === "ITEM_UPDATED") {
+    const alteracoes = (log.details as { alteracoes?: Alteracao[] }).alteracoes;
+    if (!Array.isArray(alteracoes) || alteracoes.length === 0) return null;
+    return alteracoes
+      .map((a) => `${a.campo}: ${a.de ?? "—"} → ${a.para ?? "—"}`)
+      .join(" · ");
+  }
+  if (log.action === "REORDERED") {
+    const novaOrdem = (log.details as { novaOrdem?: string[] }).novaOrdem;
+    if (!Array.isArray(novaOrdem)) return null;
+    return novaOrdem.map((t, i) => `${i + 1}. ${t}`).join(", ");
+  }
+  return null;
+}
+
 function LogEntry({ log }: { log: SetlistLog }) {
   const color = ACTION_COLOR[log.action] ?? "#8fa9c8";
   const label = ACTION_LABEL[log.action] ?? log.action;
+  const detail = formatLogDetails(log);
   return (
     <View style={{
       marginBottom: 8,
@@ -1270,6 +1290,11 @@ function LogEntry({ log }: { log: SetlistLog }) {
           </Text>
         ) : null}
       </View>
+      {detail ? (
+        <Text style={{ color: "#7a9dc0", fontSize: 11, marginBottom: 4 }} numberOfLines={3}>
+          {detail}
+        </Text>
+      ) : null}
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={{ color: "#7a9dc0", fontSize: 12 }}>{log.userName}</Text>
         <Text style={{ color: "#4a6278", fontSize: 11 }}>{formatLogTime(log.createdAt)}</Text>
