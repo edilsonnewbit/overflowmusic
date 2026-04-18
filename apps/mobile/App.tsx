@@ -566,6 +566,7 @@ export default function App() {
 
     return (
       <ChecklistScreen
+        events={events}
         eventId={eventId}
         onChangeEventId={setEventId}
         templates={templates}
