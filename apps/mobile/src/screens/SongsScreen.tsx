@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import WebView from "react-native-webview";
+import { Ionicons } from "@expo/vector-icons";
 import { fetchSongById, fetchSongs } from "../lib/api";
 import { canManageSongs, canSeeFullSongDetail, canSeeSongsPage } from "../lib/permissions";
 import { CACHE_SONGS, getCache, setCache } from "../lib/cache";
@@ -360,8 +361,9 @@ function SongDetail({ song, onBack, fullDetail }: { song: Song; onBack: () => vo
 
   return (
     <ScrollView style={{ flex: 1 }}>
-      <Pressable onPress={onBack} style={{ padding: 12 }}>
-        <Text style={{ color: "#7cf2a2", fontSize: 13 }}>← Músicas</Text>
+      <Pressable onPress={onBack} style={{ padding: 12, flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <Ionicons name="chevron-back" size={16} color="#7cf2a2" />
+        <Text style={{ color: "#7cf2a2", fontSize: 13 }}>Músicas</Text>
       </Pressable>
 
       {/* header */}

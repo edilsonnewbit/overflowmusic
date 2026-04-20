@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { ChecklistRun, ChecklistTemplate, MusicEvent } from "../types";
 import { styles } from "../styles";
 
@@ -87,7 +88,7 @@ export function ChecklistScreen({
             </Text>
           )}
         </View>
-        <Text style={{ color: "#7a9dc0", fontSize: 13 }}>{showEventPicker ? "▲" : "▼"}</Text>
+        <Ionicons name={showEventPicker ? "chevron-up" : "chevron-down"} size={16} color="#7a9dc0" />
       </Pressable>
 
       {/* Lista de eventos para selecionar */}
@@ -140,7 +141,12 @@ export function ChecklistScreen({
         >
           {loadingChecklist
             ? <ActivityIndicator color="#07101d" size="small" />
-            : <Text style={styles.primaryButtonText}>↺ Atualizar checklist</Text>}
+            : (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="refresh-outline" size={16} color="#07101d" />
+                <Text style={styles.primaryButtonText}>Atualizar checklist</Text>
+              </View>
+            )}
         </Pressable>
       )}
 
@@ -239,7 +245,7 @@ export function ChecklistScreen({
                   {isUpdating
                     ? <ActivityIndicator size="small" color={item.checked ? "#07101d" : "#7cf2a2"} />
                     : item.checked
-                      ? <Text style={{ color: "#07101d", fontSize: 13, fontWeight: "700" }}>✓</Text>
+                      ? <Ionicons name="checkmark" size={14} color="#07101d" />
                       : null}
                 </View>
 
@@ -254,9 +260,10 @@ export function ChecklistScreen({
                     {item.label}
                   </Text>
                   {item.checkedByName ? (
-                    <Text style={{ color: "#4a6278", fontSize: 11, marginTop: 2 }}>
-                      ✓ por {item.checkedByName}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                      <Ionicons name="checkmark" size={11} color="#4a6278" />
+                      <Text style={{ color: "#4a6278", fontSize: 11 }}>por {item.checkedByName}</Text>
+                    </View>
                   ) : null}
                 </View>
               </Pressable>

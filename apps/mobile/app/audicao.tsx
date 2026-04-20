@@ -9,18 +9,19 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { styles, colors } from "../src/styles";
 
 // ─── Volunteer areas ──────────────────────────────────────────────────────────
 
 type VolunteerArea = "MUSICA" | "MIDIA" | "DANCA" | "INTERCESSAO" | "SUPORTE";
 
-const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: string; skills: string[] }> = {
-  MUSICA: { label: "Música", icon: "🎵", skills: ["Vocal", "Violão", "Guitarra", "Baixo", "Bateria", "Teclado", "Piano", "Trompete", "Saxofone", "Violino", "Flauta", "Percussão", "Gaita", "Contrabaixo"] },
-  MIDIA: { label: "Mídia", icon: "🎬", skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides", "Iluminação", "Som/PA"] },
-  DANCA: { label: "Dança", icon: "💃", skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"] },
-  INTERCESSAO: { label: "Intercessão", icon: "🙏", skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"] },
-  SUPORTE: { label: "Suporte", icon: "🤝", skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"] },
+const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: keyof typeof Ionicons.glyphMap; skills: string[] }> = {
+  MUSICA: { label: "Música", icon: "musical-notes-outline", skills: ["Vocal", "Violão", "Guitarra", "Baixo", "Bateria", "Teclado", "Piano", "Trompete", "Saxofone", "Violino", "Flauta", "Percussão", "Gaita", "Contrabaixo"] },
+  MIDIA: { label: "Mídia", icon: "videocam-outline", skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides", "Iluminação", "Som/PA"] },
+  DANCA: { label: "Dança", icon: "body-outline", skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"] },
+  INTERCESSAO: { label: "Intercessão", icon: "heart-outline", skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"] },
+  SUPORTE: { label: "Suporte", icon: "people-outline", skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"] },
 };
 
 const AREA_KEYS = Object.keys(VOLUNTEER_AREAS) as VolunteerArea[];
@@ -181,12 +182,14 @@ export default function AudicaoScreen() {
                 style={{
                   paddingHorizontal: 14, paddingVertical: 8,
                   borderRadius: 24, borderWidth: 1,
+                  flexDirection: "row", alignItems: "center", gap: 6,
                   borderColor: selected ? "#7cf2a2" : "#2d4b6d",
                   backgroundColor: selected ? "#0f3020" : "#0d1f2e",
                 }}
               >
+                <Ionicons name={icon} size={14} color={selected ? "#7cf2a2" : "#8fa9c8"} />
                 <Text style={{ color: selected ? "#7cf2a2" : "#8fa9c8", fontSize: 13, fontWeight: selected ? "700" : "400" }}>
-                  {icon} {label}
+                  {label}
                 </Text>
               </Pressable>
             );

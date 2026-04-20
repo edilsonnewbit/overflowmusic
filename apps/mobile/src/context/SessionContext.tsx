@@ -85,7 +85,7 @@ export interface SessionContextValue {
   handleCreateEvent: (input: { title: string; dateTime: string; location?: string; address?: string; eventType?: string }) => Promise<void>;
   handleUpdateEvent: (
     id: string,
-    input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string },
+    input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string; generateSlug?: boolean },
   ) => Promise<void>;
   handleDeleteEvent: (id: string) => Promise<void>;
 
@@ -518,7 +518,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   async function handleUpdateEvent(
     id: string,
-    input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string },
+    input: { title?: string; dateTime?: string; location?: string; address?: string; eventType?: string; status?: string; generateSlug?: boolean },
   ) {
     setEventsStatus("Salvando alterações...");
     try {

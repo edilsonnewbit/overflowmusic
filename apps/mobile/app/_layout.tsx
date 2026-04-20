@@ -32,6 +32,7 @@ function ProtectedLayout() {
     const inTabs = segments[0] === "(tabs)";
     const isLogin = segments[0] === "login";
     const isPresent = segments[0] === "present";
+    const isMultitrack = segments[0] === "multitrack";
 
     // Unauthenticated user inside protected tab group → send to login
     if (!user && inTabs) {
@@ -39,6 +40,10 @@ function ProtectedLayout() {
     }
     // Unauthenticated user navigating to present → send to login
     if (!user && isPresent) {
+      router.replace("/login");
+    }
+    // Unauthenticated user navigating to multitrack → send to login
+    if (!user && isMultitrack) {
       router.replace("/login");
     }
     // Authenticated user sitting at login screen → send to home
@@ -92,6 +97,7 @@ function ProtectedLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="present" options={{ presentation: "fullScreenModal" }} />
+      <Stack.Screen name="multitrack" options={{ presentation: "fullScreenModal" }} />
     </Stack>
   );
 }
