@@ -27,6 +27,8 @@ export type DecisionRow = {
   decisionType: string;
   howDidYouHear: string | null;
   acceptsContact: boolean;
+  churchHelp: string | null;
+  wantsPrayer: boolean | null;
   notes: string | null;
   createdAt: string;
 };
@@ -107,6 +109,8 @@ export class DecisionsService {
         decisionType: d.decisionType,
         howDidYouHear: d.howDidYouHear,
         acceptsContact: d.acceptsContact,
+        churchHelp: d.churchHelp,
+        wantsPrayer: d.wantsPrayer,
         notes: d.notes,
         createdAt: d.createdAt.toISOString(),
       })),
@@ -122,7 +126,7 @@ export class DecisionsService {
       orderBy: { createdAt: "asc" },
     });
 
-    const header = "Nome,WhatsApp,Cidade,Igreja,Tipo de Decisão,Como soube,Aceita contato,Data\n";
+    const header = "Nome,WhatsApp,Cidade,Igreja,Tipo de Decisão,Como soube,Aceita contato,Conexão Igreja,Quer oração,Observações,Data\n";
     const rows = decisions.map((d) =>
       [
         `"${d.name}"`,
@@ -132,6 +136,9 @@ export class DecisionsService {
         `"${d.decisionType}"`,
         `"${d.howDidYouHear ?? ""}"`,
         d.acceptsContact ? "Sim" : "Não",
+        `"${d.churchHelp ?? ""}"`,
+        d.wantsPrayer === true ? "Sim" : d.wantsPrayer === false ? "Não" : "",
+        `"${(d.notes ?? "").replace(/"/g, '""')}"`,
         new Date(d.createdAt).toLocaleString("pt-BR"),
       ].join(",")
     );
