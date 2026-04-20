@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { updateProfile } from "../lib/api";
 import { styles } from "../styles";
 import type { AuthUser } from "../types";
@@ -8,12 +9,12 @@ import type { AuthUser } from "../types";
 
 type VolunteerArea = "MUSICA" | "MIDIA" | "DANCA" | "INTERCESSAO" | "SUPORTE";
 
-const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: string; skills: string[] }> = {
-  MUSICA: { label: "Música", icon: "🎵", skills: ["Vocal", "Violão", "Guitarra", "Baixo", "Bateria", "Teclado", "Piano", "Trompete", "Saxofone", "Violino", "Flauta", "Percussão", "Gaita", "Contrabaixo"] },
-  MIDIA: { label: "Mídia", icon: "🎬", skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides", "Iluminação", "Som/PA"] },
-  DANCA: { label: "Dança", icon: "💃", skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"] },
-  INTERCESSAO: { label: "Intercessão", icon: "🙏", skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"] },
-  SUPORTE: { label: "Suporte", icon: "🤝", skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"] },
+const VOLUNTEER_AREAS: Record<VolunteerArea, { label: string; icon: keyof typeof Ionicons.glyphMap; skills: string[] }> = {
+  MUSICA: { label: "Música", icon: "musical-notes-outline", skills: ["Vocal", "Violão", "Guitarra", "Baixo", "Bateria", "Teclado", "Piano", "Trompete", "Saxofone", "Violino", "Flauta", "Percussão", "Gaita", "Contrabaixo"] },
+  MIDIA: { label: "Mídia", icon: "videocam-outline", skills: ["Câmera", "Transmissão ao vivo", "Edição de vídeo", "Fotografia", "Slides", "Iluminação", "Som/PA"] },
+  DANCA: { label: "Dança", icon: "body-outline", skills: ["Coreógrafo(a)", "Bailarino(a)", "Dança contemporânea", "Dança circular"] },
+  INTERCESSAO: { label: "Intercessão", icon: "heart-outline", skills: ["Intercessor(a)", "Líder de oração", "Grupo de jejum"] },
+  SUPORTE: { label: "Suporte", icon: "people-outline", skills: ["Recepção", "Logística", "Segurança", "Ministério infantil", "Limpeza/organização"] },
 };
 
 const AREA_KEYS = Object.keys(VOLUNTEER_AREAS) as VolunteerArea[];
@@ -160,13 +161,12 @@ export function AccountScreen({ user, accessToken, onLogout, onUserUpdate }: Pro
         {/* Area badge */}
         {areaInfo && (
           <View style={{
-            borderRadius: 20, borderWidth: 1,
+            borderRadius: 20, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 5,
             borderColor: "#2d4b6d", backgroundColor: "#0f2040",
-            paddingHorizontal: 10, paddingVertical: 2, marginBottom: 8,
+            paddingHorizontal: 10, paddingVertical: 4, marginBottom: 8,
           }}>
-            <Text style={{ color: "#a5c8ff", fontSize: 11, fontWeight: "600" }}>
-              {areaInfo.icon} {areaInfo.label}
-            </Text>
+            <Ionicons name={areaInfo.icon} size={12} color="#a5c8ff" />
+            <Text style={{ color: "#a5c8ff", fontSize: 11, fontWeight: "600" }}>{areaInfo.label}</Text>
           </View>
         )}
 
@@ -179,12 +179,14 @@ export function AccountScreen({ user, accessToken, onLogout, onUserUpdate }: Pro
           <Pressable
             onPress={openEdit}
             style={({ pressed }) => ({
-              marginTop: 16, paddingHorizontal: 20, paddingVertical: 8,
+              marginTop: 16, paddingHorizontal: 18, paddingVertical: 8,
               borderRadius: 20, borderWidth: 1, borderColor: "#2d4b6d",
               backgroundColor: pressed ? "#0d1d2e" : "transparent",
+              flexDirection: "row", alignItems: "center", gap: 6,
             })}
           >
-            <Text style={{ color: "#7cf2a2", fontSize: 13, fontWeight: "600" }}>✏ Editar perfil</Text>
+            <Ionicons name="pencil-outline" size={14} color="#7cf2a2" />
+            <Text style={{ color: "#7cf2a2", fontSize: 13, fontWeight: "600" }}>Editar perfil</Text>
           </Pressable>
         )}
       </View>
@@ -268,14 +270,15 @@ export function AccountScreen({ user, accessToken, onLogout, onUserUpdate }: Pro
                     onPress={() => handleAreaChange(area)}
                     disabled={saving}
                     style={{
-                      paddingHorizontal: 12, paddingVertical: 6,
-                      borderRadius: 20, borderWidth: 1,
+                      paddingHorizontal: 12, paddingVertical: 7, flexDirection: "row",
+                      alignItems: "center", gap: 6, borderRadius: 20, borderWidth: 1,
                       borderColor: selected ? "#7cf2a2" : "#2d4b6d",
                       backgroundColor: selected ? "#0f3020" : "#0d1f2e",
                     }}
                   >
+                    <Ionicons name={icon} size={14} color={selected ? "#7cf2a2" : "#8fa9c8"} />
                     <Text style={{ color: selected ? "#7cf2a2" : "#8fa9c8", fontSize: 13, fontWeight: selected ? "700" : "400" }}>
-                      {icon} {label}
+                      {label}
                     </Text>
                   </Pressable>
                 );

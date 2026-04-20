@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "../context/SessionContext";
 
 const INSTRUMENT_LABEL: Record<string, string> = {
@@ -48,7 +49,7 @@ export function NotificationBell() {
         hitSlop={8}
       >
         <View>
-          <Text style={{ fontSize: 20 }}>🔔</Text>
+          <Ionicons name="notifications-outline" size={22} color={count > 0 ? "#fbbf24" : "#4a6278"} />
           {count > 0 && (
             <View
               style={{
@@ -126,7 +127,7 @@ export function NotificationBell() {
               </Text>
             )}
             <Pressable onPress={() => setOpen(false)} hitSlop={14}>
-              <Text style={{ color: "#4a6278", fontSize: 20 }}>✕</Text>
+              <Ionicons name="close" size={20} color="#4a6278" />
             </Pressable>
           </View>
 

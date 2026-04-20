@@ -14,6 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "../../src/context/SessionContext";
 import { canManageRehearsals, canSeeRehearsals } from "../../src/lib/permissions";
@@ -323,7 +324,10 @@ export default function RehearsalsScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>🎸 Ensaios</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="mic-outline" size={20} color="#e0eaf5" />
+            <Text style={styles.headerTitle}>Ensaios</Text>
+          </View>
         </View>
         <View style={styles.center}>
           <Text style={{ color: "#f87171", fontSize: 15, fontWeight: "600", textAlign: "center" }}>
@@ -341,10 +345,16 @@ export default function RehearsalsScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🎸 Ensaios</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Ionicons name="mic-outline" size={20} color="#e0eaf5" />
+          <Text style={styles.headerTitle}>Ensaios</Text>
+        </View>
         {canEdit && (
           <Pressable style={styles.addBtn} onPress={openCreate}>
-            <Text style={styles.addBtnText}>+ Novo</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Ionicons name="add-outline" size={16} color="#07101d" />
+              <Text style={styles.addBtnText}>Novo</Text>
+            </View>
           </Pressable>
         )}
       </View>
@@ -367,7 +377,7 @@ export default function RehearsalsScreen() {
                 {canEdit && (
                   <View style={styles.cardActions}>
                     <Pressable onPress={() => openEdit(r)} hitSlop={8} style={styles.iconBtn}>
-                      <Text style={styles.iconBtnText}>✏</Text>
+                      <Ionicons name="pencil-outline" size={16} color="#7cf2a2" />
                     </Pressable>
                     <Pressable
                       onPress={() => confirmDelete(r.id)}
@@ -378,30 +388,45 @@ export default function RehearsalsScreen() {
                       {deletingId === r.id ? (
                         <ActivityIndicator size="small" color="#f87171" />
                       ) : (
-                        <Text style={[styles.iconBtnText, { color: "#f87171" }]}>🗑</Text>
+                        <Ionicons name="trash-outline" size={16} color="#f87171" />
                       )}
                     </Pressable>
                   </View>
                 )}
               </View>
 
-              <Text style={styles.cardDate}>📅 {formatDate(r.dateTime)}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+                <Ionicons name="calendar-outline" size={13} color="#7a9dc0" />
+                <Text style={styles.cardDate}>{formatDate(r.dateTime)}</Text>
+              </View>
 
               {r.location ? (
-                <Text style={styles.cardMeta}>📍 {r.location}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+                  <Ionicons name="location-outline" size={13} color="#7a9dc0" />
+                  <Text style={styles.cardMeta}>{r.location}</Text>
+                </View>
               ) : null}
 
               {r.durationMinutes ? (
-                <Text style={styles.cardMeta}>⏱ {r.durationMinutes} min</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+                  <Ionicons name="time-outline" size={13} color="#7a9dc0" />
+                  <Text style={styles.cardMeta}>{r.durationMinutes} min</Text>
+                </View>
               ) : null}
 
               {r.address ? (
                 <View style={styles.mapRow}>
                   <Pressable style={styles.mapBtn} onPress={() => openMaps(r.address!)}>
-                    <Text style={styles.mapBtnText}>🗺 Maps</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Ionicons name="map-outline" size={13} color="#e0eaf5" />
+                      <Text style={styles.mapBtnText}>Maps</Text>
+                    </View>
                   </Pressable>
                   <Pressable style={[styles.mapBtn, styles.wazeBtn]} onPress={() => openWaze(r.address!)}>
-                    <Text style={styles.mapBtnText}>🚗 Waze</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Ionicons name="navigate-outline" size={13} color="#e0eaf5" />
+                      <Text style={styles.mapBtnText}>Waze</Text>
+                    </View>
                   </Pressable>
                 </View>
               ) : null}
@@ -411,7 +436,10 @@ export default function RehearsalsScreen() {
               ) : null}
 
               {r.notes ? (
-                <Text style={styles.cardNotes}>📝 {r.notes}</Text>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 5, marginTop: 2 }}>
+                  <Ionicons name="document-text-outline" size={13} color="#7a9dc0" style={{ marginTop: 1 }} />
+                  <Text style={[styles.cardNotes, { flex: 1 }]}>{r.notes}</Text>
+                </View>
               ) : null}
 
               {/* Botão Setlist */}
@@ -422,9 +450,16 @@ export default function RehearsalsScreen() {
                 ]}
                 onPress={() => toggleRehearsalSetlist(r.id)}
               >
-                <Text style={[styles.setlistBtnText, activeRehearsalId === r.id && styles.setlistBtnTextActive]}>
-                  {activeRehearsalId === r.id ? "▲ Fechar Setlist" : "♪ Ver Setlist"}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons
+                    name={activeRehearsalId === r.id ? "chevron-up" : "musical-notes-outline"}
+                    size={15}
+                    color={activeRehearsalId === r.id ? "#7cf2a2" : "#7a9dc0"}
+                  />
+                  <Text style={[styles.setlistBtnText, activeRehearsalId === r.id && styles.setlistBtnTextActive]}>
+                    {activeRehearsalId === r.id ? "Fechar Setlist" : "Ver Setlist"}
+                  </Text>
+                </View>
               </Pressable>
 
               {/* Painel de Setlist expandido */}
@@ -473,7 +508,7 @@ export default function RehearsalsScreen() {
                             void loadLogs(r.id, 1, logsSearchInput);
                           }}
                         >
-                          <Text style={{ color: "#1ecad3", fontSize: 13 }}>🔍</Text>
+                          <Ionicons name="search-outline" size={16} color="#1ecad3" />
                         </Pressable>
                       </View>
                       {logsLoading ? (
@@ -492,7 +527,10 @@ export default function RehearsalsScreen() {
                             onPress={() => void loadLogs(r.id, logsPage - 1, logsSearch)}
                             style={{ opacity: logsPage <= 1 ? 0.35 : 1, borderWidth: 1, borderColor: "#1e3a52", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
                           >
-                            <Text style={{ color: "#7a9dc0", fontSize: 12 }}>← Anterior</Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                              <Ionicons name="chevron-back" size={13} color="#7a9dc0" />
+                              <Text style={{ color: "#7a9dc0", fontSize: 12 }}>Anterior</Text>
+                            </View>
                           </Pressable>
                           <View style={{ justifyContent: "center" }}>
                             <Text style={{ color: "#7a9dc0", fontSize: 12 }}>{logsPage}/{logsPages}</Text>
@@ -502,7 +540,10 @@ export default function RehearsalsScreen() {
                             onPress={() => void loadLogs(r.id, logsPage + 1, logsSearch)}
                             style={{ opacity: logsPage >= logsPages ? 0.35 : 1, borderWidth: 1, borderColor: "#1e3a52", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
                           >
-                            <Text style={{ color: "#7a9dc0", fontSize: 12 }}>Próximo →</Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                              <Text style={{ color: "#7a9dc0", fontSize: 12 }}>Próximo</Text>
+                              <Ionicons name="chevron-forward" size={13} color="#7a9dc0" />
+                            </View>
                           </Pressable>
                         </View>
                       )}
@@ -543,7 +584,12 @@ export default function RehearsalsScreen() {
                               >
                                 {addingSong
                                   ? <ActivityIndicator color="#07101d" size="small" />
-                                  : <Text style={styles.addBtnText}>+ Adicionar</Text>}
+                                  : (
+                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                      <Ionicons name="add-outline" size={16} color="#07101d" />
+                                      <Text style={styles.addBtnText}>Adicionar</Text>
+                                    </View>
+                                  )}
                               </Pressable>
                             </View>
                           )}
@@ -570,14 +616,14 @@ export default function RehearsalsScreen() {
                                         onPress={() => void handleMoveItem(r.id, item, "up")}
                                         style={[styles.orderBtn, (isBusy || isFirst) && { opacity: 0.25 }]}
                                       >
-                                        <Text style={{ color: "#7cf2a2", fontSize: 11 }}>▲</Text>
+                                        <Ionicons name="chevron-up" size={13} color="#7cf2a2" />
                                       </Pressable>
                                       <Pressable
                                         disabled={isBusy || isLast}
                                         onPress={() => void handleMoveItem(r.id, item, "down")}
                                         style={[styles.orderBtn, (isBusy || isLast) && { opacity: 0.25 }]}
                                       >
-                                        <Text style={{ color: "#7cf2a2", fontSize: 11 }}>▼</Text>
+                                        <Ionicons name="chevron-down" size={13} color="#7cf2a2" />
                                       </Pressable>
                                     </View>
                                     {/* Conteúdo */}
@@ -606,15 +652,17 @@ export default function RehearsalsScreen() {
                                           onPress={() => void handleRemoveItem(r.id, item.id)}
                                           style={[styles.orderBtn, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
                                         >
-                                          <Text style={{ color: "#f87171", fontSize: 11 }}>✕</Text>
+                                          <Ionicons name="close" size={13} color="#f87171" />
                                         </Pressable>
                                         <Pressable
                                           onPress={() => editingItemId === item.id ? setEditingItemId(null) : startItemEdit(item)}
                                           style={[styles.orderBtn, { borderColor: editingItemId === item.id ? "#f87171" : "#2d4b6d" }]}
                                         >
-                                          <Text style={{ color: editingItemId === item.id ? "#f87171" : "#7cf2a2", fontSize: 11 }}>
-                                            {editingItemId === item.id ? "✕" : "✏"}
-                                          </Text>
+                                          <Ionicons
+                                            name={editingItemId === item.id ? "close" : "pencil-outline"}
+                                            size={13}
+                                            color={editingItemId === item.id ? "#f87171" : "#7cf2a2"}
+                                          />
                                         </Pressable>
                                       </View>
                                     )}

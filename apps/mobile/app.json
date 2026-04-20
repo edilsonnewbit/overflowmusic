@@ -45,7 +45,8 @@
           }
         }
       ],
-      "expo-router"
+      "expo-router",
+      "react-native-audio-api"
     ],
     "extra": {
       "eas": {

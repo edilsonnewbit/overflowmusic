@@ -7,6 +7,8 @@ import { styles } from "../../src/styles";
 
 export default function EventsTab() {
   const {
+    accessToken,
+    user,
     events,
     loadingEvents,
     activeEventId,
@@ -54,6 +56,10 @@ export default function EventsTab() {
           </View>
         )}
         <EventsScreen
+          accessToken={accessToken}
+          currentUser={user}
+          currentUserId={user?.id ?? null}
+          currentUserRole={user?.role ?? null}
           events={events}
           loading={loadingEvents}
           activeEventId={activeEventId}

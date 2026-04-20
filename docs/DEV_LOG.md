@@ -2215,3 +2215,59 @@ Registro oficial de progresso para handoff entre LLMs.
 - Próximo passo:
   - Testar app no dispositivo/Expo Go e confirmar que navegação funciona como esperado.
 
+
+### [2026-04-17 19:47 America/Recife] — Codex (GPT-5) — Fase P0: Chat de Evento no Mobile
+- Objetivo: iniciar paridade web→mobile implementando chat do evento na tela de Eventos (listar, enviar e excluir mensagem).
+- Feito:
+  - `apps/mobile/src/lib/api.ts`
+    - adicionados tipos e funções de chat:
+      - `EventChatMessage`
+      - `fetchEventChat(eventId, accessToken?)`
+      - `sendEventChatMessage(eventId, input, accessToken?)`
+      - `deleteEventChatMessage(eventId, messageId, accessToken?)`
+  - `apps/mobile/src/screens/EventsScreen.tsx`
+    - adicionada seção **Chat do Evento** dentro do detalhe do evento ativo.
+    - implementado carregamento inicial + polling automático a cada 10s.
+    - implementado envio de mensagem com opção de mensagem privada e seleção de destinatário (a partir dos músicos escalados).
+    - implementada exclusão de mensagem (autor ou ADMIN/SUPER_ADMIN), com confirmação.
+    - adicionados estados de loading/erro/envio/exclusão para feedback de UI.
+  - `apps/mobile/app/(tabs)/events.tsx`
+    - integração dos novos props para chat (`accessToken`, `currentUserId`, `currentUserRole`).
+- Arquivos:
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/screens/EventsScreen.tsx`
+  - `apps/mobile/app/(tabs)/events.tsx`
+- Validação:
+  - `npx tsc --noEmit -p apps/mobile/tsconfig.json` → **0 erros**.
+- Pendências:
+  - implementar paridade de **chat por aba dedicada** (igual web) e refino visual estilo WhatsApp.
+  - adicionar suporte mobile para blocos restantes da Fase P0: decisões/QR, voluntários e logs de setlist.
+- Próximo passo:
+  - implementar **Decisões + QR Code** no mobile (visualização do link de decisão do evento e ação de copiar/abrir).
+
+### [2026-04-17 19:50 America/Recife] — Codex (GPT-5) — Fase P0: Decisões + QR no Mobile
+- Objetivo: avançar paridade web→mobile adicionando fluxo de decisões no detalhe do evento (gerar slug, exibir link e QR).
+- Feito:
+  - `packages/types/index.ts`
+    - `MusicEvent` atualizado com `slug?: string | null` para refletir payload real do backend.
+  - `apps/mobile/src/lib/api.ts`
+    - `updateEvent(...)` passou a aceitar `generateSlug?: boolean` no payload de PATCH.
+  - `apps/mobile/src/context/SessionContext.tsx`
+    - assinatura de `handleUpdateEvent` atualizada para aceitar `generateSlug`.
+  - `apps/mobile/src/screens/EventsScreen.tsx`
+    - adicionada seção **Decisões** no evento ativo.
+    - quando já existe slug: exibe URL pública de decisão + QR (imagem remota) + ações de abrir e compartilhar link.
+    - quando não existe slug: botão **Gerar QR Code** chama `onUpdateEvent(eventId, { generateSlug: true })`.
+  - compatibilidade mantida com o fluxo já implementado de chat.
+- Arquivos:
+  - `packages/types/index.ts`
+  - `apps/mobile/src/lib/api.ts`
+  - `apps/mobile/src/context/SessionContext.tsx`
+  - `apps/mobile/src/screens/EventsScreen.tsx`
+- Validação:
+  - `npx tsc --noEmit -p apps/mobile/tsconfig.json` → **0 erros**.
+- Pendências:
+  - migrar QR para geração local/offline (evitar dependência de serviço externo de imagem).
+  - implementar próximos blocos de paridade P0: voluntários no evento e logs de setlist.
+- Próximo passo:
+  - implementar **logs de setlist do evento** no mobile (listar alterações com paginação simples).

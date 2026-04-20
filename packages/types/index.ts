@@ -165,6 +165,7 @@ export type EventMusician = {
 export type MusicEvent = {
   id: string;
   title: string;
+  slug?: string | null;
   dateTime: string;
   location: string | null;
   address?: string | null;
