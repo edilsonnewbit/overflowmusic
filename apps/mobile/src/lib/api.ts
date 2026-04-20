@@ -926,3 +926,37 @@ export async function fetchRehearsalSetlistLogs(
     pages: typeof body.pages === "number" ? body.pages : 1,
   };
 }
+
+// ── Decisions ─────────────────────────────────────────────────────────────────
+
+export type EventDecision = {
+  id: string;
+  name: string;
+  whatsapp: string;
+  city: string | null;
+  church: string | null;
+  decisionType: string | null;
+  howDidYouHear: string | null;
+  acceptsContact: boolean;
+  churchHelp: string | null;
+  wantsPrayer: boolean | null;
+  notes: string | null;
+  createdAt: string;
+};
+
+export async function fetchEventDecisions(
+  accessToken: string,
+  eventId: string,
+): Promise<{ ok: boolean; decisions: EventDecision[]; total: number; message?: string }> {
+  const response = await fetch(`${API_BASE}/decisions/event/${encodeURIComponent(eventId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const body = await parseJson(response);
+  if (!response.ok) return { ok: false, decisions: [], total: 0, message: typeof body.message === "string" ? body.message : "Falha ao carregar decisões." };
+  return {
+    ok: true,
+    decisions: Array.isArray(body.decisions) ? (body.decisions as EventDecision[]) : [],
+    total: typeof body.total === "number" ? body.total : 0,
+  };
+}
+

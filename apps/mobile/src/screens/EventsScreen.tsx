@@ -1,19 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Image, Linking, Pressable, Share, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import type { EventMusician, EventSetlist, MusicEvent, SetlistItem } from "../types";
+import type { AuthUser, EventMusician, EventSetlist, MusicEvent, SetlistItem } from "../types";
 import { styles } from "../styles";
 import {
   deleteEventChatMessage,
   fetchEventChat,
+  fetchEventDecisions,
   fetchEventMusicians,
   fetchEventRehearsals,
   fetchEventSetlistLogs,
   sendEventChatMessage,
   type EventChatMessage,
+  type EventDecision,
   type Rehearsal,
   type SetlistLog,
 } from "../lib/api";
+import { canManageEvents } from "../lib/permissions";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Rascunho", ACTIVE: "Ativo", PUBLISHED: "Publicado", FINISHED: "Encerrado", ARCHIVED: "Arquivado",
@@ -30,6 +34,7 @@ const SLOT_LABEL: Record<string, string> = {
 };
 type Props = {
   accessToken?: string | null;
+  currentUser?: AuthUser | null;
   currentUserId?: string | null;
   currentUserRole?: string | null;
   events: MusicEvent[];
@@ -57,6 +62,7 @@ function formatDate(iso: string) {
 
 export function EventsScreen({
   accessToken = null,
+  currentUser = null,
   currentUserId = null,
   currentUserRole = null,
   events,
@@ -78,6 +84,7 @@ export function EventsScreen({
   onExitFocusMode,
 }: Props) {
   const router = useRouter();
+  const canManage = currentUser ? canManageEvents(currentUser) : false;
   const [showForm, setShowForm] = useState(false);
   const [formTitle, setFormTitle] = useState("");
   const [formDate, setFormDate] = useState("");
@@ -217,6 +224,9 @@ export function EventsScreen({
   const [sendingChat, setSendingChat] = useState(false);
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
   const [generatingDecisionSlug, setGeneratingDecisionSlug] = useState(false);
+  const [decisions, setDecisions] = useState<EventDecision[]>([]);
+  const [loadingDecisions, setLoadingDecisions] = useState(false);
+  const [decisionsLoaded, setDecisionsLoaded] = useState<string | null>(null); // eventId last loaded
 
   async function loadChatMessages(targetEventId: string, silent = false) {
     if (!silent) setLoadingChat(true);
@@ -371,6 +381,17 @@ export function EventsScreen({
     setGeneratingDecisionSlug(false);
   }
 
+  async function loadDecisions(eventId: string) {
+    if (!accessToken || !canManage) return;
+    setLoadingDecisions(true);
+    const result = await fetchEventDecisions(accessToken, eventId);
+    setLoadingDecisions(false);
+    if (result.ok) {
+      setDecisions(result.decisions);
+      setDecisionsLoaded(eventId);
+    }
+  }
+
   return (
     <View style={styles.card}>
       {/* ── Header row */}
@@ -380,13 +401,13 @@ export function EventsScreen({
             onPress={onExitFocusMode}
             style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}
           >
-            <Text style={{ color: "#1ecad3", fontSize: 18, lineHeight: 22 }}>←</Text>
+            <Ionicons name="chevron-back" size={18} color="#1ecad3" />
             <Text style={{ color: "#1ecad3", fontSize: 13, fontWeight: "600" }}>Todos os eventos</Text>
           </Pressable>
         ) : (
           <Text style={styles.cardTitle}>Eventos</Text>
         )}
-        {!focusMode && (
+        {!focusMode && canManage && (
           <Pressable
             style={({ pressed }) => ([
               {
@@ -404,9 +425,7 @@ export function EventsScreen({
             ])}
             onPress={() => { setShowForm((v) => !v); setFormError(""); }}
           >
-            <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 16, lineHeight: 20 }}>
-              {showForm ? "✕" : "+"}
-            </Text>
+            <Ionicons name={showForm ? "close" : "add-outline"} size={16} color={showForm ? "#f28c8c" : "#7cf2a2"} />
             <Text style={{ color: showForm ? "#f28c8c" : "#7cf2a2", fontSize: 13, fontWeight: "700" }}>
               {showForm ? "Cancelar" : "Novo Evento"}
             </Text>
@@ -416,7 +435,7 @@ export function EventsScreen({
 
       {!focusMode && <Text style={[styles.helper, { marginBottom: 8 }]}>{statusText}</Text>}
 
-      {!focusMode && showForm && (
+      {!focusMode && canManage && showForm && (
         <View style={{ marginBottom: 12, gap: 6 }}>
           <TextInput
             style={formInputStyle}
@@ -535,7 +554,10 @@ export function EventsScreen({
                   </Text>
                   {ev.address ? (
                     <View style={{ flexDirection: "row", gap: 6, marginTop: 4, alignItems: "center" }}>
-                      <Text style={[styles.helper, { flex: 1 }]} numberOfLines={1}>📍 {ev.address}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flex: 1 }}>
+                        <Ionicons name="location-outline" size={12} color="#7a9dc0" />
+                        <Text style={[styles.helper, { flex: 1 }]} numberOfLines={1}>{ev.address}</Text>
+                      </View>
                       <Pressable
                         onPress={() => void Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(ev.address!)}`)}
                         style={{ borderWidth: 1, borderColor: "#60a5fa", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}
@@ -553,55 +575,65 @@ export function EventsScreen({
                 </Pressable>
 
                 {/* Action row: edit + delete */}
-                <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
-                  <Pressable
-                    onPress={() => (isEditing ? cancelEdit() : startEdit(ev))}
-                    style={({ pressed }) => ([
-                      actionBtnStyle,
-                      { borderColor: isEditing ? "#f28c8c" : "#2d4b6d" },
-                      pressed && { opacity: 0.7 },
-                    ])}
-                    accessibilityLabel="Editar evento"
-                  >
-                    <Text style={{ color: isEditing ? "#f28c8c" : "#7cf2a2", fontSize: 13 }}>
-                      {isEditing ? "✕ Cancelar" : "✏ Editar"}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => confirmDelete(ev)}
-                    style={({ pressed }) => ([actionBtnStyle, { borderColor: "#5a2a2a" }, pressed && { opacity: 0.7 }])}
-                    accessibilityLabel="Excluir evento"
-                  >
-                    <Text style={{ color: "#f28c8c", fontSize: 13 }}>🗑 Excluir</Text>
-                  </Pressable>
-                </View>
+                {canManage && (
+                  <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+                    <Pressable
+                      onPress={() => (isEditing ? cancelEdit() : startEdit(ev))}
+                      style={({ pressed }) => ([
+                        actionBtnStyle,
+                        { borderColor: isEditing ? "#f28c8c" : "#2d4b6d" },
+                        pressed && { opacity: 0.7 },
+                      ])}
+                      accessibilityLabel="Editar evento"
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                        <Ionicons name={isEditing ? "close" : "pencil-outline"} size={13} color={isEditing ? "#f28c8c" : "#7cf2a2"} />
+                        <Text style={{ color: isEditing ? "#f28c8c" : "#7cf2a2", fontSize: 13 }}>
+                          {isEditing ? "Cancelar" : "Editar"}
+                        </Text>
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => confirmDelete(ev)}
+                      style={({ pressed }) => ([actionBtnStyle, { borderColor: "#5a2a2a" }, pressed && { opacity: 0.7 }])}
+                      accessibilityLabel="Excluir evento"
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                        <Ionicons name="trash-outline" size={13} color="#f28c8c" />
+                        <Text style={{ color: "#f28c8c", fontSize: 13 }}>Excluir</Text>
+                      </View>
+                    </Pressable>
+                  </View>
+                )}
 
                 {/* Status chips */}
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-                  {(["DRAFT", "ACTIVE", "PUBLISHED", "FINISHED"] as const).map((s) => {
-                    const isCurrent = (ev.computedStatus ?? ev.status) === s;
-                    const sc = STATUS_COLOR[s] ?? "#8fa9c8";
-                    return (
-                      <Pressable
-                        key={s}
-                        onPress={() => !isCurrent && void onUpdateEvent(ev.id, { status: s })}
-                        style={({ pressed }) => ([
-                          {
-                            paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-                            borderWidth: 1,
-                            borderColor: isCurrent ? sc : "#2a4a6a",
-                            backgroundColor: isCurrent ? sc + "22" : "transparent",
-                            opacity: pressed ? 0.7 : 1,
-                          },
-                        ])}
-                      >
-                        <Text style={{ color: isCurrent ? sc : "#8fa9c8", fontSize: 11, fontWeight: isCurrent ? "700" : "400" }}>
-                          {STATUS_LABEL[s]}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                {canManage && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                    {(["DRAFT", "ACTIVE", "PUBLISHED", "FINISHED"] as const).map((s) => {
+                      const isCurrent = (ev.computedStatus ?? ev.status) === s;
+                      const sc = STATUS_COLOR[s] ?? "#8fa9c8";
+                      return (
+                        <Pressable
+                          key={s}
+                          onPress={() => !isCurrent && void onUpdateEvent(ev.id, { status: s })}
+                          style={({ pressed }) => ([
+                            {
+                              paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+                              borderWidth: 1,
+                              borderColor: isCurrent ? sc : "#2a4a6a",
+                              backgroundColor: isCurrent ? sc + "22" : "transparent",
+                              opacity: pressed ? 0.7 : 1,
+                            },
+                          ])}
+                        >
+                          <Text style={{ color: isCurrent ? sc : "#8fa9c8", fontSize: 11, fontWeight: isCurrent ? "700" : "400" }}>
+                            {STATUS_LABEL[s]}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
 
               {/* Formulário inline de edição */}
@@ -727,7 +759,7 @@ export function EventsScreen({
                     void loadEventLogs(1, logsSearchInput);
                   }}
                 >
-                  <Text style={{ color: "#1ecad3", fontSize: 13, fontWeight: "700" }}>🔍</Text>
+                  <Ionicons name="search-outline" size={16} color="#1ecad3" />
                 </Pressable>
               </View>
 
@@ -751,7 +783,10 @@ export function EventsScreen({
                     onPress={() => void loadEventLogs(logsPage - 1, logsSearch)}
                     style={{ opacity: logsPage <= 1 ? 0.35 : 1, borderWidth: 1, borderColor: "#2d4b6d", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
                   >
-                    <Text style={{ color: "#7a9dc0", fontSize: 13 }}>← Anterior</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Ionicons name="chevron-back" size={13} color="#7a9dc0" />
+                      <Text style={{ color: "#7a9dc0", fontSize: 13 }}>Anterior</Text>
+                    </View>
                   </Pressable>
                   <View style={{ justifyContent: "center" }}>
                     <Text style={{ color: "#7a9dc0", fontSize: 12 }}>{logsPage}/{logsPages}</Text>
@@ -761,7 +796,10 @@ export function EventsScreen({
                     onPress={() => void loadEventLogs(logsPage + 1, logsSearch)}
                     style={{ opacity: logsPage >= logsPages ? 0.35 : 1, borderWidth: 1, borderColor: "#2d4b6d", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
                   >
-                    <Text style={{ color: "#7a9dc0", fontSize: 13 }}>Próximo →</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Text style={{ color: "#7a9dc0", fontSize: 13 }}>Próximo</Text>
+                      <Ionicons name="chevron-forward" size={13} color="#7a9dc0" />
+                    </View>
                   </Pressable>
                 </View>
               )}
@@ -801,22 +839,24 @@ export function EventsScreen({
                       {/* Layout principal: [▲/▼] | [conteúdo] | [✕ ✏] */}
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                         {/* Botões de ordem empilhados à esquerda */}
-                        <View style={{ gap: 2 }}>
-                          <Pressable
-                            disabled={isBusy || isFirst}
-                            onPress={() => void onMoveItem(item, "up", sortedItems)}
-                            style={[orderBtnStyle, (isBusy || isFirst) && { opacity: 0.25 }]}
-                          >
-                            <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▲</Text>
-                          </Pressable>
-                          <Pressable
-                            disabled={isBusy || isLast}
-                            onPress={() => void onMoveItem(item, "down", sortedItems)}
-                            style={[orderBtnStyle, (isBusy || isLast) && { opacity: 0.25 }]}
-                          >
-                            <Text style={{ color: "#7cf2a2", fontSize: 11, lineHeight: 14 }}>▼</Text>
-                          </Pressable>
-                        </View>
+                        {canManage && (
+                          <View style={{ gap: 2 }}>
+                            <Pressable
+                              disabled={isBusy || isFirst}
+                              onPress={() => void onMoveItem(item, "up", sortedItems)}
+                              style={[orderBtnStyle, (isBusy || isFirst) && { opacity: 0.25 }]}
+                            >
+                              <Ionicons name="chevron-up" size={13} color="#7cf2a2" />
+                            </Pressable>
+                            <Pressable
+                              disabled={isBusy || isLast}
+                              onPress={() => void onMoveItem(item, "down", sortedItems)}
+                              style={[orderBtnStyle, (isBusy || isLast) && { opacity: 0.25 }]}
+                            >
+                              <Ionicons name="chevron-down" size={13} color="#7cf2a2" />
+                            </Pressable>
+                          </View>
+                        )}
 
                         {/* Conteúdo central: título + info */}
                         <View style={{ flex: 1 }}>
@@ -840,29 +880,33 @@ export function EventsScreen({
                         </View>
 
                         {/* Ações à direita: remover + editar */}
-                        <View style={{ gap: 4 }}>
-                          <Pressable
-                            disabled={isBusy}
-                            onPress={() => void onRemoveItem(item.id)}
-                            style={[orderBtnStyle, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
-                            accessibilityLabel={`Remover ${item.songTitle} do setlist`}
-                          >
-                            <Text style={{ color: "#f28c8c", fontSize: 11, lineHeight: 14 }}>✕</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() =>
-                              editingItemId === item.id
-                                ? setEditingItemId(null)
-                                : startItemEdit(item)
-                            }
-                            style={[orderBtnStyle, { borderColor: editingItemId === item.id ? "#f28c8c" : "#2d4b6d" }]}
-                            accessibilityLabel="Editar item do setlist"
-                          >
-                            <Text style={{ color: editingItemId === item.id ? "#f28c8c" : "#7cf2a2", fontSize: 11, lineHeight: 14 }}>
-                              {editingItemId === item.id ? "✕" : "✏"}
-                            </Text>
-                          </Pressable>
-                        </View>
+                        {canManage && (
+                          <View style={{ gap: 4 }}>
+                            <Pressable
+                              disabled={isBusy}
+                              onPress={() => void onRemoveItem(item.id)}
+                              style={[orderBtnStyle, { borderColor: "#5a2a2a" }, isBusy && { opacity: 0.25 }]}
+                              accessibilityLabel={`Remover ${item.songTitle} do setlist`}
+                            >
+                              <Ionicons name="close" size={13} color="#f28c8c" />
+                            </Pressable>
+                            <Pressable
+                              onPress={() =>
+                                editingItemId === item.id
+                                  ? setEditingItemId(null)
+                                  : startItemEdit(item)
+                              }
+                              style={[orderBtnStyle, { borderColor: editingItemId === item.id ? "#f28c8c" : "#2d4b6d" }]}
+                              accessibilityLabel="Editar item do setlist"
+                            >
+                              <Ionicons
+                                name={editingItemId === item.id ? "close" : "pencil-outline"}
+                                size={13}
+                                color={editingItemId === item.id ? "#f28c8c" : "#7cf2a2"}
+                              />
+                            </Pressable>
+                          </View>
+                        )}
                       </View>
 
                       {editingItemId === item.id && (
@@ -943,6 +987,20 @@ export function EventsScreen({
                   >
                     <Text style={{ color: "#60a5fa", fontWeight: "700", fontSize: 15, letterSpacing: 0.5 }}>
                       Compartilhar
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => ({
+                      flex: 1, borderRadius: 12, paddingVertical: 14,
+                      alignItems: "center" as const, justifyContent: "center" as const,
+                      borderWidth: 1.5, borderColor: "#818cf8",
+                      backgroundColor: pressed ? "#818cf822" : "transparent",
+                    })}
+                    onPress={() => router.push({ pathname: "/multitrack", params: { eventId: activeEventId! } })}
+                    accessibilityLabel="Abrir player multitrack"
+                  >
+                    <Text style={{ color: "#818cf8", fontWeight: "700", fontSize: 15, letterSpacing: 0.5 }}>
+                      🎛 VS ao Vivo
                     </Text>
                   </Pressable>
                   <Pressable
@@ -1038,7 +1096,10 @@ export function EventsScreen({
                     {r.location ? `  —  ${r.location}` : ""}
                   </Text>
                   {r.durationMinutes ? (
-                    <Text style={[styles.helper, { marginTop: 1 }]}>⏱ {r.durationMinutes} min</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 }}>
+                      <Ionicons name="time-outline" size={12} color="#7a9dc0" />
+                      <Text style={styles.helper}>{r.durationMinutes} min</Text>
+                    </View>
                   ) : null}
                 </View>
               ))
@@ -1047,7 +1108,9 @@ export function EventsScreen({
 
           {/* Decisões */}
           <View style={{ marginTop: 16 }}>
-            <Text style={styles.cardTitle}>Decisões</Text>
+            <Text style={styles.cardTitle}>Decisões de Fé</Text>
+
+            {/* QR / Link section */}
             {decisionUrl ? (
               <>
                 <Text style={[styles.helper, { marginTop: 4 }]}>
@@ -1058,15 +1121,16 @@ export function EventsScreen({
                     <View style={{ backgroundColor: "#fff", padding: 8, borderRadius: 10 }}>
                       <Image
                         source={{ uri: decisionQrUrl }}
-                        style={{ width: 180, height: 180 }}
+                        style={{ width: 160, height: 160 }}
                         resizeMode="contain"
                       />
                     </View>
                   </View>
                 ) : null}
-                <Text style={[styles.helper, { marginTop: 10 }]} numberOfLines={2}>
-                  🔗 {decisionUrl}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8 }}>
+                  <Ionicons name="link-outline" size={12} color="#7a9dc0" />
+                  <Text style={[styles.helper, { flex: 1 }]} numberOfLines={2}>{decisionUrl}</Text>
+                </View>
                 <View style={{ marginTop: 8, flexDirection: "row", gap: 8 }}>
                   <Pressable
                     style={[styles.secondaryButton, { flex: 1 }]}
@@ -1078,7 +1142,7 @@ export function EventsScreen({
                     style={[styles.primaryButton, { flex: 1 }]}
                     onPress={() => void Share.share({ message: decisionUrl })}
                   >
-                    <Text style={styles.primaryButtonText}>Compartilhar link</Text>
+                    <Text style={styles.primaryButtonText}>Compartilhar</Text>
                   </Pressable>
                 </View>
               </>
@@ -1087,16 +1151,146 @@ export function EventsScreen({
                 <Text style={[styles.helper, { marginTop: 4 }]}>
                   Este evento ainda não tem link de decisões.
                 </Text>
-                <Pressable
-                  style={[styles.primaryButton, { marginTop: 8, backgroundColor: generatingDecisionSlug ? "#2a3a2a" : "#1e5a7a" }]}
-                  onPress={() => void handleGenerateDecisionSlug()}
-                  disabled={generatingDecisionSlug}
-                >
-                  {generatingDecisionSlug
-                    ? <ActivityIndicator color="#7cf2a2" />
-                    : <Text style={styles.primaryButtonText}>Gerar QR Code</Text>}
-                </Pressable>
+                {canManage && (
+                  <Pressable
+                    style={[styles.primaryButton, { marginTop: 8, backgroundColor: generatingDecisionSlug ? "#2a3a2a" : "#1e5a7a" }]}
+                    onPress={() => void handleGenerateDecisionSlug()}
+                    disabled={generatingDecisionSlug}
+                  >
+                    {generatingDecisionSlug
+                      ? <ActivityIndicator color="#7cf2a2" />
+                      : <Text style={styles.primaryButtonText}>Gerar QR Code</Text>}
+                  </Pressable>
+                )}
               </>
+            )}
+
+            {/* Lista de decisões (só admins) */}
+            {canManage && activeEventId && (
+              <View style={{ marginTop: 16 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <Text style={{ color: "#7a9dc0", fontSize: 13, fontWeight: "700" }}>
+                    Registros{decisions.length > 0 ? ` (${decisions.length})` : ""}
+                  </Text>
+                  <Pressable
+                    onPress={() => void loadDecisions(activeEventId)}
+                    disabled={loadingDecisions}
+                    style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 4, opacity: pressed || loadingDecisions ? 0.6 : 1 })}
+                  >
+                    {loadingDecisions
+                      ? <ActivityIndicator size="small" color="#1ecad3" />
+                      : <Ionicons name="refresh-outline" size={15} color="#1ecad3" />}
+                    <Text style={{ color: "#1ecad3", fontSize: 12 }}>
+                      {decisionsLoaded === activeEventId ? "Atualizar" : "Carregar"}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {decisionsLoaded === activeEventId && decisions.length === 0 && !loadingDecisions && (
+                  <Text style={[styles.helper, { textAlign: "center", paddingVertical: 8 }]}>
+                    Nenhuma decisão registrada ainda.
+                  </Text>
+                )}
+
+                {decisions.map((d) => {
+                  const DECISION_TYPE_LABEL: Record<string, string> = {
+                    PRIMEIRA_VEZ: "Primeira vez",
+                    RECONSAGRACAO: "Reconsagração",
+                    BATISMO: "Batismo",
+                    OUTRO: "Outro",
+                  };
+                  const typeLabel = d.decisionType ? (DECISION_TYPE_LABEL[d.decisionType] ?? d.decisionType) : null;
+                  const wa = d.whatsapp.replace(/\D/g, "");
+                  const waNum = wa.startsWith("55") ? wa : `55${wa}`;
+                  const waUrl = `https://wa.me/${waNum}`;
+                  return (
+                    <View
+                      key={d.id}
+                      style={{
+                        backgroundColor: "#0d1d2e",
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: "#1e3a52",
+                        padding: 12,
+                        marginBottom: 8,
+                        gap: 6,
+                      }}
+                    >
+                      {/* Nome + tipo */}
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                        <Text style={{ color: "#f0f7ff", fontWeight: "700", fontSize: 14 }}>{d.name}</Text>
+                        {typeLabel && (
+                          <View style={{ backgroundColor: "#0f2a1e", borderRadius: 20, borderWidth: 1, borderColor: "#2a6644", paddingHorizontal: 8, paddingVertical: 2 }}>
+                            <Text style={{ color: "#7cf2a2", fontSize: 11, fontWeight: "700" }}>{typeLabel}</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Data */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="time-outline" size={12} color="#4a6278" />
+                        <Text style={{ color: "#4a6278", fontSize: 11 }}>
+                          {new Date(d.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </Text>
+                        {d.city && <Text style={{ color: "#4a6278", fontSize: 11 }}>  •  {d.city}</Text>}
+                      </View>
+
+                      {/* WhatsApp + botão */}
+                      <Pressable
+                        onPress={() => void Linking.openURL(waUrl)}
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
+                          backgroundColor: pressed ? "#0e2c1e" : "#092015",
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: "#2a6644",
+                          padding: 10,
+                        })}
+                      >
+                        <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+                        <Text style={{ color: "#25D366", fontWeight: "700", fontSize: 14, flex: 1 }}>{d.whatsapp}</Text>
+                        <Ionicons name="open-outline" size={14} color="#25D366" />
+                      </Pressable>
+
+                      {/* Igreja + detalhes extras */}
+                      {(d.church || d.churchHelp || d.wantsPrayer) && (
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                          {d.church && (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#0d1d2e", borderRadius: 8, borderWidth: 1, borderColor: "#1e3a52", paddingHorizontal: 8, paddingVertical: 3 }}>
+                              <Ionicons name="business-outline" size={11} color="#7a9dc0" />
+                              <Text style={{ color: "#b3c6e0", fontSize: 11 }}>{d.church}</Text>
+                            </View>
+                          )}
+                          {d.wantsPrayer === true && (
+                            <View style={{ backgroundColor: "#1c1205", borderRadius: 8, borderWidth: 1, borderColor: "#5c3600", paddingHorizontal: 8, paddingVertical: 3 }}>
+                              <Text style={{ color: "#fbbf24", fontSize: 11, fontWeight: "600" }}>🙏 Quer oração</Text>
+                            </View>
+                          )}
+                          {d.churchHelp === "WANTS_CHURCH" && (
+                            <View style={{ backgroundColor: "#0a1929", borderRadius: 8, borderWidth: 1, borderColor: "#1e3a52", paddingHorizontal: 8, paddingVertical: 3 }}>
+                              <Text style={{ color: "#7a9dc0", fontSize: 11 }}>Quer indicação de Igreja</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Como soube */}
+                      {d.howDidYouHear && (
+                        <Text style={{ color: "#4a6278", fontSize: 11, fontStyle: "italic" }}>
+                          Como soube: {d.howDidYouHear}
+                        </Text>
+                      )}
+
+                      {/* Obs */}
+                      {d.notes && (
+                        <Text style={{ color: "#4a6278", fontSize: 11 }}>Obs: {d.notes}</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
             )}
           </View>
 
@@ -1130,9 +1324,12 @@ export function EventsScreen({
                       </Text>
                     ) : null}
                     {msg.isPrivate ? (
-                      <Text style={{ color: "#fbbf24", fontSize: 11, marginBottom: 3 }}>
-                        🔒 Privado{msg.toUserName ? ` → ${msg.toUserName}` : ""}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 }}>
+                        <Ionicons name="lock-closed-outline" size={11} color="#fbbf24" />
+                        <Text style={{ color: "#fbbf24", fontSize: 11 }}>
+                          Privado{msg.toUserName ? ` → ${msg.toUserName}` : ""}
+                        </Text>
+                      </View>
                     ) : null}
                     <Text style={{ color: "#e8f2ff", fontSize: 13, lineHeight: 19 }}>{msg.text}</Text>
                     <View style={{ marginTop: 6, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -1179,9 +1376,12 @@ export function EventsScreen({
                     backgroundColor: chatPrivate ? "#2d1e00" : "transparent",
                   }}
                 >
-                  <Text style={{ color: chatPrivate ? "#fbbf24" : "#8fa9c8", fontSize: 12 }}>
-                    🔒 Privado
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="lock-closed-outline" size={12} color={chatPrivate ? "#fbbf24" : "#8fa9c8"} />
+                    <Text style={{ color: chatPrivate ? "#fbbf24" : "#8fa9c8", fontSize: 12 }}>
+                      Privado
+                    </Text>
+                  </View>
                 </Pressable>
                 {chatPrivate ? (
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
