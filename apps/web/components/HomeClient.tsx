@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { canSeeSongsPage, canSeeRehearsals, canSeeChecklists, canSeeAdminLinks } from "@/lib/permissions";
 
 type DashboardStats = {
   pendingUsers: number;
@@ -410,26 +411,40 @@ export function HomeClient() {
           </div>
         </Link>
 
-        <Link href="/songs" className="dash-card">
-          <span style={dashIconStyle}>🎵</span>
-          <div>
-            <p style={dashTagStyle}>Music</p>
-            <h3 style={dashTitleStyle}>Biblioteca de Músicas</h3>
-            <p style={dashDescStyle}>Browse cifras com acordes, busque e importe versões.</p>
-          </div>
-        </Link>
+        {user && canSeeSongsPage(user) && (
+          <Link href="/songs" className="dash-card">
+            <span style={dashIconStyle}>🎵</span>
+            <div>
+              <p style={dashTagStyle}>Music</p>
+              <h3 style={dashTitleStyle}>Biblioteca de Músicas</h3>
+              <p style={dashDescStyle}>Browse cifras com acordes, busque e importe versões.</p>
+            </div>
+          </Link>
+        )}
 
+        {user && canSeeRehearsals(user) && (
+          <Link href="/rehearsals" className="dash-card">
+            <span style={dashIconStyle}>🎸</span>
+            <div>
+              <p style={dashTagStyle}>Rehearsals</p>
+              <h3 style={dashTitleStyle}>Ensaios</h3>
+              <p style={dashDescStyle}>Gerencie ensaios com local, endereço e vínculo a eventos.</p>
+            </div>
+          </Link>
+        )}
 
-        <Link href="/rehearsals" className="dash-card">
-          <span style={dashIconStyle}>🎸</span>
-          <div>
-            <p style={dashTagStyle}>Rehearsals</p>
-            <h3 style={dashTitleStyle}>Ensaios</h3>
-            <p style={dashDescStyle}>Gerencie ensaios com local, endereço e vínculo a eventos.</p>
-          </div>
-        </Link>
+        {user && canSeeChecklists(user) && (
+          <Link href="/checklists" className="dash-card">
+            <span style={dashIconStyle}>✅</span>
+            <div>
+              <p style={dashTagStyle}>Operations</p>
+              <h3 style={dashTitleStyle}>Checklists</h3>
+              <p style={dashDescStyle}>Checklists operacionais por evento e área.</p>
+            </div>
+          </Link>
+        )}
 
-        {(user?.role === "SUPER_ADMIN" || user?.role === "ADMIN") && (
+        {user && canSeeAdminLinks(user) && (
           <>
             <Link href="/admin/team" className="dash-card">
               <span style={dashIconStyle}>👥</span>

@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { CSSProperties, useEffect, useState } from "react";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthRequired } from "@/components/AuthRequired";
+import { useAuth } from "@/components/AuthProvider";
+import { canManageSongs } from "@/lib/permissions";
+import { useRouter } from "next/navigation";
 
 type SongListItem = {
   id: string;
@@ -43,6 +46,16 @@ async function parseJson<T>(response: Response): Promise<ApiResult<T>> {
 }
 
 export default function SongImportPage() {
+  return (
+    <AuthRequired>
+      <SongImportContent />
+    </AuthRequired>
+  );
+}
+
+function SongImportContent() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [txtPreviewInput, setTxtPreviewInput] = useState("");
   const [txtPreviewFile, setTxtPreviewFile] = useState<File | null>(null);
   const [targetSongId, setTargetSongId] = useState("");
@@ -57,8 +70,13 @@ export default function SongImportPage() {
   const [status, setStatus] = useState("Pronto");
 
   useEffect(() => {
+    if (!user) return;
+    if (!canManageSongs(user)) {
+      router.replace("/songs");
+      return;
+    }
     void loadSongs();
-  }, []);
+  }, [user, router]);
 
   async function loadSongs() {
     setLoadingSongs(true);
@@ -180,7 +198,6 @@ export default function SongImportPage() {
   return (
     <main style={{ minHeight: "100vh", padding: "24px 24px 36px" }}>
       <section style={{ maxWidth: 1180, margin: "0 auto" }}>
-        <AuthGate>
           <header style={headerStyle}>
             <p style={tagStyle}>Music</p>
             <h1 style={{ margin: "8px 0 12px", fontSize: 36, lineHeight: 1.1 }}>Importar Cifra (TXT)</h1>
@@ -323,7 +340,6 @@ export default function SongImportPage() {
               )}
             </div>
           </article>
-        </AuthGate>
       </section>
     </main>
   );

@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CSSProperties, useState } from "react";
-import { AuthGate } from "@/components/AuthGate";
+import { CSSProperties, useEffect, useState } from "react";
+import { AuthRequired } from "@/components/AuthRequired";
+import { useAuth } from "@/components/AuthProvider";
+import { canManageSongs } from "@/lib/permissions";
 
 const TABERNACLE_ZONES = [
   { value: "Z1", label: "Z1 — Átrios" },
@@ -15,14 +17,22 @@ const TABERNACLE_ZONES = [
 
 export default function NewSongPage() {
   return (
-    <AuthGate>
+    <AuthRequired>
       <NewSongContent />
-    </AuthGate>
+    </AuthRequired>
   );
 }
 
 function NewSongContent() {
   const router = useRouter();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    if (!canManageSongs(user)) {
+      router.replace("/songs");
+    }
+  }, [user, router]);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [defaultKey, setDefaultKey] = useState("");
