@@ -866,6 +866,110 @@ a {
   border: none;
 }
 
+/* ── FX row ───────────────────────────────────────────────────────────────── */
+.mt-track-wrap {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #0f1e2e;
+}
+/* override border on the inner strip so wrapper owns it */
+.mt-track-wrap .mt-track-strip {
+  border-bottom: none;
+}
+
+.mt-fx-chip {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid #1e2d3d;
+  background: transparent;
+  color: #3d5a76;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1.4;
+}
+.mt-fx-chip:hover { color: #7cf2a2; border-color: #7cf2a2; }
+.mt-fx-chip.active {
+  background: #0a1a28;
+}
+.mt-fx-chip.open { background: #0f1e2e; }
+
+.mt-fx-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #060e18;
+  border-top: 1px solid #0f1e2e;
+  flex-wrap: wrap;
+}
+
+.mt-fx-toggle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #1e2d3d;
+  background: transparent;
+  color: #3d5a76;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  min-height: 28px;
+}
+.mt-fx-toggle:hover { color: #94a3b8; border-color: #3d5a76; }
+.mt-fx-toggle.active { background: #0a1a28; }
+
+.mt-fx-reverb-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.mt-fx-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #3d5a76;
+  white-space: nowrap;
+}
+
+.mt-fx-reverb-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: #1e2d3d;
+  outline: none;
+  cursor: pointer;
+}
+.mt-fx-reverb-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--fx-color, #3d5a76);
+  cursor: pointer;
+  border: none;
+}
+.mt-fx-reverb-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--fx-color, #3d5a76);
+  cursor: pointer;
+  border: none;
+}
+
 /* ── Metronome strip ──────────────────────────────────────────────────────── */
 .mt-metronome-strip {
   display: grid;

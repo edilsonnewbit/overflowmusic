@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import type { TrackState } from "./useMultitrackEngine";
+import { useEffect, useRef, useState } from "react";
+import type { TrackState, TrackFx } from "./useMultitrackEngine";
 
 const TRACK_ICONS: Record<string, string> = {
   CLICK: "🥁",
@@ -37,14 +37,23 @@ type Props = {
   track: TrackState;
   isPlaying: boolean;
   onVolumeChange: (v: number) => void;
-  onPanChange: (v: number) => void;
-  onMuteToggle: () => void;
+  onPanChange:    (v: number) => void;
+  onMuteToggle:   () => void;
+  onFxChange:     (fx: Partial<TrackFx>) => void;
 };
 
-export function TrackStrip({ track, isPlaying, onVolumeChange, onPanChange, onMuteToggle }: Props) {
+export function TrackStrip({
+  track, isPlaying,
+  onVolumeChange, onPanChange, onMuteToggle, onFxChange,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
   const color     = TRACK_COLORS[track.trackType] ?? "#94a3b8";
+  const [fxOpen, setFxOpen] = useState(false);
+
+  const hasFxActive =
+    track.fx.hpfEnabled || track.fx.lpfEnabled ||
+    track.fx.compEnabled || track.fx.reverbWet > 0;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -65,7 +74,7 @@ export function TrackStrip({ track, isPlaying, onVolumeChange, onPanChange, onMu
       ctx.fillStyle = "#0b1623";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.lineWidth  = 1.5;
+      ctx.lineWidth   = 1.5;
       ctx.strokeStyle = track.muted ? "#334155" : color;
       ctx.beginPath();
 
@@ -101,69 +110,133 @@ export function TrackStrip({ track, isPlaying, onVolumeChange, onPanChange, onMu
   const icon = TRACK_ICONS[track.trackType] ?? "🎵";
 
   return (
-    <div className={`mt-track-strip${track.muted ? " muted" : ""}${track.loadState === "error" ? " error" : ""}`}>
-      {/* Left: label + mute */}
-      <div className="mt-track-label">
-        <button
-          type="button"
-          className={`mt-mute-btn${track.muted ? " active" : ""}`}
-          onClick={onMuteToggle}
-          title={track.muted ? "Ativar" : "Mutar"}
-          style={{ borderColor: color }}
-        >
-          {icon}
-        </button>
-        <span className="mt-track-name" style={{ color: track.muted ? "#475569" : color }}>
-          {track.label}
-        </span>
-      </div>
+    <div className="mt-track-wrap">
+      {/* Main strip row */}
+      <div className={`mt-track-strip${track.muted ? " muted" : ""}${track.loadState === "error" ? " error" : ""}`}>
 
-      {/* Center: waveform */}
-      <div className="mt-track-wave">
-        {track.loadState === "loading" && (
-          <div className="mt-track-loading">carregando...</div>
-        )}
-        {track.loadState === "error" && (
-          <div className="mt-track-error">erro ao carregar</div>
-        )}
-        {(track.loadState === "ready" || track.loadState === "idle") && (
-          <canvas ref={canvasRef} className="mt-waveform-canvas" />
-        )}
-      </div>
+        {/* Left: mute + name + FX chip */}
+        <div className="mt-track-label">
+          <button
+            type="button"
+            className={`mt-mute-btn${track.muted ? " active" : ""}`}
+            onClick={onMuteToggle}
+            title={track.muted ? "Ativar" : "Mutar"}
+            style={{ borderColor: color }}
+          >
+            {icon}
+          </button>
+          <span className="mt-track-name" style={{ color: track.muted ? "#475569" : color }}>
+            {track.label}
+          </span>
+          <button
+            type="button"
+            className={`mt-fx-chip${hasFxActive ? " active" : ""}${fxOpen ? " open" : ""}`}
+            onClick={() => setFxOpen((o) => !o)}
+            title="Efeitos de áudio"
+            style={hasFxActive ? { borderColor: color, color } : undefined}
+          >
+            FX
+          </button>
+        </div>
 
-      {/* Right: volume fader + pan slider */}
-      <div className="mt-fader-wrap">
-        {/* Volume */}
-        <input
-          type="range"
-          min={0} max={1} step={0.01}
-          value={track.volume}
-          onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-          className="mt-fader"
-          style={{ "--fader-color": color } as React.CSSProperties}
-          title={`Volume: ${Math.round(track.volume * 100)}%`}
-        />
-        <span className="mt-fader-val">{Math.round(track.volume * 100)}</span>
+        {/* Center: waveform */}
+        <div className="mt-track-wave">
+          {track.loadState === "loading" && (
+            <div className="mt-track-loading">carregando...</div>
+          )}
+          {track.loadState === "error" && (
+            <div className="mt-track-error">erro ao carregar</div>
+          )}
+          {(track.loadState === "ready" || track.loadState === "idle") && (
+            <canvas ref={canvasRef} className="mt-waveform-canvas" />
+          )}
+        </div>
 
-        {/* Pan */}
-        <div className="mt-pan-row">
-          <span className="mt-pan-side">L</span>
+        {/* Right: volume fader + pan slider */}
+        <div className="mt-fader-wrap">
+          {/* Volume */}
           <input
             type="range"
-            min={-1} max={1} step={0.01}
-            value={track.pan}
-            onChange={(e) => onPanChange(parseFloat(e.target.value))}
-            className="mt-pan-slider"
-            style={{ "--pan-color": color } as React.CSSProperties}
-            title={`Pan: ${panLabel(track.pan)}`}
-            onDoubleClick={() => onPanChange(0)}
+            min={0} max={1} step={0.01}
+            value={track.volume}
+            onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+            className="mt-fader"
+            style={{ "--fader-color": color } as React.CSSProperties}
+            title={`Volume: ${Math.round(track.volume * 100)}%`}
           />
-          <span className="mt-pan-side">R</span>
+          <span className="mt-fader-val">{Math.round(track.volume * 100)}</span>
+
+          {/* Pan */}
+          <div className="mt-pan-row">
+            <span className="mt-pan-side">L</span>
+            <input
+              type="range"
+              min={-1} max={1} step={0.01}
+              value={track.pan}
+              onChange={(e) => onPanChange(parseFloat(e.target.value))}
+              className="mt-pan-slider"
+              style={{ "--pan-color": color } as React.CSSProperties}
+              title={`Pan: ${panLabel(track.pan)}`}
+              onDoubleClick={() => onPanChange(0)}
+            />
+            <span className="mt-pan-side">R</span>
+          </div>
+          <span className="mt-fader-val" style={{ color: Math.abs(track.pan) > 0.02 ? color : undefined }}>
+            {panLabel(track.pan)}
+          </span>
         </div>
-        <span className="mt-fader-val" style={{ color: Math.abs(track.pan) > 0.02 ? color : undefined }}>
-          {panLabel(track.pan)}
-        </span>
       </div>
+
+      {/* FX row — expands below when fxOpen */}
+      {fxOpen && (
+        <div className="mt-fx-row">
+          {/* Toggle buttons */}
+          <button
+            type="button"
+            className={`mt-fx-toggle${track.fx.hpfEnabled ? " active" : ""}`}
+            onClick={() => onFxChange({ hpfEnabled: !track.fx.hpfEnabled })}
+            title="Corte de graves (80 Hz)"
+            style={track.fx.hpfEnabled ? { borderColor: color, color } : undefined}
+          >
+            LOW CUT
+          </button>
+          <button
+            type="button"
+            className={`mt-fx-toggle${track.fx.lpfEnabled ? " active" : ""}`}
+            onClick={() => onFxChange({ lpfEnabled: !track.fx.lpfEnabled })}
+            title="Corte de agudos (8 kHz)"
+            style={track.fx.lpfEnabled ? { borderColor: color, color } : undefined}
+          >
+            HI CUT
+          </button>
+          <button
+            type="button"
+            className={`mt-fx-toggle${track.fx.compEnabled ? " active" : ""}`}
+            onClick={() => onFxChange({ compEnabled: !track.fx.compEnabled })}
+            title="Compressor suave"
+            style={track.fx.compEnabled ? { borderColor: color, color } : undefined}
+          >
+            COMP
+          </button>
+
+          {/* Reverb wet slider */}
+          <div className="mt-fx-reverb-wrap">
+            <span className="mt-fx-label">REVERB</span>
+            <input
+              type="range"
+              min={0} max={1} step={0.01}
+              value={track.fx.reverbWet}
+              onChange={(e) => onFxChange({ reverbWet: parseFloat(e.target.value) })}
+              className="mt-fx-reverb-slider"
+              style={{ "--fx-color": track.fx.reverbWet > 0 ? color : "#1e2d3d" } as React.CSSProperties}
+              title={`Reverb: ${Math.round(track.fx.reverbWet * 100)}%`}
+            />
+            <span className="mt-fx-label" style={{ color: track.fx.reverbWet > 0 ? color : undefined }}>
+              {Math.round(track.fx.reverbWet * 100)}%
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

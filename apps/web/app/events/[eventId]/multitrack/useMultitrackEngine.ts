@@ -3,76 +3,128 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SongTrack } from "@/lib/types";
 
+// ── FX state ──────────────────────────────────────────────────────────────────
+export type TrackFx = {
+  hpfEnabled:  boolean;   // low-cut  80 Hz
+  lpfEnabled:  boolean;   // high-cut  8 kHz
+  compEnabled: boolean;   // gentle compressor preset
+  reverbWet:   number;    // 0-1
+};
+
+const DEFAULT_FX: TrackFx = {
+  hpfEnabled: false, lpfEnabled: false, compEnabled: false, reverbWet: 0,
+};
+
+// ── Track state ───────────────────────────────────────────────────────────────
 export type TrackState = {
   id: string;
   label: string;
   trackType: string;
   driveFileId: string;
-  buffer: AudioBuffer | null;
-  gainNode: GainNode | null;
-  panNode: StereoPannerNode | null;
+  buffer:       AudioBuffer | null;
+  gainNode:     GainNode | null;
+  panNode:      StereoPannerNode | null;
+  hpfNode:      BiquadFilterNode | null;
+  lpfNode:      BiquadFilterNode | null;
+  compNode:     DynamicsCompressorNode | null;
+  convolver:    ConvolverNode | null;
+  dryGain:      GainNode | null;
+  reverbWetGain: GainNode | null;
   analyserNode: AnalyserNode | null;
-  volume: number;
-  pan: number;       // -1 (L) … 0 (C) … +1 (R)
-  muted: boolean;
+  volume:  number;
+  pan:     number;
+  muted:   boolean;
+  fx:      TrackFx;
   loadState: "idle" | "loading" | "ready" | "error";
 };
 
+// ── Engine API ────────────────────────────────────────────────────────────────
 export type MultitrackEngine = {
-  tracks: TrackState[];
+  tracks:    TrackState[];
   isPlaying: boolean;
   isLoading: boolean;
   currentTime: number;
-  duration: number;
+  duration:    number;
   // metronome
   metronomeActive: boolean;
-  metronomeBpm: number;
-  toggleMetronome: () => void;
-  setMetronomeBpm: (bpm: number) => void;
+  metronomeBpm:    number;
+  toggleMetronome:  () => void;
+  setMetronomeBpm:  (bpm: number) => void;
   // transport
-  loadSong: (songTracks: SongTrack[]) => Promise<void>;
-  play: () => void;
-  pause: () => void;
-  seek: (seconds: number) => void;
-  setVolume: (trackId: string, value: number) => void;
-  setPan: (trackId: string, value: number) => void;
-  toggleMute: (trackId: string) => void;
+  loadSong:    (songTracks: SongTrack[]) => Promise<void>;
+  play:        () => void;
+  pause:       () => void;
+  seek:        (seconds: number) => void;
+  setVolume:   (trackId: string, value: number) => void;
+  setPan:      (trackId: string, value: number) => void;
+  toggleMute:  (trackId: string) => void;
+  setFx:       (trackId: string, fx: Partial<TrackFx>) => void;
 };
 
+// ── Algorithmic reverb IR ─────────────────────────────────────────────────────
+function buildRoomIR(ctx: AudioContext): AudioBuffer {
+  const sr     = ctx.sampleRate;
+  const dur    = 2.0;   // seconds
+  const decay  = 3;
+  const length = Math.floor(sr * dur);
+  const ir     = ctx.createBuffer(2, length, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+    }
+  }
+  return ir;
+}
+
+// ── Apply FX values to nodes (no state update) ────────────────────────────────
+function applyFxToNodes(ts: TrackState, fx: TrackFx) {
+  if (ts.hpfNode)       ts.hpfNode.frequency.value  = fx.hpfEnabled  ? 80    : 20;
+  if (ts.lpfNode)       ts.lpfNode.frequency.value   = fx.lpfEnabled  ? 8000  : 20000;
+  if (ts.compNode) {
+    ts.compNode.threshold.value = fx.compEnabled ? -24 : 0;
+    ts.compNode.ratio.value     = fx.compEnabled ? 4   : 1;
+    ts.compNode.attack.value    = 0.01;
+    ts.compNode.release.value   = 0.25;
+    ts.compNode.knee.value      = 6;
+  }
+  if (ts.dryGain)      ts.dryGain.gain.value      = 1 - fx.reverbWet;
+  if (ts.reverbWetGain) ts.reverbWetGain.gain.value = fx.reverbWet;
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
 export function useMultitrackEngine(): MultitrackEngine {
-  // ── Refs (never cause re-renders) ─────────────────────────────────────────
-  const ctxRef          = useRef<AudioContext | null>(null);
-  const sourcesRef      = useRef<Map<string, AudioBufferSourceNode>>(new Map());
-  const startTimeRef    = useRef<number>(0);
-  const offsetRef       = useRef<number>(0);
-  const rafRef          = useRef<number>(0);
-  const isPlayingRef    = useRef<boolean>(false);
-  const tracksRef       = useRef<TrackState[]>([]);
-  const durationRef     = useRef<number>(0);
-  const generationRef   = useRef<number>(0);
-  const bufferCacheRef  = useRef<Map<string, AudioBuffer>>(new Map());
+  const ctxRef         = useRef<AudioContext | null>(null);
+  const sourcesRef     = useRef<Map<string, AudioBufferSourceNode>>(new Map());
+  const startTimeRef   = useRef<number>(0);
+  const offsetRef      = useRef<number>(0);
+  const rafRef         = useRef<number>(0);
+  const isPlayingRef   = useRef<boolean>(false);
+  const tracksRef      = useRef<TrackState[]>([]);
+  const durationRef    = useRef<number>(0);
+  const generationRef  = useRef<number>(0);
+  const bufferCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
+  const irBufferRef    = useRef<AudioBuffer | null>(null);
 
-  // ── Metronome refs ────────────────────────────────────────────────────────
-  const metronomeActiveRef  = useRef<boolean>(false);
-  const metronomeBpmRef     = useRef<number>(120);
-  const nextClickTimeRef    = useRef<number>(0);
-  const metronomeTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Metronome
+  const metronomeActiveRef = useRef<boolean>(false);
+  const metronomeBpmRef    = useRef<number>(120);
+  const nextClickTimeRef   = useRef<number>(0);
+  const metronomeTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  const [tracks,           setTracks]           = useState<TrackState[]>([]);
-  const [isPlaying,        setIsPlaying]        = useState(false);
-  const [isLoading,        setIsLoading]        = useState(false);
-  const [currentTime,      setCurrentTime]      = useState(0);
-  const [duration,         setDuration]         = useState(0);
-  const [metronomeActive,  setMetronomeActive]  = useState(false);
-  const [metronomeBpm,     setMetronomeBpmState] = useState(120);
+  // State
+  const [tracks,          setTracks]          = useState<TrackState[]>([]);
+  const [isPlaying,       setIsPlaying]       = useState(false);
+  const [isLoading,       setIsLoading]       = useState(false);
+  const [currentTime,     setCurrentTime]     = useState(0);
+  const [duration,        setDuration]        = useState(0);
+  const [metronomeActive, setMetronomeActive] = useState(false);
+  const [metronomeBpm,    setMetronomeBpmState] = useState(120);
 
-  // ── Sync helpers ──────────────────────────────────────────────────────────
   function syncTracks(t: TrackState[])  { tracksRef.current = t; setTracks(t); }
   function syncPlaying(v: boolean)      { isPlayingRef.current = v; setIsPlaying(v); }
   function syncDuration(v: number)      { durationRef.current = v; setDuration(v); }
 
-  // ── AudioContext ───────────────────────────────────────────────────────────
   function getCtx(): AudioContext {
     if (!ctxRef.current) ctxRef.current = new AudioContext();
     return ctxRef.current;
@@ -84,16 +136,26 @@ export function useMultitrackEngine(): MultitrackEngine {
     return ctx;
   }
 
-  // ── Disconnect old audio-graph nodes ───────────────────────────────────────
+  function getOrCreateIR(ctx: AudioContext): AudioBuffer {
+    if (!irBufferRef.current) irBufferRef.current = buildRoomIR(ctx);
+    return irBufferRef.current;
+  }
+
   function disconnectTrackNodes() {
     for (const ts of tracksRef.current) {
       ts.gainNode?.disconnect();
       ts.panNode?.disconnect();
+      ts.hpfNode?.disconnect();
+      ts.lpfNode?.disconnect();
+      ts.compNode?.disconnect();
+      ts.convolver?.disconnect();
+      ts.dryGain?.disconnect();
+      ts.reverbWetGain?.disconnect();
       ts.analyserNode?.disconnect();
     }
   }
 
-  // ── Metronome click sound (Web Audio API scheduling) ─────────────────────
+  // ── Metronome ───────────────────────────────────────────────────────────────
   function scheduleClick(ctx: AudioContext, time: number, accent: boolean) {
     const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -109,14 +171,13 @@ export function useMultitrackEngine(): MultitrackEngine {
   function scheduleMetronomeClicks() {
     const ctx = ctxRef.current;
     if (!ctx || !metronomeActiveRef.current || !isPlayingRef.current) return;
-    const beatDur      = 60 / metronomeBpmRef.current;
-    const scheduleAhead = 0.12; // seconds ahead to schedule
-    while (nextClickTimeRef.current < ctx.currentTime + scheduleAhead) {
-      // Compute beat number relative to offset to know if it's beat 1
-      const beatIndex = Math.round(
-        (nextClickTimeRef.current - startTimeRef.current + offsetRef.current) / beatDur
+    const beatDur = 60 / metronomeBpmRef.current;
+    const ahead   = 0.12;
+    while (nextClickTimeRef.current < ctx.currentTime + ahead) {
+      const beatIdx = Math.round(
+        (nextClickTimeRef.current - startTimeRef.current + offsetRef.current) / beatDur,
       );
-      scheduleClick(ctx, nextClickTimeRef.current, beatIndex % 4 === 0);
+      scheduleClick(ctx, nextClickTimeRef.current, beatIdx % 4 === 0);
       nextClickTimeRef.current += beatDur;
     }
   }
@@ -133,17 +194,15 @@ export function useMultitrackEngine(): MultitrackEngine {
     }
   }
 
-  // Sync nextClickTime with current playback position
   function syncNextClickTime(ctx: AudioContext, startAt: number, fromOffset: number) {
     const beatDur = 60 / metronomeBpmRef.current;
-    // Find how many beats have passed at fromOffset, then schedule the next beat
-    const beatsElapsed = Math.floor(fromOffset / beatDur);
-    const nextBeatOffset = (beatsElapsed + 1) * beatDur;
-    const secondsUntilNextBeat = nextBeatOffset - fromOffset;
-    nextClickTimeRef.current = startAt + secondsUntilNextBeat;
+    const beatsElapsed    = Math.floor(fromOffset / beatDur);
+    const nextBeatOffset  = (beatsElapsed + 1) * beatDur;
+    const secsUntilBeat   = nextBeatOffset - fromOffset;
+    nextClickTimeRef.current = startAt + secsUntilBeat;
   }
 
-  // ── Source-node management ─────────────────────────────────────────────────
+  // ── Sources ─────────────────────────────────────────────────────────────────
   function stopAllSources() {
     generationRef.current++;
     for (const [, node] of sourcesRef.current) {
@@ -171,16 +230,11 @@ export function useMultitrackEngine(): MultitrackEngine {
       source.onended = () => {
         if (generationRef.current !== gen) return;
         sourcesRef.current.delete(ts.id);
-        if (sourcesRef.current.size === 0 && isPlayingRef.current) {
-          handleNaturalEnd(dur);
-        }
+        if (sourcesRef.current.size === 0 && isPlayingRef.current) handleNaturalEnd(dur);
       };
     }
 
-    // Sync metronome to this playback start
-    if (metronomeActiveRef.current) {
-      syncNextClickTime(ctx, startAt, fromOffset);
-    }
+    if (metronomeActiveRef.current) syncNextClickTime(ctx, startAt, fromOffset);
   }
 
   function handleNaturalEnd(dur: number) {
@@ -191,7 +245,6 @@ export function useMultitrackEngine(): MultitrackEngine {
     syncPlaying(false);
   }
 
-  // ── Ticker ─────────────────────────────────────────────────────────────────
   function startTicker() {
     cancelAnimationFrame(rafRef.current);
     function tick() {
@@ -214,7 +267,7 @@ export function useMultitrackEngine(): MultitrackEngine {
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  // ── loadSong ───────────────────────────────────────────────────────────────
+  // ── loadSong ────────────────────────────────────────────────────────────────
   const loadSong = useCallback(async (songTracks: SongTrack[]) => {
     stopAllSources();
     stopMetronomeScheduler();
@@ -229,15 +282,19 @@ export function useMultitrackEngine(): MultitrackEngine {
 
     const initStates: TrackState[] = songTracks.map((t) => ({
       id: t.id, label: t.label, trackType: t.trackType, driveFileId: t.driveFileId,
-      buffer: null, gainNode: null, panNode: null, analyserNode: null,
+      buffer: null, gainNode: null, panNode: null,
+      hpfNode: null, lpfNode: null, compNode: null,
+      convolver: null, dryGain: null, reverbWetGain: null,
+      analyserNode: null,
       volume: t.trackType === "CLICK" ? 0.5 : 1,
-      pan: 0,
-      muted: false, loadState: "loading",
+      pan: 0, muted: false, fx: { ...DEFAULT_FX },
+      loadState: "loading",
     }));
     syncTracks(initStates);
     setIsLoading(true);
 
     const ctx = await ensureCtxRunning();
+    const ir  = getOrCreateIR(ctx);
 
     const results = await Promise.allSettled(
       songTracks.map(async (t) => {
@@ -245,31 +302,71 @@ export function useMultitrackEngine(): MultitrackEngine {
         if (!audioBuffer) {
           const res = await fetch(`/api/audio-proxy?fileId=${encodeURIComponent(t.driveFileId)}`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const arrayBuffer = await res.arrayBuffer();
-          audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          audioBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
           bufferCacheRef.current.set(t.driveFileId, audioBuffer);
         }
-        const gainNode    = ctx.createGain();
-        const panNode     = ctx.createStereoPanner();
-        const analyserNode = ctx.createAnalyser();
+
+        // Build audio graph:
+        // source → gain → pan → hpf → lpf → comp → dryGain  ─────────────────→ analyser → dest
+        //                                         └→ convolver → reverbWetGain ──→ analyser
+        const gainNode      = ctx.createGain();
+        const panNode       = ctx.createStereoPanner();
+        const hpfNode       = ctx.createBiquadFilter();
+        const lpfNode       = ctx.createBiquadFilter();
+        const compNode      = ctx.createDynamicsCompressor();
+        const convolver     = ctx.createConvolver();
+        const dryGain       = ctx.createGain();
+        const reverbWetGain = ctx.createGain();
+        const analyserNode  = ctx.createAnalyser();
         analyserNode.fftSize = 256;
-        // chain: source → gain → pan → analyser → destination
+
+        // HPF (low-cut) — bypassed by default (20 Hz ≈ no filtering)
+        hpfNode.type            = "highpass";
+        hpfNode.frequency.value = 20;
+        hpfNode.Q.value         = 0.7;
+
+        // LPF (high-cut) — bypassed by default (20 kHz ≈ no filtering)
+        lpfNode.type            = "lowpass";
+        lpfNode.frequency.value = 20000;
+        lpfNode.Q.value         = 0.7;
+
+        // Compressor — bypass default (ratio 1 = no compression)
+        compNode.threshold.value = 0;
+        compNode.ratio.value     = 1;
+        compNode.attack.value    = 0.01;
+        compNode.release.value   = 0.25;
+        compNode.knee.value      = 6;
+
+        // Reverb — wet 0 by default
+        convolver.buffer = ir;
+        dryGain.gain.value      = 1;
+        reverbWetGain.gain.value = 0;
+
+        // Wire it up
         gainNode.connect(panNode);
-        panNode.connect(analyserNode);
+        panNode.connect(hpfNode);
+        hpfNode.connect(lpfNode);
+        lpfNode.connect(compNode);
+        compNode.connect(dryGain);
+        compNode.connect(convolver);
+        convolver.connect(reverbWetGain);
+        dryGain.connect(analyserNode);
+        reverbWetGain.connect(analyserNode);
         analyserNode.connect(ctx.destination);
-        return { id: t.id, audioBuffer, gainNode, panNode, analyserNode };
-      })
+
+        return { id: t.id, audioBuffer, gainNode, panNode, hpfNode, lpfNode, compNode, convolver, dryGain, reverbWetGain, analyserNode };
+      }),
     );
 
     let maxDuration = 0;
     const updatedTracks = initStates.map((ts, i) => {
       const result = results[i];
       if (result?.status === "fulfilled") {
-        const { audioBuffer, gainNode, panNode, analyserNode } = result.value;
+        const { audioBuffer, gainNode, panNode, hpfNode, lpfNode, compNode, convolver, dryGain, reverbWetGain, analyserNode } = result.value;
         gainNode.gain.value = ts.volume;
-        panNode.pan.value   = ts.pan;
+        panNode.pan.value   = 0;
         if (audioBuffer.duration > maxDuration) maxDuration = audioBuffer.duration;
-        return { ...ts, buffer: audioBuffer, gainNode, panNode, analyserNode, loadState: "ready" as const };
+        return { ...ts, buffer: audioBuffer, gainNode, panNode, hpfNode, lpfNode, compNode, convolver, dryGain, reverbWetGain, analyserNode, loadState: "ready" as const };
       }
       return { ...ts, loadState: "error" as const };
     });
@@ -280,7 +377,7 @@ export function useMultitrackEngine(): MultitrackEngine {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Transport ──────────────────────────────────────────────────────────────
+  // ── Transport ───────────────────────────────────────────────────────────────
   const play = useCallback(async () => {
     const ctx = await ensureCtxRunning();
     startAllSources(ctx, offsetRef.current);
@@ -310,7 +407,6 @@ export function useMultitrackEngine(): MultitrackEngine {
     cancelAnimationFrame(rafRef.current);
     offsetRef.current = clamped;
     setCurrentTime(clamped);
-
     if (isPlayingRef.current) {
       const ctx = ctxRef.current ?? getCtx();
       startAllSources(ctx, clamped);
@@ -320,7 +416,7 @@ export function useMultitrackEngine(): MultitrackEngine {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Volume / Pan / Mute ───────────────────────────────────────────────────
+  // ── Mix controls ────────────────────────────────────────────────────────────
   const setVolume = useCallback((trackId: string, value: number) => {
     const updated = tracksRef.current.map((ts) => {
       if (ts.id !== trackId) return ts;
@@ -353,7 +449,18 @@ export function useMultitrackEngine(): MultitrackEngine {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Metronome controls ────────────────────────────────────────────────────
+  const setFx = useCallback((trackId: string, patch: Partial<TrackFx>) => {
+    const updated = tracksRef.current.map((ts) => {
+      if (ts.id !== trackId) return ts;
+      const fx = { ...ts.fx, ...patch };
+      applyFxToNodes(ts, fx);
+      return { ...ts, fx };
+    });
+    syncTracks(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Metronome controls ──────────────────────────────────────────────────────
   const toggleMetronome = useCallback(() => {
     const next = !metronomeActiveRef.current;
     metronomeActiveRef.current = next;
@@ -374,10 +481,9 @@ export function useMultitrackEngine(): MultitrackEngine {
     const clamped = Math.min(300, Math.max(20, bpm));
     metronomeBpmRef.current = clamped;
     setMetronomeBpmState(clamped);
-    // If scheduler is running, it will pick up the new BPM on next tick
   }, []);
 
-  // ── Cleanup ────────────────────────────────────────────────────────────────
+  // ── Cleanup ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       cancelAnimationFrame(rafRef.current);
@@ -395,6 +501,6 @@ export function useMultitrackEngine(): MultitrackEngine {
     metronomeActive, metronomeBpm,
     toggleMetronome, setMetronomeBpm,
     loadSong, play, pause, seek,
-    setVolume, setPan, toggleMute,
+    setVolume, setPan, toggleMute, setFx,
   };
 }
