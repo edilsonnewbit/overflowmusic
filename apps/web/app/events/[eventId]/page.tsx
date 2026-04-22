@@ -160,6 +160,8 @@ export default function EventDetailPage({ params }: PageProps) {
   const [addingItem, setAddingItem] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [itemMenuOpenId, setItemMenuOpenId] = useState<string | null>(null);
+  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
@@ -217,6 +219,14 @@ export default function EventDetailPage({ params }: PageProps) {
     }
     void loadTeamUsers();
   }, []);
+
+  // Fecha menu de 3 pontinhos ao clicar fora
+  useEffect(() => {
+    if (!itemMenuOpenId) return;
+    function handleClick() { setItemMenuOpenId(null); }
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, [itemMenuOpenId]);
 
   const loadEvent = useCallback(async (id: string) => {
     setLoading(true);
@@ -1051,14 +1061,7 @@ export default function EventDetailPage({ params }: PageProps) {
                               )}
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                              <button
-                                style={deleteBtn}
-                                disabled={isBusy}
-                                onClick={() => void deleteSetlistItem(item.id)}
-                                title="Remover"
-                              >
-                                {isDeleting ? "..." : "✕"}
-                              </button>
+                              {/* Botões de mídia */}
                               {(() => {
                                 const song = songs.find((s) => s.title.toLowerCase() === item.songTitle.toLowerCase());
                                 if (!song) return null;
@@ -1097,6 +1100,82 @@ export default function EventDetailPage({ params }: PageProps) {
                                   </div>
                                 );
                               })()}
+
+                              {/* Menu 3 pontinhos */}
+                              {authUser?.role !== "MEMBER" && (
+                                <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+                                  {confirmDeleteItemId === item.id ? (
+                                    /* Confirmação inline */
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                                      <span style={{ fontSize: 11, color: "#f87171", fontWeight: 600, whiteSpace: "nowrap" }}>Remover?</span>
+                                      <div style={{ display: "flex", gap: 4 }}>
+                                        <button
+                                          type="button"
+                                          disabled={isDeleting}
+                                          onClick={() => {
+                                            void deleteSetlistItem(item.id);
+                                            setConfirmDeleteItemId(null);
+                                          }}
+                                          style={{ padding: "3px 8px", fontSize: 11, fontWeight: 700, borderRadius: 6, border: "none", background: "#dc2626", color: "#fff", cursor: "pointer" }}
+                                        >
+                                          {isDeleting ? "..." : "Sim"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setConfirmDeleteItemId(null)}
+                                          style={{ padding: "3px 8px", fontSize: 11, fontWeight: 600, borderRadius: 6, border: "1px solid #3f3f46", background: "transparent", color: "#a1a1aa", cursor: "pointer" }}
+                                        >
+                                          Não
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      {/* Botão ⋯ */}
+                                      <button
+                                        type="button"
+                                        disabled={isBusy}
+                                        onClick={() => setItemMenuOpenId(itemMenuOpenId === item.id ? null : item.id)}
+                                        style={{
+                                          width: 28, height: 28, padding: 0, borderRadius: 6,
+                                          border: "1px solid #3f3f46", background: "transparent",
+                                          color: "#71717a", cursor: "pointer", fontSize: 16,
+                                          display: "flex", alignItems: "center", justifyContent: "center",
+                                          lineHeight: 1,
+                                        }}
+                                        title="Opções"
+                                      >
+                                        ⋯
+                                      </button>
+
+                                      {/* Dropdown */}
+                                      {itemMenuOpenId === item.id && (
+                                        <div style={{
+                                          position: "absolute", right: 0, top: 32, zIndex: 50,
+                                          background: "#18181b", border: "1px solid #3f3f46",
+                                          borderRadius: 8, padding: 4, minWidth: 120,
+                                          boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+                                        }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => { openEditItem(item); setItemMenuOpenId(null); }}
+                                            style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 13, border: "none", background: "transparent", color: "#d4d4d8", cursor: "pointer", borderRadius: 6 }}
+                                          >
+                                            ✏ Editar
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => { setConfirmDeleteItemId(item.id); setItemMenuOpenId(null); }}
+                                            style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 13, border: "none", background: "transparent", color: "#f87171", cursor: "pointer", borderRadius: 6 }}
+                                          >
+                                            🗑 Remover
+                                          </button>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </li>
