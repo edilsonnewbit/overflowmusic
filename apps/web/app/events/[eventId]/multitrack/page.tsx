@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { use } from "react";
 import Link from "next/link";
-import type { SetlistSongTracks } from "@/lib/types";
+import type { SetlistSongTracks, Pad } from "@/lib/types";
 import { useAuth } from "@/components/AuthProvider";
 import { SongCard } from "./SongCard";
 import { TrackStrip } from "./TrackStrip";
@@ -24,6 +24,11 @@ export default function MultitrackPage({ params }: Props) {
   const [loading,          setLoading]          = useState(true);
   const [error,            setError]            = useState<string | null>(null);
   const songCardRowRef = useRef<HTMLDivElement>(null);
+
+  // Pad library
+  const [pads,        setPads]        = useState<Pad[]>([]);
+  const [padModalOpen, setPadModalOpen] = useState(false);
+  const [padLoading,  setPadLoading]  = useState(false);
 
   const engine = useMultitrackEngine();
 
@@ -105,6 +110,29 @@ export default function MultitrackPage({ params }: Props) {
       }
     })();
   }, [eventId]);
+
+  // Fetch available pads once
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/pads");
+        if (res.ok) {
+          const body = (await res.json()) as Pad[];
+          setPads(Array.isArray(body) ? body : []);
+        }
+      } catch { /* pads são opcionais */ }
+    })();
+  }, []);
+
+  async function handleAddPad(pad: Pad) {
+    setPadModalOpen(false);
+    setPadLoading(true);
+    try {
+      await engine.addPadTrack({ id: pad.id, name: pad.name, driveFileId: pad.driveFileId });
+    } finally {
+      setPadLoading(false);
+    }
+  }
 
   // Load tracks when song changes
   useEffect(() => {
@@ -284,9 +312,75 @@ export default function MultitrackPage({ params }: Props) {
             onPanChange={(v) => engine.setPan(track.id, v)}
             onMuteToggle={() => engine.toggleMute(track.id)}
             onFxChange={(fx) => engine.setFx(track.id, fx)}
+            onRemove={track.loop ? () => engine.removePadTrack(track.id) : undefined}
           />
         ))}
+
+        {/* Add pad button */}
+        {!engine.isLoading && currentSong && pads.length > 0 && (
+          <div className="mt-add-pad-row">
+            <button
+              type="button"
+              className="mt-add-pad-btn"
+              onClick={() => setPadModalOpen(true)}
+              disabled={padLoading}
+            >
+              {padLoading ? "Carregando pad..." : "🎹 + Adicionar Pad"}
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Pad picker modal */}
+      {padModalOpen && (
+        <div className="mt-pad-backdrop" onClick={() => setPadModalOpen(false)}>
+          <div className="mt-pad-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mt-pad-modal-header">
+              <span className="mt-pad-modal-title">Escolher Pad</span>
+              {currentSong?.key && (
+                <span className="mt-pad-key-hint">Tom atual: <strong>{currentSong.key}</strong></span>
+              )}
+              <button type="button" className="mt-pad-close" onClick={() => setPadModalOpen(false)}>✕</button>
+            </div>
+            <div className="mt-pad-list">
+              {/* Matching key first */}
+              {currentSong?.key && pads.filter((p) => p.key === currentSong.key).length > 0 && (
+                <div className="mt-pad-section">
+                  <span className="mt-pad-section-label">Tom {currentSong.key}</span>
+                  {pads
+                    .filter((p) => p.key === currentSong.key)
+                    .map((pad) => (
+                      <PadRow
+                        key={pad.id}
+                        pad={pad}
+                        active={engine.tracks.some((t) => t.id === `pad-${pad.id}`)}
+                        onAdd={() => void handleAddPad(pad)}
+                        onRemove={() => engine.removePadTrack(`pad-${pad.id}`)}
+                      />
+                    ))}
+                </div>
+              )}
+              {/* Other keys */}
+              {pads.filter((p) => p.key !== currentSong?.key).length > 0 && (
+                <div className="mt-pad-section">
+                  <span className="mt-pad-section-label">Outros tons</span>
+                  {pads
+                    .filter((p) => p.key !== currentSong?.key)
+                    .map((pad) => (
+                      <PadRow
+                        key={pad.id}
+                        pad={pad}
+                        active={engine.tracks.some((t) => t.id === `pad-${pad.id}`)}
+                        onAdd={() => void handleAddPad(pad)}
+                        onRemove={() => engine.removePadTrack(`pad-${pad.id}`)}
+                      />
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transport bar */}
       <TransportBar
@@ -310,6 +404,36 @@ export default function MultitrackPage({ params }: Props) {
         hasPrev={currentSongIndex > 0}
         hasNext={currentSongIndex < songTracks.length - 1}
       />
+    </div>
+  );
+}
+
+// ── Pad row in picker modal ────────────────────────────────────────────────────
+function PadRow({
+  pad, active, onAdd, onRemove,
+}: {
+  pad: Pad;
+  active: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="mt-pad-row">
+      <div className="mt-pad-row-info">
+        <span className="mt-pad-row-name">{pad.name}</span>
+        {pad.description && (
+          <span className="mt-pad-row-desc">{pad.description}</span>
+        )}
+      </div>
+      {active ? (
+        <button type="button" className="mt-pad-row-btn active" onClick={onRemove}>
+          ✕ Remover
+        </button>
+      ) : (
+        <button type="button" className="mt-pad-row-btn" onClick={onAdd}>
+          + Usar
+        </button>
+      )}
     </div>
   );
 }

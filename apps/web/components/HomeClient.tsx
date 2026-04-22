@@ -445,6 +445,17 @@ export function HomeClient() {
         )}
 
         {user && canSeeAdminLinks(user) && (
+          <Link href="/pads" className="dash-card">
+            <span style={dashIconStyle}>🎹</span>
+            <div>
+              <p style={dashTagStyle}>Admin</p>
+              <h3 style={dashTitleStyle}>Pads</h3>
+              <p style={dashDescStyle}>Gerencie pads contínuos por tonalidade para o VS ao Vivo.</p>
+            </div>
+          </Link>
+        )}
+
+        {user && canSeeAdminLinks(user) && (
           <>
             <Link href="/admin/team" className="dash-card">
               <span style={dashIconStyle}>👥</span>

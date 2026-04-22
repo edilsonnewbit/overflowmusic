@@ -1288,3 +1288,398 @@ a {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
+
+/* ── Pad remove btn (in TrackStrip) ─────────────────────────────────────── */
+.mt-pad-remove-btn {
+  background: none;
+  border: none;
+  font-size: 10px;
+  color: #3d5a76;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.mt-pad-remove-btn:hover { color: #ef4444; }
+
+/* ── Add pad row ─────────────────────────────────────────────────────────── */
+.mt-add-pad-row {
+  display: flex;
+  justify-content: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #0f1e2e;
+}
+.mt-add-pad-btn {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px dashed #1e2d3d;
+  background: transparent;
+  color: #3d5a76;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.mt-add-pad-btn:hover { color: #7cf2a2; border-color: #7cf2a2; }
+.mt-add-pad-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Pad picker modal ────────────────────────────────────────────────────── */
+.mt-pad-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.mt-pad-modal {
+  background: #0b1623;
+  border: 1px solid #1e2d3d;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mt-pad-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid #0f1e2e;
+  flex-shrink: 0;
+}
+.mt-pad-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e2e8f0;
+  flex: 1;
+}
+.mt-pad-key-hint {
+  font-size: 11px;
+  color: #3d5a76;
+}
+.mt-pad-key-hint strong { color: #7cf2a2; }
+.mt-pad-close {
+  background: none;
+  border: none;
+  color: #3d5a76;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.mt-pad-close:hover { color: #94a3b8; background: #0f1e2e; }
+
+.mt-pad-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 0;
+}
+.mt-pad-section { padding: 4px 0 8px; }
+.mt-pad-section-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #3d5a76;
+  text-transform: uppercase;
+  padding: 4px 18px 6px;
+}
+
+.mt-pad-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  transition: background 0.1s;
+}
+.mt-pad-row:hover { background: #0a1a28; }
+.mt-pad-row-info { flex: 1; min-width: 0; }
+.mt-pad-row-name {
+  display: block;
+  font-size: 13px;
+  color: #cbd5e1;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mt-pad-row-desc {
+  display: block;
+  font-size: 11px;
+  color: #3d5a76;
+  margin-top: 1px;
+}
+.mt-pad-row-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid #1e2d3d;
+  background: transparent;
+  color: #3d5a76;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.mt-pad-row-btn:hover { color: #7cf2a2; border-color: #7cf2a2; }
+.mt-pad-row-btn.active {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+.mt-pad-row-btn.active:hover { background: #1a0808; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Pads page
+═══════════════════════════════════════════════════════════════════════════ */
+.pads-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 20px 16px 80px;
+}
+.pads-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.pads-back {
+  color: #3d5a76;
+  text-decoration: none;
+  font-size: 13px;
+}
+.pads-back:hover { color: #7cf2a2; }
+.pads-title {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0;
+}
+.pads-subtitle {
+  font-size: 13px;
+  color: #3d5a76;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+.pads-add-btn {
+  padding: 8px 16px;
+  background: #7cf2a2;
+  color: #0a1a28;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.pads-add-btn:hover { opacity: 0.85; }
+
+.pads-loading { color: #3d5a76; padding: 24px 0; text-align: center; }
+.pads-error   { color: #ef4444; padding: 16px; background: #1a0808; border-radius: 8px; }
+.pads-empty   { color: #3d5a76; padding: 40px 0; text-align: center; }
+
+/* Groups by key */
+.pads-group { margin-bottom: 28px; }
+.pads-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.pads-key-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  background: #0f1e2e;
+  border: 1px solid #1e2d3d;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #7cf2a2;
+  text-transform: uppercase;
+}
+
+/* Grid */
+.pads-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.pad-card {
+  background: #0b1623;
+  border: 1px solid #1e2d3d;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s;
+}
+.pad-card:hover { border-color: #3d5a76; }
+.pad-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.pad-card-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #cbd5e1;
+  line-height: 1.3;
+}
+.pad-card-desc {
+  font-size: 11px;
+  color: #3d5a76;
+  margin: 0;
+  line-height: 1.4;
+}
+.pad-drive-link {
+  font-size: 11px;
+  color: #3d5a76;
+  text-decoration: none;
+  align-self: flex-start;
+}
+.pad-drive-link:hover { color: #7cf2a2; }
+
+/* Card actions */
+.pad-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pad-action-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.5;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+}
+.pad-action-btn:hover { opacity: 1; background: #0f1e2e; }
+.pad-action-btn.danger:hover { opacity: 1; }
+.pad-confirm-delete {
+  font-size: 11px;
+  color: #ef4444;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pad-confirm-yes {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pad-confirm-no {
+  background: none;
+  color: #3d5a76;
+  border: none;
+  font-size: 10px;
+  cursor: pointer;
+}
+.pad-confirm-no:hover { color: #94a3b8; }
+
+/* Modal */
+.pads-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+.pads-modal {
+  background: #0b1623;
+  border: 1px solid #1e2d3d;
+  border-radius: 12px;
+  padding: 28px;
+  width: 100%;
+  max-width: 460px;
+}
+.pads-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0 0 20px;
+}
+.pads-form { display: flex; flex-direction: column; gap: 14px; }
+.pads-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pads-input {
+  background: #060e18;
+  border: 1px solid #1e2d3d;
+  border-radius: 6px;
+  padding: 9px 12px;
+  color: #e2e8f0;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.pads-input:focus { border-color: #7cf2a2; }
+.pads-select { appearance: none; cursor: pointer; }
+.pads-form-error {
+  color: #ef4444;
+  font-size: 12px;
+  padding: 8px 10px;
+  background: #1a0808;
+  border-radius: 6px;
+}
+.pads-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+.pads-cancel-btn {
+  padding: 9px 18px;
+  background: #0f1e2e;
+  border: 1px solid #1e2d3d;
+  border-radius: 6px;
+  color: #64748b;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pads-cancel-btn:hover { color: #94a3b8; }
+.pads-save-btn {
+  padding: 9px 18px;
+  background: #7cf2a2;
+  border: none;
+  border-radius: 6px;
+  color: #0a1a28;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.pads-save-btn:hover { opacity: 0.85; }
+.pads-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }

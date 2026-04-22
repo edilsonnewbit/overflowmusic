@@ -162,6 +162,19 @@ export type SetlistSongTracks = {
   tracks: SongTrack[];
 };
 
+// ── Pads ──────────────────────────────────────────────────────────────────────
+
+export type Pad = {
+  id: string;
+  name: string;
+  key: string | null;
+  driveFileId: string;
+  driveUrl: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // ── Checklists ────────────────────────────────────────────────────────────────
 
 export type ChecklistTemplate = {

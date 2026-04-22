@@ -21,6 +21,7 @@ export type TrackState = {
   label: string;
   trackType: string;
   driveFileId: string;
+  loop: boolean;        // true for pad tracks — loops continuously
   buffer:       AudioBuffer | null;
   gainNode:     GainNode | null;
   panNode:      StereoPannerNode | null;
@@ -58,7 +59,9 @@ export type MultitrackEngine = {
   setVolume:   (trackId: string, value: number) => void;
   setPan:      (trackId: string, value: number) => void;
   toggleMute:  (trackId: string) => void;
-  setFx:       (trackId: string, fx: Partial<TrackFx>) => void;
+  setFx:        (trackId: string, fx: Partial<TrackFx>) => void;
+  addPadTrack:  (pad: { id: string; name: string; driveFileId: string }) => Promise<void>;
+  removePadTrack: (trackId: string) => void;
 };
 
 // ── Algorithmic reverb IR ─────────────────────────────────────────────────────
@@ -219,19 +222,34 @@ export function useMultitrackEngine(): MultitrackEngine {
     startTimeRef.current = startAt;
     const dur = durationRef.current;
 
+    // Count only non-loop tracks for natural-end detection
+    let nonLoopCount = 0;
     for (const ts of tracksRef.current) {
       if (!ts.buffer || !ts.gainNode || ts.loadState !== "ready") continue;
-      if (fromOffset >= ts.buffer.duration) continue;
+      if (!ts.loop && fromOffset < ts.buffer.duration) nonLoopCount++;
+    }
+    let nonLoopEnded = 0;
+
+    for (const ts of tracksRef.current) {
+      if (!ts.buffer || !ts.gainNode || ts.loadState !== "ready") continue;
       const source = ctx.createBufferSource();
       source.buffer = ts.buffer;
+      if (ts.loop) {
+        source.loop = true;
+      } else {
+        if (fromOffset >= ts.buffer.duration) continue;
+      }
       source.connect(ts.gainNode);
-      source.start(startAt, fromOffset);
+      source.start(startAt, ts.loop ? (fromOffset % ts.buffer.duration) : fromOffset);
       sourcesRef.current.set(ts.id, source);
-      source.onended = () => {
-        if (generationRef.current !== gen) return;
-        sourcesRef.current.delete(ts.id);
-        if (sourcesRef.current.size === 0 && isPlayingRef.current) handleNaturalEnd(dur);
-      };
+      if (!ts.loop) {
+        source.onended = () => {
+          if (generationRef.current !== gen) return;
+          sourcesRef.current.delete(ts.id);
+          nonLoopEnded++;
+          if (nonLoopEnded >= nonLoopCount && isPlayingRef.current) handleNaturalEnd(dur);
+        };
+      }
     }
 
     if (metronomeActiveRef.current) syncNextClickTime(ctx, startAt, fromOffset);
@@ -282,6 +300,7 @@ export function useMultitrackEngine(): MultitrackEngine {
 
     const initStates: TrackState[] = songTracks.map((t) => ({
       id: t.id, label: t.label, trackType: t.trackType, driveFileId: t.driveFileId,
+      loop: false,
       buffer: null, gainNode: null, panNode: null,
       hpfNode: null, lpfNode: null, compNode: null,
       convolver: null, dryGain: null, reverbWetGain: null,
@@ -483,6 +502,118 @@ export function useMultitrackEngine(): MultitrackEngine {
     setMetronomeBpmState(clamped);
   }, []);
 
+  // ── Pad tracks ──────────────────────────────────────────────────────────────
+  const addPadTrack = useCallback(async (pad: { id: string; name: string; driveFileId: string }) => {
+    // Don't add duplicate
+    if (tracksRef.current.some((t) => t.id === `pad-${pad.id}`)) return;
+
+    const padTrackId = `pad-${pad.id}`;
+    const padState: TrackState = {
+      id: padTrackId, label: pad.name, trackType: "PAD", driveFileId: pad.driveFileId,
+      loop: true,
+      buffer: null, gainNode: null, panNode: null,
+      hpfNode: null, lpfNode: null, compNode: null,
+      convolver: null, dryGain: null, reverbWetGain: null,
+      analyserNode: null,
+      volume: 0.7, pan: 0, muted: false, fx: { ...DEFAULT_FX },
+      loadState: "loading",
+    };
+
+    // Append to existing tracks
+    const withPad = [...tracksRef.current, padState];
+    syncTracks(withPad);
+
+    try {
+      const ctx = await ensureCtxRunning();
+      const ir  = getOrCreateIR(ctx);
+
+      let audioBuffer = bufferCacheRef.current.get(pad.driveFileId) ?? null;
+      if (!audioBuffer) {
+        const res = await fetch(`/api/audio-proxy?fileId=${encodeURIComponent(pad.driveFileId)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        audioBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
+        bufferCacheRef.current.set(pad.driveFileId, audioBuffer);
+      }
+
+      // Build audio graph (same chain as loadSong)
+      const gainNode      = ctx.createGain();
+      const panNode       = ctx.createStereoPanner();
+      const hpfNode       = ctx.createBiquadFilter();
+      const lpfNode       = ctx.createBiquadFilter();
+      const compNode      = ctx.createDynamicsCompressor();
+      const convolver     = ctx.createConvolver();
+      const dryGain       = ctx.createGain();
+      const reverbWetGain = ctx.createGain();
+      const analyserNode  = ctx.createAnalyser();
+      analyserNode.fftSize = 256;
+
+      hpfNode.type = "highpass"; hpfNode.frequency.value = 20; hpfNode.Q.value = 0.7;
+      lpfNode.type = "lowpass";  lpfNode.frequency.value = 20000; lpfNode.Q.value = 0.7;
+      compNode.threshold.value = 0; compNode.ratio.value = 1;
+      compNode.attack.value = 0.01; compNode.release.value = 0.25; compNode.knee.value = 6;
+      convolver.buffer = ir;
+      dryGain.gain.value = 1; reverbWetGain.gain.value = 0;
+      gainNode.gain.value = 0.7;
+
+      gainNode.connect(panNode);
+      panNode.connect(hpfNode); hpfNode.connect(lpfNode); lpfNode.connect(compNode);
+      compNode.connect(dryGain); compNode.connect(convolver);
+      convolver.connect(reverbWetGain);
+      dryGain.connect(analyserNode); reverbWetGain.connect(analyserNode);
+      analyserNode.connect(ctx.destination);
+
+      const readyPad: TrackState = {
+        ...padState,
+        buffer: audioBuffer, gainNode, panNode, hpfNode, lpfNode,
+        compNode, convolver, dryGain, reverbWetGain, analyserNode,
+        loadState: "ready",
+      };
+
+      const updated = tracksRef.current.map((t) => t.id === padTrackId ? readyPad : t);
+      syncTracks(updated);
+
+      // If currently playing, start the pad source immediately
+      if (isPlayingRef.current) {
+        const startAt = ctx.currentTime + 0.01;
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.loop = true;
+        source.connect(gainNode);
+        const offset = (ctx.currentTime - startTimeRef.current + offsetRef.current);
+        source.start(startAt, offset % audioBuffer.duration);
+        sourcesRef.current.set(padTrackId, source);
+      }
+    } catch {
+      const errTracks = tracksRef.current.map((t) =>
+        t.id === padTrackId ? { ...t, loadState: "error" as const } : t,
+      );
+      syncTracks(errTracks);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const removePadTrack = useCallback((trackId: string) => {
+    // Stop and disconnect the source if playing
+    const source = sourcesRef.current.get(trackId);
+    if (source) {
+      try { source.stop(); } catch { /* already stopped */ }
+      source.disconnect();
+      sourcesRef.current.delete(trackId);
+    }
+    // Disconnect nodes
+    const ts = tracksRef.current.find((t) => t.id === trackId);
+    if (ts) {
+      ts.gainNode?.disconnect(); ts.panNode?.disconnect();
+      ts.hpfNode?.disconnect(); ts.lpfNode?.disconnect();
+      ts.compNode?.disconnect(); ts.convolver?.disconnect();
+      ts.dryGain?.disconnect(); ts.reverbWetGain?.disconnect();
+      ts.analyserNode?.disconnect();
+    }
+    const updated = tracksRef.current.filter((t) => t.id !== trackId);
+    syncTracks(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Cleanup ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -502,5 +633,6 @@ export function useMultitrackEngine(): MultitrackEngine {
     toggleMetronome, setMetronomeBpm,
     loadSong, play, pause, seek,
     setVolume, setPan, toggleMute, setFx,
+    addPadTrack, removePadTrack,
   };
 }

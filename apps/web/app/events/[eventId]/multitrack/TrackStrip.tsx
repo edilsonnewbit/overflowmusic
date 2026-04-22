@@ -40,11 +40,12 @@ type Props = {
   onPanChange:    (v: number) => void;
   onMuteToggle:   () => void;
   onFxChange:     (fx: Partial<TrackFx>) => void;
+  onRemove?:      () => void;  // only for loop/pad tracks
 };
 
 export function TrackStrip({
   track, isPlaying,
-  onVolumeChange, onPanChange, onMuteToggle, onFxChange,
+  onVolumeChange, onPanChange, onMuteToggle, onFxChange, onRemove,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
@@ -137,6 +138,16 @@ export function TrackStrip({
           >
             FX
           </button>
+          {onRemove && (
+            <button
+              type="button"
+              className="mt-pad-remove-btn"
+              onClick={onRemove}
+              title="Remover pad"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* Center: waveform */}

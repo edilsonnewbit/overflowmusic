@@ -27,6 +27,8 @@ import { NotificationsService } from "./notifications/notifications.service";
 import { QueueService } from "./notifications/queue.service";
 import { OrganizationsController } from "./organizations/organizations.controller";
 import { OrganizationsService } from "./organizations/organizations.service";
+import { PadsController } from "./pads/pads.controller";
+import { PadsService } from "./pads/pads.service";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RehearsalsController } from "./rehearsals/rehearsals.controller";
 import { RehearsalsService } from "./rehearsals/rehearsals.service";
@@ -52,6 +54,7 @@ import { SongsService } from "./songs/songs.service";
     EventChatController,
     NotificationsController,
     OrganizationsController,
+    PadsController,
     SetlistController,
     SongsController,
     RehearsalsController,
@@ -72,6 +75,7 @@ import { SongsService } from "./songs/songs.service";
     NotificationsService,
     QueueService,
     OrganizationsService,
+    PadsService,
     SetlistService,
     SongsService,
     RehearsalsService,
