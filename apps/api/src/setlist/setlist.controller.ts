@@ -26,6 +26,7 @@ type CreateSetlistItemBody = {
   zone?: string;
   transitionNotes?: string;
   order?: number;
+  padId?: string | null;
 };
 
 type UpdateSetlistItemBody = Partial<CreateSetlistItemBody>;

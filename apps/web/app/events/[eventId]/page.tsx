@@ -6,7 +6,7 @@ import { AuthRequired } from "@/components/AuthRequired";
 import { useAuth } from "@/components/AuthProvider";
 import { QRCodeCanvas } from "@/components/QRCodeCanvas";
 import EventChat from "@/components/EventChat";
-import type { EventStatus, SetlistItem, EventSetlist } from "@/lib/types";
+import type { EventStatus, SetlistItem, EventSetlist, Pad } from "@/lib/types";
 type Setlist = NonNullable<EventSetlist>;
 
 type EventMusician = {
@@ -157,6 +157,12 @@ export default function EventDetailPage({ params }: PageProps) {
   const [addSongLeader, setAddSongLeader] = useState("");
   const [addSongZone, setAddSongZone] = useState("");
   const [addSongNotes, setAddSongNotes] = useState("");
+
+  // pad form (add pad to setlist)
+  const [pads, setPads] = useState<Pad[]>([]);
+  const [addSetlistTab, setAddSetlistTab] = useState<"song" | "pad">("song");
+  const [selectedPad, setSelectedPad] = useState<Pad | null>(null);
+  const [addPadNotes, setAddPadNotes] = useState("");
   const [addingItem, setAddingItem] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
@@ -218,6 +224,16 @@ export default function EventDetailPage({ params }: PageProps) {
       }
     }
     void loadTeamUsers();
+
+    async function loadPads() {
+      try {
+        const res = await fetch("/api/pads", { cache: "no-store" });
+        if (!res.ok) return;
+        const body = (await res.json()) as Pad[];
+        setPads(Array.isArray(body) ? body : []);
+      } catch { /* pads são opcionais */ }
+    }
+    void loadPads();
   }, []);
 
   // Fecha menu de 3 pontinhos ao clicar fora
@@ -433,6 +449,34 @@ export default function EventDetailPage({ params }: PageProps) {
       await loadEvent(eventId);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Erro ao adicionar.");
+    } finally {
+      setAddingItem(false);
+    }
+  }
+
+  async function addPadToSetlist(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedPad || !eventId) return;
+    setAddingItem(true);
+    setStatus("Adicionando pad...");
+    try {
+      const response = await fetch(`/api/events/${eventId}/setlist/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          songTitle: selectedPad.name,
+          key: selectedPad.key ?? undefined,
+          transitionNotes: addPadNotes.trim() || undefined,
+          padId: selectedPad.id,
+        }),
+      });
+      await parseJson<unknown>(response);
+      setSelectedPad(null);
+      setAddPadNotes("");
+      setStatus("Pad adicionado.");
+      await loadEvent(eventId);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Erro ao adicionar pad.");
     } finally {
       setAddingItem(false);
     }
@@ -987,6 +1031,7 @@ export default function EventDetailPage({ params }: PageProps) {
                                 title="Clique para editar"
                               >
                                 <span style={{ color: "#8fa9c8", marginRight: 2, fontSize: 13 }}>{idx + 1}.</span>
+                                {item.padId && <span style={{ fontSize: 11, background: "#1e1040", color: "#818cf8", border: "1px solid #4c3d9e", borderRadius: 4, padding: "1px 5px", fontWeight: 700 }}>🎹 PAD</span>}
                                 {item.songTitle}
                                 {isMoving && <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 4 }}>movendo...</span>}
                                 <span style={{ color: "#7cf2a2", fontSize: 11, marginLeft: 4, opacity: 0.6 }}>✎</span>
@@ -1177,8 +1222,29 @@ export default function EventDetailPage({ params }: PageProps) {
                   </ol>
                 )}
 
-                {/* Add Item Form */}
-                <form onSubmit={(e) => void addSetlistItem(e)} style={addFormStyle}>
+                {/* Add Item Form — tabs: Música / Pad */}
+                <div style={addFormStyle}>
+                  {/* Tab switcher */}
+                  <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+                    {(["song", "pad"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setAddSetlistTab(t)}
+                        style={{
+                          padding: "4px 14px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                          border: addSetlistTab === t ? "1px solid #7cf2a2" : "1px solid #1e2d3d",
+                          background: addSetlistTab === t ? "#0a1a28" : "transparent",
+                          color: addSetlistTab === t ? "#7cf2a2" : "#3d5a76",
+                        }}
+                      >
+                        {t === "song" ? "🎵 Música" : "🎹 Pad"}
+                      </button>
+                    ))}
+                  </div>
+
+                {addSetlistTab === "song" && (
+                <form onSubmit={(e) => void addSetlistItem(e)}>
                   <h3 style={{ margin: "0 0 10px", fontSize: 14, color: "#7cf2a2" }}>
                     + Adicionar música
                   </h3>
@@ -1279,10 +1345,58 @@ export default function EventDetailPage({ params }: PageProps) {
                     {addingItem ? "Adicionando..." : "Adicionar"}
                   </button>
                 </form>
+                )}
+
+                {/* Pad form */}
+                {addSetlistTab === "pad" && (
+                <form onSubmit={(e) => void addPadToSetlist(e)}>
+                  <h3 style={{ margin: "0 0 10px", fontSize: 14, color: "#818cf8" }}>🎹 Adicionar Pad</h3>
+                  {pads.length === 0 ? (
+                    <p style={{ fontSize: 12, color: "#3d5a76" }}>
+                      Nenhum pad cadastrado.{" "}
+                      <a href="/pads" style={{ color: "#818cf8" }}>Cadastrar pads →</a>
+                    </p>
+                  ) : (
+                    <>
+                      <select
+                        style={{ ...inputStyle, appearance: "none" as const, marginBottom: 8 }}
+                        value={selectedPad?.id ?? ""}
+                        onChange={(e) => {
+                          const pad = pads.find((p) => p.id === e.target.value) ?? null;
+                          setSelectedPad(pad);
+                        }}
+                        disabled={addingItem}
+                      >
+                        <option value="">Escolher pad *</option>
+                        {pads.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.key ? `[${p.key}] ` : ""}{p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        style={inputStyle}
+                        placeholder="Notas de transição (opcional)"
+                        value={addPadNotes}
+                        onChange={(e) => setAddPadNotes(e.target.value)}
+                        disabled={addingItem}
+                      />
+                      <button
+                        type="submit"
+                        style={{ ...primaryBtn, background: "#4c3d9e", color: "#e0d9ff", marginTop: 8 }}
+                        disabled={addingItem || !selectedPad}
+                      >
+                        {addingItem ? "Adicionando..." : "Adicionar Pad"}
+                      </button>
+                    </>
+                  )}
+                </form>
+                )}
 
                 {status !== "OK" && status !== "Carregando evento..." && (
                   <p style={{ color: "#fbbf24", fontSize: 13, marginBottom: 12 }}>{status}</p>
                 )}
+                </div>
                 </>)}
               </section>
 

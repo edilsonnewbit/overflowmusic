@@ -299,14 +299,17 @@ model SetlistItem {
   id              String   @id @default(uuid())
   setlistId       String
   order           Int
-  songTitle       String
+  songTitle       String   // nome da música ou do pad (para logs e display)
   key             String?
   leaderName      String?
   zone            String?
   transitionNotes String?
+  // Pad moment: quando padId está preenchido, o item representa um pad contínuo
+  padId           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   setlist         Setlist  @relation(fields: [setlistId], references: [id], onDelete: Cascade)
+  pad             Pad?     @relation(fields: [padId], references: [id], onDelete: SetNull)
 
   @@index([setlistId, order])
 }
@@ -449,14 +452,15 @@ model EventRehearsal {
 // Pads são áudios de longa duração (5-10 min) que tocam em loop contínuo,
 // geralmente usados para preencher o espaço sonoro durante o culto.
 model Pad {
-  id          String   @id @default(uuid())
-  name        String
-  key         String?  // Ex: "C", "C#", "D", "Db" — null = qualquer tom
-  driveFileId String
-  driveUrl    String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String        @id @default(uuid())
+  name         String
+  key          String?       // Ex: "C", "C#", "D", "Db" — null = qualquer tom
+  driveFileId  String
+  driveUrl     String
+  description  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  setlistItems SetlistItem[]
 
   @@index([key])
 }

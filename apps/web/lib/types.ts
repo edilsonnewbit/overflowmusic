@@ -128,6 +128,8 @@ export type SetlistItem = {
   leaderName: string | null;
   zone: string | null;
   transitionNotes: string | null;
+  padId: string | null;
+  pad: { id: string; name: string; driveFileId: string; key: string | null } | null;
 };
 
 export type EventSetlist = {
@@ -160,6 +162,7 @@ export type SetlistSongTracks = {
   key: string | null;
   leaderName: string | null;
   tracks: SongTrack[];
+  pad: { id: string; name: string; driveFileId: string; key: string | null } | null;
 };
 
 // ── Pads ──────────────────────────────────────────────────────────────────────

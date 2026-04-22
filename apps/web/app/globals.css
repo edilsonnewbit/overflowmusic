@@ -624,6 +624,15 @@ a {
 .mt-song-card:hover { border-color: #2d4b6d; background: #132030; }
 .mt-song-card.active { border-color: #7cf2a2; background: #0f2a1e; }
 .mt-song-card.no-tracks { opacity: 0.5; }
+/* Pad card variant */
+.mt-pad-card { border-color: #2d1f60; }
+.mt-pad-card:hover { border-color: #4c3d9e; background: #130f28; }
+.mt-pad-card.active { border-color: #818cf8; background: #1a1040; }
+.mt-pad-thumb {
+  background: linear-gradient(135deg, #1a1040 0%, #2d1f60 100%);
+  flex-direction: column;
+  gap: 2px;
+}
 
 .mt-card-thumb {
   width: 36px;

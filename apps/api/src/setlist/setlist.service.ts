@@ -15,6 +15,7 @@ type CreateSetlistItemInput = {
   zone?: string;
   transitionNotes?: string;
   order?: number;
+  padId?: string | null;  // quando preenchido, item representa um momento de pad
 };
 
 type UpdateSetlistItemInput = Partial<CreateSetlistItemInput>;
@@ -30,7 +31,7 @@ export class SetlistService {
   async getByEvent(eventId: string) {
     const setlist = await this.prisma.setlist.findUnique({
       where: { eventId },
-      include: { items: { orderBy: { order: "asc" } } },
+      include: { items: { orderBy: { order: "asc" }, include: { pad: true } } },
     });
 
     if (!setlist) {
@@ -86,7 +87,9 @@ export class SetlistService {
         leaderName: input.leaderName?.trim() || null,
         zone: input.zone?.trim() || null,
         transitionNotes: input.transitionNotes?.trim() || null,
+        padId: input.padId ?? null,
       },
+      include: { pad: true },
     });
 
     const details: Record<string, unknown> = {};
@@ -94,6 +97,7 @@ export class SetlistService {
     if (item.leaderName) details.lider = item.leaderName;
     if (item.zone) details.zona = item.zone;
     if (item.transitionNotes) details.notas = item.transitionNotes;
+    if (item.padId) details.tipo = "pad";
 
     await this.writeLog(setlist.id, actor, "ITEM_ADDED", songTitle, details);
     return { ok: true, item };
@@ -462,11 +466,18 @@ export class SetlistService {
   async getSetlistTracks(eventId: string) {
     const setlist = await this.prisma.setlist.findUnique({
       where: { eventId },
-      include: { items: { orderBy: { order: "asc" } } },
+      include: {
+        items: {
+          orderBy: { order: "asc" },
+          include: { pad: true },
+        },
+      },
     });
     if (!setlist) return { ok: true, songTracks: [] };
 
-    const titles = setlist.items.map((i) => i.songTitle);
+    // Only look up songs for non-pad items
+    const songItems = setlist.items.filter((i) => !i.padId);
+    const titles = songItems.map((i) => i.songTitle);
     const songs = await this.prisma.song.findMany({
       where: { title: { in: titles } },
       include: { tracks: { orderBy: { order: "asc" } } },
@@ -479,7 +490,10 @@ export class SetlistService {
       songTitle: item.songTitle,
       key: item.key,
       leaderName: item.leaderName,
-      tracks: byTitle.get(item.songTitle) ?? [],
+      tracks: item.padId ? [] : (byTitle.get(item.songTitle) ?? []),
+      pad: item.pad
+        ? { id: item.pad.id, name: item.pad.name, driveFileId: item.pad.driveFileId, key: item.pad.key }
+        : null,
     }));
 
     return { ok: true, songTracks };

@@ -138,7 +138,14 @@ export default function MultitrackPage({ params }: Props) {
   useEffect(() => {
     const song = songTracks[currentSongIndex];
     if (!song) return;
-    void engine.loadSong(song.tracks);
+    if (song.pad) {
+      // Pad item: load as empty song then add pad as loop track
+      void engine.loadSong([]).then(() => {
+        if (song.pad) void engine.addPadTrack(song.pad);
+      });
+    } else {
+      void engine.loadSong(song.tracks);
+    }
   }, [currentSongIndex, songTracks]);
 
   // Scroll active card into view
@@ -150,6 +157,7 @@ export default function MultitrackPage({ params }: Props) {
   }, [currentSongIndex]);
 
   const currentSong   = songTracks[currentSongIndex] ?? null;
+  const isPadItem     = currentSong?.pad !== null && currentSong?.pad !== undefined;
   const hasClickTrack = currentSong?.tracks.some((t) => t.trackType === "CLICK") ?? false;
 
   if (authLoading || loading) {
@@ -214,8 +222,8 @@ export default function MultitrackPage({ params }: Props) {
           </div>
         )}
 
-        {/* Metronome strip — visível quando não há trilha CLICK na música */}
-        {!engine.isLoading && !hasClickTrack && currentSong && (
+        {/* Metronome strip — visível quando não há trilha CLICK e não é item de pad */}
+        {!engine.isLoading && !hasClickTrack && !isPadItem && currentSong && (
           <div className="mt-metronome-strip">
             {/* Left: toggle */}
             <div className="mt-metronome-left">
@@ -294,7 +302,7 @@ export default function MultitrackPage({ params }: Props) {
           </div>
         )}
 
-        {!engine.isLoading && engine.tracks.length === 0 && currentSong && (
+        {!engine.isLoading && engine.tracks.length === 0 && currentSong && !isPadItem && (
           <div className="mt-tracks-empty">
             <p>Esta música não tem faixas cadastradas.</p>
             <p style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>

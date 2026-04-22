@@ -22,6 +22,29 @@ const TRACK_TYPE_COLORS: Record<string, string> = {
 
 export function SongCard({ song, isActive, onSelect }: Props) {
   const hasNoTracks = song.tracks.length === 0;
+  const isPad = song.pad !== null;
+
+  if (isPad) {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`mt-song-card mt-pad-card${isActive ? " active" : ""}`}
+      >
+        <div className="mt-card-thumb mt-pad-thumb">
+          <span className="mt-card-num">{song.order}</span>
+          <span style={{ fontSize: 18 }}>🎹</span>
+        </div>
+        <div className="mt-card-info">
+          <p className="mt-card-title">{song.songTitle}</p>
+          <p className="mt-card-meta">
+            {song.key ? <span className="mt-card-key">{song.key}</span> : null}
+            <span className="mt-card-tracks" style={{ color: "#818cf8" }}>pad · loop</span>
+          </p>
+        </div>
+      </button>
+    );
+  }
 
   return (
     <button
