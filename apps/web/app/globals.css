@@ -783,6 +783,9 @@ a {
   align-items: center;
   gap: 2px;
   padding: 4px 6px;
+  width: 80px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 .mt-fader {
   -webkit-appearance: none;
@@ -823,19 +826,22 @@ a {
   align-items: center;
   gap: 2px;
   margin-top: 3px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .mt-pan-side {
   font-size: 8px;
   font-weight: 700;
   color: #3d5a76;
   width: 7px;
-  text-align: center;
   flex-shrink: 0;
+  text-align: center;
 }
 .mt-pan-slider {
   -webkit-appearance: none;
   appearance: none;
   flex: 1;
+  min-width: 0;
   height: 3px;
   border-radius: 2px;
   background: #1e2d3d;
@@ -903,22 +909,46 @@ a {
 }
 .mt-metronome-center {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
   padding: 0 12px;
   background: #0b1623;
   height: 100%;
   border-left: 1px solid #0f1e2e;
   border-right: 1px solid #0f1e2e;
 }
+.mt-metronome-beats {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.mt-beat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #1e2d3d;
+  opacity: 0.25;
+  transition: opacity 0.05s, transform 0.05s;
+  flex-shrink: 0;
+}
+.mt-beat-dot.accent { width: 13px; height: 13px; }
+.mt-beat-dot.lit { opacity: 1; transform: scale(1.25); }
 .mt-metronome-hint {
   font-size: 11px;
   color: #3d5a76;
 }
 .mt-metronome-right {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 0 6px;
+  gap: 5px;
+  padding: 6px 6px;
+}
+.mt-bpm-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 .mt-bpm-label {
   font-size: 9px;
@@ -958,6 +988,25 @@ a {
 }
 .mt-bpm-input::-webkit-outer-spin-button,
 .mt-bpm-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.mt-tap-btn {
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid #2a3d52;
+  background: #0d1f30;
+  color: #8fa9c8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.mt-tap-btn:active {
+  background: #1a3a52;
+  border-color: #7cf2a2;
+  color: #7cf2a2;
+}
 
 /* ── Transport bar ────────────────────────────────────────────────────────── */
 .mt-transport {

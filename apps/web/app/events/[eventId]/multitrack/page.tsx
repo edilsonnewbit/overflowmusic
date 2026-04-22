@@ -12,19 +12,84 @@ import { useMultitrackEngine } from "./useMultitrackEngine";
 
 type Props = { params: Promise<{ eventId: string }> };
 
+// 4 beats per measure — dots represent beats 1-4
+const BEAT_COUNT = 4;
+
 export default function MultitrackPage({ params }: Props) {
   const { eventId } = use(params);
   const { user, loading: authLoading } = useAuth();
 
-  const [songTracks,        setSongTracks]        = useState<SetlistSongTracks[]>([]);
-  const [currentSongIndex,  setCurrentSongIndex]  = useState(0);
-  const [loading,           setLoading]           = useState(true);
-  const [error,             setError]             = useState<string | null>(null);
+  const [songTracks,       setSongTracks]       = useState<SetlistSongTracks[]>([]);
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+  const [loading,          setLoading]          = useState(true);
+  const [error,            setError]            = useState<string | null>(null);
   const songCardRowRef = useRef<HTMLDivElement>(null);
 
   const engine = useMultitrackEngine();
 
-  // Fetch setlist tracks
+  // ── Tap tempo ─────────────────────────────────────────────────────────────
+  const tapTimesRef   = useRef<number[]>([]);
+  const tapResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleTap() {
+    const now = Date.now();
+    // Clear taps older than 3 seconds
+    const recent = tapTimesRef.current.filter((t) => now - t < 3000);
+    recent.push(now);
+    tapTimesRef.current = recent;
+
+    if (recent.length >= 2) {
+      const intervals: number[] = [];
+      for (let i = 1; i < recent.length; i++) intervals.push(recent[i] - recent[i - 1]);
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      engine.setMetronomeBpm(Math.round(60000 / avg));
+    }
+
+    // Reset tap history after 3s of inactivity
+    if (tapResetTimer.current) clearTimeout(tapResetTimer.current);
+    tapResetTimer.current = setTimeout(() => { tapTimesRef.current = []; }, 3000);
+  }
+
+  // ── Beat indicator (visual) ───────────────────────────────────────────────
+  const beatDotsRef   = useRef<(HTMLDivElement | null)[]>([]);
+  const currentBeat   = useRef<number>(0);
+  const lastBeatTime  = useRef<number>(0);
+
+  useEffect(() => {
+    if (!engine.metronomeActive || !engine.isPlaying) {
+      // Reset all dots when metronome is off
+      beatDotsRef.current.forEach((d) => d?.classList.remove("lit"));
+      currentBeat.current = 0;
+      return;
+    }
+
+    const beatMs = (60 / engine.metronomeBpm) * 1000;
+    let rafId: number;
+
+    function tick() {
+      const now = performance.now();
+      if (now - lastBeatTime.current >= beatMs) {
+        lastBeatTime.current = now;
+        // Remove lit from previous dot
+        const prev = currentBeat.current;
+        beatDotsRef.current[prev]?.classList.remove("lit");
+        // Advance beat
+        currentBeat.current = (prev + 1) % BEAT_COUNT;
+        beatDotsRef.current[currentBeat.current]?.classList.add("lit");
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    // Align lastBeatTime so tick starts from beat 1
+    lastBeatTime.current = performance.now() - beatMs;
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(rafId);
+      beatDotsRef.current.forEach((d) => d?.classList.remove("lit"));
+    };
+  }, [engine.metronomeActive, engine.isPlaying, engine.metronomeBpm]);
+
+  // ── Fetch setlist tracks ──────────────────────────────────────────────────
   useEffect(() => {
     if (!eventId) return;
     void (async () => {
@@ -56,9 +121,7 @@ export default function MultitrackPage({ params }: Props) {
     card?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   }, [currentSongIndex]);
 
-  const currentSong = songTracks[currentSongIndex] ?? null;
-
-  // Check if current song has a CLICK track uploaded
+  const currentSong   = songTracks[currentSongIndex] ?? null;
   const hasClickTrack = currentSong?.tracks.some((t) => t.trackType === "CLICK") ?? false;
 
   if (authLoading || loading) {
@@ -123,9 +186,10 @@ export default function MultitrackPage({ params }: Props) {
           </div>
         )}
 
-        {/* Metronome strip — aparece quando não há trilha CLICK carregada */}
+        {/* Metronome strip — visível quando não há trilha CLICK na música */}
         {!engine.isLoading && !hasClickTrack && currentSong && (
           <div className="mt-metronome-strip">
+            {/* Left: toggle */}
             <div className="mt-metronome-left">
               <button
                 type="button"
@@ -135,38 +199,69 @@ export default function MultitrackPage({ params }: Props) {
               >
                 🥁
               </button>
-              <span className="mt-metronome-label" style={{ color: engine.metronomeActive ? "#ef4444" : "#475569" }}>
+              <span
+                className="mt-metronome-label"
+                style={{ color: engine.metronomeActive ? "#ef4444" : "#475569" }}
+              >
                 CLICK
               </span>
             </div>
+
+            {/* Center: beat indicator + hint */}
             <div className="mt-metronome-center">
               {engine.metronomeActive ? (
-                <span className="mt-metronome-hint">Click ativo · acento no 1º tempo de cada 4</span>
+                <div className="mt-metronome-beats">
+                  {Array.from({ length: BEAT_COUNT }).map((_, i) => (
+                    <div
+                      key={i}
+                      ref={(el) => { beatDotsRef.current[i] = el; }}
+                      className={`mt-beat-dot${i === 0 ? " accent" : ""}`}
+                      style={{ background: i === 0 ? "#ef4444" : "#8fa9c8" }}
+                    />
+                  ))}
+                  <span className="mt-metronome-hint" style={{ marginLeft: 8 }}>
+                    {engine.metronomeBpm} BPM
+                  </span>
+                </div>
               ) : (
-                <span className="mt-metronome-hint">Sem trilha CLICK — ative o metrônomo interno</span>
+                <span className="mt-metronome-hint">
+                  Sem trilha CLICK — ative o metrônomo interno
+                </span>
               )}
             </div>
+
+            {/* Right: BPM control + tap tempo */}
             <div className="mt-metronome-right">
-              <span className="mt-bpm-label">BPM</span>
+              <div className="mt-bpm-row">
+                <span className="mt-bpm-label">BPM</span>
+                <button
+                  type="button"
+                  className="mt-bpm-btn"
+                  onClick={() => engine.setMetronomeBpm(engine.metronomeBpm - 1)}
+                  disabled={engine.metronomeBpm <= 20}
+                >−</button>
+                <input
+                  type="number"
+                  className="mt-bpm-input"
+                  min={20} max={300}
+                  value={engine.metronomeBpm}
+                  onChange={(e) => engine.setMetronomeBpm(parseInt(e.target.value, 10) || 120)}
+                />
+                <button
+                  type="button"
+                  className="mt-bpm-btn"
+                  onClick={() => engine.setMetronomeBpm(engine.metronomeBpm + 1)}
+                  disabled={engine.metronomeBpm >= 300}
+                >+</button>
+              </div>
               <button
                 type="button"
-                className="mt-bpm-btn"
-                onClick={() => engine.setMetronomeBpm(engine.metronomeBpm - 1)}
-                disabled={engine.metronomeBpm <= 20}
-              >−</button>
-              <input
-                type="number"
-                className="mt-bpm-input"
-                min={20} max={300}
-                value={engine.metronomeBpm}
-                onChange={(e) => engine.setMetronomeBpm(parseInt(e.target.value, 10) || 120)}
-              />
-              <button
-                type="button"
-                className="mt-bpm-btn"
-                onClick={() => engine.setMetronomeBpm(engine.metronomeBpm + 1)}
-                disabled={engine.metronomeBpm >= 300}
-              >+</button>
+                className="mt-tap-btn"
+                onClick={handleTap}
+                title="Toque no ritmo para definir o BPM"
+              >
+                TAP
+              </button>
             </div>
           </div>
         )}
