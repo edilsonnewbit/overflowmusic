@@ -706,7 +706,7 @@ a {
 /* ── Track strip ──────────────────────────────────────────────────────────── */
 .mt-track-strip {
   display: grid;
-  grid-template-columns: 120px 1fr 80px;
+  grid-template-columns: 160px 1fr 80px;
   align-items: center;
   gap: 0;
   height: 68px;
@@ -973,7 +973,7 @@ a {
 /* ── Metronome strip ──────────────────────────────────────────────────────── */
 .mt-metronome-strip {
   display: grid;
-  grid-template-columns: 120px 1fr auto;
+  grid-template-columns: 160px 1fr auto;
   align-items: center;
   height: 68px;
   border-bottom: 1px solid #1a0f0f;
