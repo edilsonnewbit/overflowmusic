@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CSSProperties, FormEvent, useCallback, useEffect, useState } from "react";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthRequired } from "@/components/AuthRequired";
 import { useAuth } from "@/components/AuthProvider";
 import { QRCodeCanvas } from "@/components/QRCodeCanvas";
 import EventChat from "@/components/EventChat";
@@ -568,7 +568,7 @@ export default function EventDetailPage({ params }: PageProps) {
   const displayStatus = event?.computedStatus ?? event?.status ?? "";
 
   return (
-    <AuthGate>
+    <AuthRequired>
       <main style={{ minHeight: "100vh", padding: "24px 24px 48px" }}>
         <section style={{ maxWidth: 1180, margin: "0 auto" }}>
           {/* Header */}
@@ -1420,7 +1420,7 @@ export default function EventDetailPage({ params }: PageProps) {
           </div>
         </div>
       )}
-    </AuthGate>
+    </AuthRequired>
   );
 }
 
