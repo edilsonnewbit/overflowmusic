@@ -176,6 +176,7 @@ export class AuthController {
     @Body() body: {
       name?: string;
       instruments?: string[];
+      volunteerArea?: string | null;
       instagramProfile?: string | null;
       birthDate?: string | null;
       church?: string | null;
@@ -192,6 +193,7 @@ export class AuthController {
     return this.authService.updateMe(token, {
       name: body.name,
       instruments: body.instruments,
+      volunteerArea: body.volunteerArea,
       instagramProfile: body.instagramProfile,
       birthDate: body.birthDate,
       church: body.church,
