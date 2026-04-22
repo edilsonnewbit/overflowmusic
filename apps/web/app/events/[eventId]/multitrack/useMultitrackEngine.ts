@@ -572,6 +572,12 @@ export function useMultitrackEngine(): MultitrackEngine {
       const updated = tracksRef.current.map((t) => t.id === padTrackId ? readyPad : t);
       syncTracks(updated);
 
+      // Enable transport: use pad buffer duration as the displayed duration
+      // (loop is infinite, but we show one cycle length on the scrubber)
+      if (durationRef.current === 0) {
+        syncDuration(audioBuffer.duration);
+      }
+
       // If currently playing, start the pad source immediately
       if (isPlayingRef.current) {
         const startAt = ctx.currentTime + 0.01;
