@@ -706,10 +706,10 @@ a {
 /* ── Track strip ──────────────────────────────────────────────────────────── */
 .mt-track-strip {
   display: grid;
-  grid-template-columns: 120px 1fr 64px;
+  grid-template-columns: 120px 1fr 80px;
   align-items: center;
   gap: 0;
-  height: 52px;
+  height: 68px;
   border-bottom: 1px solid #0f1e2e;
   padding: 0 8px 0 0;
   transition: background 0.1s;
@@ -816,6 +816,148 @@ a {
   color: #3d5a76;
   line-height: 1;
 }
+
+/* ── Pan slider ───────────────────────────────────────────────────────────── */
+.mt-pan-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 3px;
+}
+.mt-pan-side {
+  font-size: 8px;
+  font-weight: 700;
+  color: #3d5a76;
+  width: 7px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.mt-pan-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: #1e2d3d;
+  outline: none;
+  cursor: pointer;
+}
+.mt-pan-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pan-color, #7cf2a2);
+  cursor: pointer;
+  border: none;
+}
+.mt-pan-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pan-color, #7cf2a2);
+  cursor: pointer;
+  border: none;
+}
+
+/* ── Metronome strip ──────────────────────────────────────────────────────── */
+.mt-metronome-strip {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  height: 68px;
+  border-bottom: 1px solid #1a0f0f;
+  background: #100808;
+  padding: 0 8px 0 0;
+}
+.mt-metronome-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+.mt-metronome-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #3d1a1a;
+  background: #0b1623;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.mt-metronome-btn.active {
+  border-color: #ef4444;
+  background: #1a0808;
+}
+.mt-metronome-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: color 0.15s;
+}
+.mt-metronome-center {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: #0b1623;
+  height: 100%;
+  border-left: 1px solid #0f1e2e;
+  border-right: 1px solid #0f1e2e;
+}
+.mt-metronome-hint {
+  font-size: 11px;
+  color: #3d5a76;
+}
+.mt-metronome-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+}
+.mt-bpm-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #3d5a76;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: 2px;
+}
+.mt-bpm-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid #1e2d3d;
+  background: #0b1623;
+  color: #8fa9c8;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.mt-bpm-btn:disabled { opacity: 0.3; cursor: default; }
+.mt-bpm-input {
+  width: 42px;
+  text-align: center;
+  background: #0b1623;
+  border: 1px solid #1e2d3d;
+  border-radius: 4px;
+  color: #c8d8e8;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 4px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.mt-bpm-input::-webkit-outer-spin-button,
+.mt-bpm-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* ── Transport bar ────────────────────────────────────────────────────────── */
 .mt-transport {

@@ -27,17 +27,24 @@ const TRACK_COLORS: Record<string, string> = {
   STEM_BACKING: "#94a3b8",
 };
 
+function panLabel(pan: number): string {
+  if (Math.abs(pan) < 0.02) return "C";
+  const pct = Math.round(Math.abs(pan) * 100);
+  return pan < 0 ? `L${pct}` : `R${pct}`;
+}
+
 type Props = {
   track: TrackState;
   isPlaying: boolean;
   onVolumeChange: (v: number) => void;
+  onPanChange: (v: number) => void;
   onMuteToggle: () => void;
 };
 
-export function TrackStrip({ track, isPlaying, onVolumeChange, onMuteToggle }: Props) {
+export function TrackStrip({ track, isPlaying, onVolumeChange, onPanChange, onMuteToggle }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rafRef = useRef<number>(0);
-  const color = TRACK_COLORS[track.trackType] ?? "#94a3b8";
+  const rafRef    = useRef<number>(0);
+  const color     = TRACK_COLORS[track.trackType] ?? "#94a3b8";
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,7 +54,7 @@ export function TrackStrip({ track, isPlaying, onVolumeChange, onMuteToggle }: P
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const bufLen = analyser.frequencyBinCount;
+    const bufLen    = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufLen);
 
     function draw() {
@@ -58,7 +65,7 @@ export function TrackStrip({ track, isPlaying, onVolumeChange, onMuteToggle }: P
       ctx.fillStyle = "#0b1623";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth  = 1.5;
       ctx.strokeStyle = track.muted ? "#334155" : color;
       ctx.beginPath();
 
@@ -68,7 +75,7 @@ export function TrackStrip({ track, isPlaying, onVolumeChange, onMuteToggle }: P
         const v = dataArray[i] / 128.0;
         const y = (v * canvas.height) / 2;
         if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        else         ctx.lineTo(x, y);
         x += sliceWidth;
       }
       ctx.lineTo(canvas.width, canvas.height / 2);
@@ -77,11 +84,10 @@ export function TrackStrip({ track, isPlaying, onVolumeChange, onMuteToggle }: P
 
     if (isPlaying) draw();
     else {
-      // Draw flat line when paused
       cancelAnimationFrame(rafRef.current);
       ctx.fillStyle = "#0b1623";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.lineWidth = 1;
+      ctx.lineWidth   = 1;
       ctx.strokeStyle = track.muted ? "#1e293b" : color + "55";
       ctx.beginPath();
       ctx.moveTo(0, canvas.height / 2);
@@ -125,13 +131,12 @@ export function TrackStrip({ track, isPlaying, onVolumeChange, onMuteToggle }: P
         )}
       </div>
 
-      {/* Right: fader */}
+      {/* Right: volume fader + pan slider */}
       <div className="mt-fader-wrap">
+        {/* Volume */}
         <input
           type="range"
-          min={0}
-          max={1}
-          step={0.01}
+          min={0} max={1} step={0.01}
           value={track.volume}
           onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
           className="mt-fader"
@@ -139,6 +144,25 @@ export function TrackStrip({ track, isPlaying, onVolumeChange, onMuteToggle }: P
           title={`Volume: ${Math.round(track.volume * 100)}%`}
         />
         <span className="mt-fader-val">{Math.round(track.volume * 100)}</span>
+
+        {/* Pan */}
+        <div className="mt-pan-row">
+          <span className="mt-pan-side">L</span>
+          <input
+            type="range"
+            min={-1} max={1} step={0.01}
+            value={track.pan}
+            onChange={(e) => onPanChange(parseFloat(e.target.value))}
+            className="mt-pan-slider"
+            style={{ "--pan-color": color } as React.CSSProperties}
+            title={`Pan: ${panLabel(track.pan)}`}
+            onDoubleClick={() => onPanChange(0)}
+          />
+          <span className="mt-pan-side">R</span>
+        </div>
+        <span className="mt-fader-val" style={{ color: Math.abs(track.pan) > 0.02 ? color : undefined }}>
+          {panLabel(track.pan)}
+        </span>
       </div>
     </div>
   );

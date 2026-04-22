@@ -1158,13 +1158,6 @@ export default function EventDetailPage({ params }: PageProps) {
                                         }}>
                                           <button
                                             type="button"
-                                            onClick={() => { openEditItem(item); setItemMenuOpenId(null); }}
-                                            style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 13, border: "none", background: "transparent", color: "#d4d4d8", cursor: "pointer", borderRadius: 6 }}
-                                          >
-                                            ✏ Editar
-                                          </button>
-                                          <button
-                                            type="button"
                                             onClick={() => { setConfirmDeleteItemId(item.id); setItemMenuOpenId(null); }}
                                             style={{ width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 13, border: "none", background: "transparent", color: "#f87171", cursor: "pointer", borderRadius: 6 }}
                                           >

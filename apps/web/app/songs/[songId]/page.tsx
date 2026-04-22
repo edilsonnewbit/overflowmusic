@@ -516,6 +516,7 @@ function SongDetailContent({ params }: { params: Promise<{ songId: string }> }) 
                       track={track}
                       isPlaying={engine.isPlaying}
                       onVolumeChange={(v) => engine.setVolume(track.id, v)}
+                      onPanChange={(v) => engine.setPan(track.id, v)}
                       onMuteToggle={() => engine.toggleMute(track.id)}
                     />
                   ))}

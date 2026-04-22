@@ -16,10 +16,10 @@ export default function MultitrackPage({ params }: Props) {
   const { eventId } = use(params);
   const { user, loading: authLoading } = useAuth();
 
-  const [songTracks, setSongTracks] = useState<SetlistSongTracks[]>([]);
-  const [currentSongIndex, setCurrentSongIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [songTracks,        setSongTracks]        = useState<SetlistSongTracks[]>([]);
+  const [currentSongIndex,  setCurrentSongIndex]  = useState(0);
+  const [loading,           setLoading]           = useState(true);
+  const [error,             setError]             = useState<string | null>(null);
   const songCardRowRef = useRef<HTMLDivElement>(null);
 
   const engine = useMultitrackEngine();
@@ -57,6 +57,9 @@ export default function MultitrackPage({ params }: Props) {
   }, [currentSongIndex]);
 
   const currentSong = songTracks[currentSongIndex] ?? null;
+
+  // Check if current song has a CLICK track uploaded
+  const hasClickTrack = currentSong?.tracks.some((t) => t.trackType === "CLICK") ?? false;
 
   if (authLoading || loading) {
     return (
@@ -119,6 +122,55 @@ export default function MultitrackPage({ params }: Props) {
             <span className="mt-spinner" /> Carregando faixas de áudio...
           </div>
         )}
+
+        {/* Metronome strip — aparece quando não há trilha CLICK carregada */}
+        {!engine.isLoading && !hasClickTrack && currentSong && (
+          <div className="mt-metronome-strip">
+            <div className="mt-metronome-left">
+              <button
+                type="button"
+                className={`mt-metronome-btn${engine.metronomeActive ? " active" : ""}`}
+                onClick={engine.toggleMetronome}
+                title={engine.metronomeActive ? "Desativar click" : "Ativar click interno"}
+              >
+                🥁
+              </button>
+              <span className="mt-metronome-label" style={{ color: engine.metronomeActive ? "#ef4444" : "#475569" }}>
+                CLICK
+              </span>
+            </div>
+            <div className="mt-metronome-center">
+              {engine.metronomeActive ? (
+                <span className="mt-metronome-hint">Click ativo · acento no 1º tempo de cada 4</span>
+              ) : (
+                <span className="mt-metronome-hint">Sem trilha CLICK — ative o metrônomo interno</span>
+              )}
+            </div>
+            <div className="mt-metronome-right">
+              <span className="mt-bpm-label">BPM</span>
+              <button
+                type="button"
+                className="mt-bpm-btn"
+                onClick={() => engine.setMetronomeBpm(engine.metronomeBpm - 1)}
+                disabled={engine.metronomeBpm <= 20}
+              >−</button>
+              <input
+                type="number"
+                className="mt-bpm-input"
+                min={20} max={300}
+                value={engine.metronomeBpm}
+                onChange={(e) => engine.setMetronomeBpm(parseInt(e.target.value, 10) || 120)}
+              />
+              <button
+                type="button"
+                className="mt-bpm-btn"
+                onClick={() => engine.setMetronomeBpm(engine.metronomeBpm + 1)}
+                disabled={engine.metronomeBpm >= 300}
+              >+</button>
+            </div>
+          </div>
+        )}
+
         {!engine.isLoading && engine.tracks.length === 0 && currentSong && (
           <div className="mt-tracks-empty">
             <p>Esta música não tem faixas cadastradas.</p>
@@ -127,12 +179,14 @@ export default function MultitrackPage({ params }: Props) {
             </p>
           </div>
         )}
+
         {engine.tracks.map((track) => (
           <TrackStrip
             key={track.id}
             track={track}
             isPlaying={engine.isPlaying}
             onVolumeChange={(v) => engine.setVolume(track.id, v)}
+            onPanChange={(v) => engine.setPan(track.id, v)}
             onMuteToggle={() => engine.toggleMute(track.id)}
           />
         ))}
