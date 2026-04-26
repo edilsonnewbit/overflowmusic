@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { AuthRequired } from "@/components/AuthRequired";
 import { canSeeRehearsals, canManageRehearsals } from "@/lib/permissions";
+import { parseSongSearchIntent } from "@/lib/song-search-intent";
 
 type Rehearsal = {
   id: string;
@@ -370,6 +371,13 @@ function RehearsalSetlistSection({ rehearsalId, canManage }: { rehearsalId: stri
   const [logsSearchInput, setLogsSearchInput] = useState("");
 
   const sortedItems = [...(setlist?.items || [])].sort((a, b) => a.order - b.order);
+  const songSearchIntent = parseSongSearchIntent(songSearch);
+  const showImportSuggestion =
+    songSearch.trim().length > 0 &&
+    !selectedSong &&
+    suggestions.length === 0 &&
+    songSearchIntent.title.length > 0 &&
+    songSearchIntent.artist.length > 0;
 
   useEffect(() => { void loadSetlist(); }, [rehearsalId]);
 
@@ -632,7 +640,7 @@ function RehearsalSetlistSection({ rehearsalId, canManage }: { rehearsalId: stri
               onChange={(e) => onSongSearchChange(e.target.value)}
               autoComplete="off"
             />
-            {suggestions.length > 0 && (
+            {(suggestions.length > 0 || showImportSuggestion) && (
               <div style={{ position: "absolute", zIndex: 20, left: 0, right: 0, background: "#0c1929", border: "1px solid #2d4b6d", borderRadius: 10, marginTop: 2, overflow: "hidden" }}>
                 {suggestions.map((s) => (
                   <button
@@ -645,6 +653,27 @@ function RehearsalSetlistSection({ rehearsalId, canManage }: { rehearsalId: stri
                     {s.defaultKey && <span style={{ color: "#7cf2a2", marginLeft: 8, fontSize: 11 }}>Tom: {s.defaultKey}</span>}
                   </button>
                 ))}
+                {showImportSuggestion && (
+                  <div style={{ padding: "10px 14px", borderTop: suggestions.length > 0 ? "1px solid rgba(45,75,109,0.4)" : "none" }}>
+                    <p style={{ margin: "0 0 8px", fontSize: 12, color: "#b3c6e0", lineHeight: 1.4 }}>
+                      Nenhuma música local encontrada. Abrir a importação automática no Cifra Club para esta busca.
+                    </p>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <Link
+                        href={`/songs/import?q=${encodeURIComponent(songSearch.trim())}&title=${encodeURIComponent(songSearchIntent.title)}&artist=${encodeURIComponent(songSearchIntent.artist)}&auto=1`}
+                        style={{ ...miniActionLinkStyle, background: "#7cf2a2", borderColor: "#7cf2a2", color: "#0a1f14" }}
+                      >
+                        Importar automaticamente
+                      </Link>
+                      <Link
+                        href={`/songs/new?title=${encodeURIComponent(songSearchIntent.title)}&artist=${encodeURIComponent(songSearchIntent.artist)}`}
+                        style={miniActionLinkStyle}
+                      >
+                        Cadastrar manualmente
+                      </Link>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -885,6 +914,20 @@ const smallSecondary: CSSProperties = {
   background: "transparent", border: "1px solid #2d4b6d",
   color: "#b3c6e0", borderRadius: 8, padding: "6px 14px",
   fontSize: 13, cursor: "pointer",
+};
+
+const miniActionLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "7px 10px",
+  borderRadius: 8,
+  border: "1px solid #2d4b6d",
+  background: "transparent",
+  color: "#b3c6e0",
+  textDecoration: "none",
+  fontSize: 12,
+  fontWeight: 700,
 };
 
 // ── styles ─────────────────────────────────────────────────────────────────────

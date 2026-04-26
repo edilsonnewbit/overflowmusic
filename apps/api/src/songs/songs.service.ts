@@ -22,6 +22,18 @@ type ImportTxtInput = {
   songId?: string;
 };
 
+type ImportCifraClubInput = {
+  title: string;
+  artist?: string;
+  songId?: string;
+};
+
+type CifraClubLookupResult = {
+  sourceUrl: string;
+  content: string;
+  parsed: ReturnType<typeof parseChordTxt>;
+};
+
 type TrackType =
   | "CLICK" | "GUIDE_VOCAL" | "FULL_BAND" | "PAD"
   | "BASS" | "STEM_KEYS" | "STEM_GUITAR" | "STEM_DRUMS" | "STEM_BACKING";
@@ -46,11 +58,207 @@ function extractFolderIdFromUrl(url: string): string | null {
   return match?.[1] ?? null;
 }
 
+const CIFRA_CLUB_BASE_URL = "https://www.cifraclub.com.br";
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeForMatch(input: string): string {
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " e ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function slugifyCifraClub(input: string): string {
+  return normalizeForMatch(input).replace(/\s+/g, "-");
+}
+
+function decodeHtmlEntities(input: string): string {
+  const namedEntities: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: "\"",
+    apos: "'",
+    nbsp: " ",
+    aacute: "a",
+    agrave: "a",
+    acirc: "a",
+    atilde: "a",
+    auml: "a",
+    eacute: "e",
+    ecirc: "e",
+    iacute: "i",
+    oacute: "o",
+    ocirc: "o",
+    otilde: "o",
+    ouml: "o",
+    uacute: "u",
+    ccedil: "c",
+    Aacute: "A",
+    Agrave: "A",
+    Acirc: "A",
+    Atilde: "A",
+    Eacute: "E",
+    Ecirc: "E",
+    Iacute: "I",
+    Oacute: "O",
+    Ocirc: "O",
+    Otilde: "O",
+    Uacute: "U",
+    Ccedil: "C",
+  };
+
+  return input
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCodePoint(Number.parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&([a-zA-Z]+);/g, (match, entity) => namedEntities[entity] ?? match);
+}
+
+function htmlToPlainText(input: string): string {
+  return decodeHtmlEntities(
+    input
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\r/g, ""),
+  );
+}
+
+function extractPageTitleParts(html: string): { title: string; artist: string | null } {
+  const match = html.match(/<title>([^<]+)<\/title>/i);
+  const titleText = decodeHtmlEntities(match?.[1] ?? "").trim();
+  const parts = titleText.split(" - ").map((value) => value.trim()).filter(Boolean);
+
+  if (parts.length >= 3 && parts[parts.length - 1]?.toLowerCase() === "cifra club") {
+    return {
+      title: parts[0] ?? "Sem título",
+      artist: parts[1] ?? null,
+    };
+  }
+
+  return {
+    title: titleText || "Sem título",
+    artist: null,
+  };
+}
+
+function extractSuggestedKeyFromHtml(html: string): string | null {
+  const toneIndex = html.toLowerCase().indexOf("tom:");
+  if (toneIndex === -1) {
+    return null;
+  }
+
+  const snippet = htmlToPlainText(html.slice(toneIndex, toneIndex + 200));
+  const match = snippet.match(/tom:\s*([A-G](?:#|b)?(?:m|maj|min)?[0-9(+)]*)/i);
+  return match?.[1]?.trim() ?? null;
+}
+
+function extractPrimaryPreBlock(html: string): string | null {
+  const matches = [...html.matchAll(/<pre[^>]*>([\s\S]*?)<\/pre>/gi)];
+  if (matches.length === 0) {
+    return null;
+  }
+
+  const sorted = matches
+    .map((match) => match[1] ?? "")
+    .sort((left, right) => right.length - left.length);
+
+  const candidate = sorted[0]?.trim() ?? "";
+  return candidate || null;
+}
+
+function buildImportContentFromCifraClubPage(html: string): { content: string; title: string; artist: string | null } {
+  const { title, artist } = extractPageTitleParts(html);
+  const preBlock = extractPrimaryPreBlock(html);
+  if (!preBlock) {
+    throw new BadRequestException("Nao foi possivel extrair a cifra da pagina encontrada.");
+  }
+
+  const key = extractSuggestedKeyFromHtml(html);
+  const chartBody = htmlToPlainText(preBlock)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (!chartBody) {
+    throw new BadRequestException("A pagina encontrada nao possui conteudo de cifra importavel.");
+  }
+
+  const header = artist ? `${artist} - ${title}` : title;
+  const content = [header, key ? `Tom: ${key}` : null, "", chartBody].filter(Boolean).join("\n");
+  return { content, title, artist };
+}
+
+function normalizeCifraClubSongPath(path: string, artistSlug: string): string | null {
+  const cleanPath = path.split("?")[0]?.split("#")[0] ?? "";
+  const baseMatch = cleanPath.match(new RegExp(`^/${escapeRegExp(artistSlug)}/([^/]+)(?:/)?`));
+  if (!baseMatch?.[1]) {
+    return null;
+  }
+
+  const invalidSuffixes = ["/letra/", "/guitarpro/", "/imprimir.html", "/tab/", "/partituras/"];
+  if (invalidSuffixes.some((suffix) => cleanPath.includes(suffix))) {
+    return null;
+  }
+
+  return `/${artistSlug}/${baseMatch[1]}/`;
+}
+
+function extractSongPathsFromArtistPage(html: string, artistSlug: string): string[] {
+  const hrefRegex = /href="([^"]+)"/gi;
+  const unique = new Set<string>();
+
+  for (const match of html.matchAll(hrefRegex)) {
+    const href = match[1] ?? "";
+    const normalized = normalizeCifraClubSongPath(href, artistSlug);
+    if (normalized) {
+      unique.add(normalized);
+    }
+  }
+
+  return [...unique];
+}
+
+function scoreSongPath(path: string, title: string): number {
+  const target = normalizeForMatch(title);
+  const targetTokens = target.split(" ").filter(Boolean);
+  const songSlug = path.split("/").filter(Boolean)[1] ?? "";
+  const songLabel = normalizeForMatch(songSlug.replace(/-/g, " "));
+
+  if (!songLabel) {
+    return 0;
+  }
+
+  if (songLabel === target) {
+    return 10_000;
+  }
+
+  let score = 0;
+  if (songLabel.includes(target) || target.includes(songLabel)) {
+    score += 2_000;
+  }
+
+  for (const token of targetTokens) {
+    if (songLabel.includes(token)) {
+      score += 100;
+    }
+  }
+
+  return score;
+}
+
 @Injectable()
 export class SongsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly driveService: DriveService,
+    private readonly driveService?: DriveService,
   ) {}
 
   async list(params: { limit?: number; offset?: number; search?: string; key?: string; tags?: string } = {}) {
@@ -231,6 +439,29 @@ export class SongsService {
     return { ok: true, parsed };
   }
 
+  async previewCifraClub(input: ImportCifraClubInput) {
+    const lookup = await this.lookupCifraClubChart(input);
+    return {
+      ok: true,
+      parsed: lookup.parsed,
+      sourceUrl: lookup.sourceUrl,
+      content: lookup.content,
+    };
+  }
+
+  async importFromCifraClub(input: ImportCifraClubInput) {
+    const lookup = await this.lookupCifraClubChart(input);
+    const result = await this.importTxt({
+      content: lookup.content,
+      songId: input.songId,
+    });
+
+    return {
+      ...result,
+      sourceUrl: lookup.sourceUrl,
+    };
+  }
+
   async listCharts(songId: string) {
     const song = await this.prisma.song.findUnique({ where: { id: songId }, select: { id: true } });
     if (!song) {
@@ -277,6 +508,80 @@ export class SongsService {
 
     const parsed = parseChordTxt(content);
     return { content, parsed };
+  }
+
+  private async lookupCifraClubChart(input: ImportCifraClubInput): Promise<CifraClubLookupResult> {
+    const title = (input.title || "").trim();
+    const artist = (input.artist || "").trim();
+
+    if (!title) {
+      throw new BadRequestException("title is required");
+    }
+
+    if (!artist) {
+      throw new BadRequestException("artist is required for automatic Cifra Club import");
+    }
+
+    const sourceUrl = await this.resolveCifraClubSongUrl(title, artist);
+    const response = await fetch(sourceUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "OverflowMusicApp/1.0 (+https://music.overflowmvmt.com)",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+    });
+
+    if (!response.ok) {
+      throw new BadRequestException("Falha ao carregar a pagina encontrada no Cifra Club.");
+    }
+
+    const html = await response.text();
+    const built = buildImportContentFromCifraClubPage(html);
+    return {
+      sourceUrl,
+      content: built.content,
+      parsed: parseChordTxt(built.content),
+    };
+  }
+
+  private async resolveCifraClubSongUrl(title: string, artist: string): Promise<string> {
+    const artistSlug = slugifyCifraClub(artist);
+    const titleSlug = slugifyCifraClub(title);
+
+    if (!artistSlug || !titleSlug) {
+      throw new BadRequestException("title and artist are required for automatic lookup");
+    }
+
+    const artistPageUrl = `${CIFRA_CLUB_BASE_URL}/${artistSlug}/`;
+    const directSongUrl = `${CIFRA_CLUB_BASE_URL}/${artistSlug}/${titleSlug}/`;
+
+    try {
+      const artistPageResponse = await fetch(artistPageUrl, {
+        method: "GET",
+        headers: {
+          "User-Agent": "OverflowMusicApp/1.0 (+https://music.overflowmvmt.com)",
+          Accept: "text/html,application/xhtml+xml",
+        },
+        redirect: "follow",
+      });
+
+      if (artistPageResponse.ok) {
+        const artistPageHtml = await artistPageResponse.text();
+        const candidatePaths = extractSongPathsFromArtistPage(artistPageHtml, artistSlug)
+          .map((path) => ({ path, score: scoreSongPath(path, title) }))
+          .filter((candidate) => candidate.score > 0)
+          .sort((left, right) => right.score - left.score);
+
+        if (candidatePaths[0]?.path) {
+          return `${CIFRA_CLUB_BASE_URL}${candidatePaths[0].path}`;
+        }
+      }
+    } catch {
+      // fallback below
+    }
+
+    return directSongUrl;
   }
 
   // ── Tracks (multitrack player) ────────────────────────────────────────────
@@ -331,7 +636,7 @@ export class SongsService {
       if (!looksLikeId) return providedName;
 
       // Try authenticated Drive API first
-      const apiName = await driveService.getFileName(fileId);
+      const apiName = await driveService?.getFileName(fileId);
       if (apiName) return apiName;
 
       // Fallback: HEAD request to public download URL
@@ -375,6 +680,10 @@ export class SongsService {
 
     const folderId = extractFolderIdFromUrl(folderUrl);
     if (!folderId) throw new BadRequestException("URL da pasta inválida. Use o link do Google Drive no formato drive.google.com/drive/folders/...");
+
+    if (!this.driveService) {
+      throw new BadRequestException("Drive service is not available.");
+    }
 
     const files = await this.driveService.listFolderFiles(folderId);
     const audioFiles = files.filter((f) =>

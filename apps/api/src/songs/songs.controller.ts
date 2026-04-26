@@ -43,6 +43,17 @@ type PreviewTxtBody = {
   content: string;
 };
 
+type ImportCifraClubBody = {
+  title: string;
+  artist?: string;
+  songId?: string;
+};
+
+type PreviewCifraClubBody = {
+  title: string;
+  artist?: string;
+};
+
 @SkipThrottle({ global: true })
 @Controller("api/songs")
 export class SongsController {
@@ -121,6 +132,24 @@ export class SongsController {
   async previewTxt(@Headers("authorization") authorization: string | undefined, @Body() body: PreviewTxtBody) {
     await this.assertWriteAccess(authorization);
     return this.songsService.previewTxt(body.content);
+  }
+
+  @Post("import/cifra-club")
+  async importCifraClub(
+    @Headers("authorization") authorization: string | undefined,
+    @Body() body: ImportCifraClubBody,
+  ) {
+    await this.assertWriteAccess(authorization);
+    return this.songsService.importFromCifraClub(body);
+  }
+
+  @Post("import/cifra-club/preview")
+  async previewCifraClub(
+    @Headers("authorization") authorization: string | undefined,
+    @Body() body: PreviewCifraClubBody,
+  ) {
+    await this.assertWriteAccess(authorization);
+    return this.songsService.previewCifraClub(body);
   }
 
   @Post("import/txt/file")

@@ -6,6 +6,7 @@ import { AuthRequired } from "@/components/AuthRequired";
 import { useAuth } from "@/components/AuthProvider";
 import { QRCodeCanvas } from "@/components/QRCodeCanvas";
 import EventChat from "@/components/EventChat";
+import { parseSongSearchIntent } from "@/lib/song-search-intent";
 import type { EventStatus, SetlistItem, EventSetlist, Pad } from "@/lib/types";
 type Setlist = NonNullable<EventSetlist>;
 
@@ -618,6 +619,18 @@ export default function EventDetailPage({ params }: PageProps) {
 
   const sortedItems = [...(event?.setlist?.items || [])].sort((a, b) => a.order - b.order);
   const isBusy = Boolean(deletingItemId || reorderingId || addingItem);
+  const songSearchMatches = songs.filter((s) =>
+    s.title.toLowerCase().includes(songSearch.toLowerCase()) ||
+    (s.artist ?? "").toLowerCase().includes(songSearch.toLowerCase())
+  );
+  const songSearchIntent = parseSongSearchIntent(songSearch);
+  const canAutoImportSong =
+    showSongDropdown &&
+    songSearch.trim().length > 0 &&
+    !selectedSong &&
+    songSearchMatches.length === 0 &&
+    songSearchIntent.title.length > 0 &&
+    songSearchIntent.artist.length > 0;
 
   const displayStatus = event?.computedStatus ?? event?.status ?? "";
 
@@ -1269,11 +1282,7 @@ export default function EventDetailPage({ params }: PageProps) {
                     />
                     {showSongDropdown && songSearch.length > 0 && !selectedSong && (
                       <ul style={dropdownStyle}>
-                        {songs
-                          .filter((s) =>
-                            s.title.toLowerCase().includes(songSearch.toLowerCase()) ||
-                            (s.artist ?? "").toLowerCase().includes(songSearch.toLowerCase())
-                          )
+                        {songSearchMatches
                           .slice(0, 10)
                           .map((s) => (
                             <li
@@ -1293,13 +1302,35 @@ export default function EventDetailPage({ params }: PageProps) {
                               {s.defaultKey && <span style={{ color: "#7cf2a2", marginLeft: 8, fontSize: 12 }}>Tom: {s.defaultKey}</span>}
                             </li>
                           ))}
-                        {songs.filter((s) =>
-                          s.title.toLowerCase().includes(songSearch.toLowerCase()) ||
-                          (s.artist ?? "").toLowerCase().includes(songSearch.toLowerCase())
-                        ).length === 0 && (
-                          <li style={{ ...dropdownItemStyle, color: "#8fa9c8", cursor: "default" }}>
-                            Nenhuma música encontrada
-                          </li>
+                        {songSearchMatches.length === 0 && (
+                          <>
+                            <li style={{ ...dropdownItemStyle, color: "#8fa9c8", cursor: "default" }}>
+                              Nenhuma música encontrada
+                            </li>
+                            {canAutoImportSong && (
+                              <li style={{ ...dropdownItemStyle, cursor: "default", paddingTop: 6, paddingBottom: 8 }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <span style={{ color: "#b3c6e0", fontSize: 12, lineHeight: 1.4 }}>
+                                    Buscar no Cifra Club e abrir a importação automática para esta música.
+                                  </span>
+                                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                    <Link
+                                      href={`/songs/import?q=${encodeURIComponent(songSearch.trim())}&title=${encodeURIComponent(songSearchIntent.title)}&artist=${encodeURIComponent(songSearchIntent.artist)}&auto=1`}
+                                      style={{ ...miniActionLinkStyle, background: "#7cf2a2", borderColor: "#7cf2a2", color: "#0a1f14" }}
+                                    >
+                                      Importar automaticamente
+                                    </Link>
+                                    <Link
+                                      href={`/songs/new?title=${encodeURIComponent(songSearchIntent.title)}&artist=${encodeURIComponent(songSearchIntent.artist)}`}
+                                      style={miniActionLinkStyle}
+                                    >
+                                      Cadastrar manualmente
+                                    </Link>
+                                  </div>
+                                </div>
+                              </li>
+                            )}
+                          </>
                         )}
                       </ul>
                     )}
@@ -1862,6 +1893,20 @@ const dropdownItemStyle: CSSProperties = {
   fontSize: 13,
   color: "#e8f2ff",
   borderBottom: "1px solid rgba(45,75,109,0.4)",
+};
+
+const miniActionLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "7px 10px",
+  borderRadius: 8,
+  border: "1px solid #2d4b6d",
+  background: "transparent",
+  color: "#b3c6e0",
+  textDecoration: "none",
+  fontSize: 12,
+  fontWeight: 700,
 };
 
 const labelStyle: CSSProperties = {

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/AuthRequired";
 import { useAuth } from "@/components/AuthProvider";
 import { canSeeSongsPage, canManageSongs, canSeeFullSongDetail } from "@/lib/permissions";
+import { parseSongSearchIntent } from "@/lib/song-search-intent";
 import type { Song } from "@/lib/types";
 
 export default function SongsPage() {
@@ -73,6 +74,9 @@ function SongsContent() {
     return matchSearch && matchKey && matchTag;
   });
 
+  const searchIntent = parseSongSearchIntent(search);
+  const showMissingActions = canManage && !loading && !error && search.trim().length > 0 && filtered.length === 0;
+
   return (
     <main style={{ minHeight: "100vh", padding: "24px 24px 40px" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
@@ -138,9 +142,39 @@ function SongsContent() {
         {error && <p style={{ color: "#f87171" }}>{error}</p>}
 
         {!loading && !error && filtered.length === 0 && (
-          <p style={{ color: "#b3c6e0" }}>
-            {search ? "Nenhuma música encontrada." : "Nenhuma música cadastrada ainda."}
-          </p>
+          showMissingActions ? (
+            <div style={emptyStateStyle}>
+              <p style={{ margin: 0, color: "#e8f1fb", fontSize: 18, fontWeight: 700 }}>
+                Nenhuma música encontrada para "{search.trim()}"
+              </p>
+              <p style={{ margin: 0, color: "#b3c6e0", lineHeight: 1.5 }}>
+                Você pode cadastrar manualmente agora ou abrir a central de importação com a busca já preenchida.
+              </p>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {searchIntent.artist ? (
+                  <Link
+                    href={`/songs/import?q=${encodeURIComponent(search.trim())}&title=${encodeURIComponent(searchIntent.title)}&artist=${encodeURIComponent(searchIntent.artist)}&auto=1`}
+                    style={importBtnStyle}
+                  >
+                    Buscar e importar automaticamente
+                  </Link>
+                ) : null}
+                <Link
+                  href={`/songs/new?title=${encodeURIComponent(searchIntent.title)}${searchIntent.artist ? `&artist=${encodeURIComponent(searchIntent.artist)}` : ""}`}
+                  style={searchIntent.artist ? secondaryPrimaryActionStyle : importBtnStyle}
+                >
+                  + Cadastrar manualmente
+                </Link>
+                <Link href={`/songs/import?q=${encodeURIComponent(search.trim())}`} style={secondaryActionStyle}>
+                  Importar do Cifra Club
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <p style={{ color: "#b3c6e0" }}>
+              {search ? "Nenhuma música encontrada." : "Nenhuma música cadastrada ainda."}
+            </p>
+          )
         )}
 
         {/* grid */}
@@ -246,6 +280,22 @@ const importBtnStyle: CSSProperties = {
   fontSize: 14,
 };
 
+const secondaryActionStyle: CSSProperties = {
+  background: "transparent",
+  color: "#d6e5f8",
+  padding: "8px 16px",
+  borderRadius: 8,
+  textDecoration: "none",
+  fontWeight: 600,
+  fontSize: 14,
+  border: "1px solid #31557c",
+};
+
+const secondaryPrimaryActionStyle: CSSProperties = {
+  ...importBtnStyle,
+  background: "#d6e5f8",
+};
+
 const searchStyle: CSSProperties = {
   width: "100%",
   padding: "10px 14px",
@@ -256,6 +306,16 @@ const searchStyle: CSSProperties = {
   fontSize: 15,
   marginBottom: 20,
   boxSizing: "border-box",
+};
+
+const emptyStateStyle: CSSProperties = {
+  display: "grid",
+  gap: 14,
+  padding: "18px 20px",
+  marginBottom: 20,
+  background: "linear-gradient(135deg, rgba(18,40,64,0.92) 0%, rgba(10,24,38,0.96) 100%)",
+  border: "1px solid #31557c",
+  borderRadius: 16,
 };
 
 const gridStyle: CSSProperties = {

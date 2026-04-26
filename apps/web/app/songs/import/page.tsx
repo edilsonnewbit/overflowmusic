@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CSSProperties, useEffect, useState } from "react";
+import { CSSProperties, useEffect, useRef, useState } from "react";
 import { AuthRequired } from "@/components/AuthRequired";
 import { useAuth } from "@/components/AuthProvider";
 import { canManageSongs } from "@/lib/permissions";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type SongListItem = {
   id: string;
@@ -28,7 +28,7 @@ type ParsedChordPreview = {
   chordDictionary: Record<string, string>;
 };
 
-type ImportSource = "text" | "file" | null;
+type ImportSource = "text" | "file" | "cifraClub" | null;
 
 type ApiResult<T> = {
   ok: boolean;
@@ -55,9 +55,23 @@ export default function SongImportPage() {
 
 function SongImportContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
+  const queryHint = searchParams.get("q")?.trim() ?? "";
+  const autoImport = searchParams.get("auto") === "1";
+  const titleParam = searchParams.get("title")?.trim() ?? "";
+  const artistParam = searchParams.get("artist")?.trim() ?? "";
+  const parsedIntent = parseSearchIntent(queryHint);
+  const queryIntent = {
+    title: titleParam || parsedIntent.title,
+    artist: artistParam || parsedIntent.artist,
+  };
+  const autoPreviewTriggeredRef = useRef(false);
   const [txtPreviewInput, setTxtPreviewInput] = useState("");
   const [txtPreviewFile, setTxtPreviewFile] = useState<File | null>(null);
+  const [cifraClubTitle, setCifraClubTitle] = useState(queryIntent.title);
+  const [cifraClubArtist, setCifraClubArtist] = useState(queryIntent.artist);
+  const [cifraClubSourceUrl, setCifraClubSourceUrl] = useState("");
   const [targetSongId, setTargetSongId] = useState("");
   const [songs, setSongs] = useState<SongListItem[]>([]);
   const [previewData, setPreviewData] = useState<ParsedChordPreview | null>(null);
@@ -70,6 +84,12 @@ function SongImportContent() {
   const [status, setStatus] = useState("Pronto");
 
   useEffect(() => {
+    setCifraClubTitle(queryIntent.title);
+    setCifraClubArtist(queryIntent.artist);
+    autoPreviewTriggeredRef.current = false;
+  }, [queryIntent.title, queryIntent.artist]);
+
+  useEffect(() => {
     if (!user) return;
     if (!canManageSongs(user)) {
       router.replace("/songs");
@@ -77,6 +97,19 @@ function SongImportContent() {
     }
     void loadSongs();
   }, [user, router]);
+
+  useEffect(() => {
+    if (!autoImport || autoPreviewTriggeredRef.current) {
+      return;
+    }
+
+    if (!queryIntent.title || !queryIntent.artist) {
+      return;
+    }
+
+    autoPreviewTriggeredRef.current = true;
+    void previewFromCifraClub();
+  }, [autoImport, queryIntent.title, queryIntent.artist]);
 
   async function loadSongs() {
     setLoadingSongs(true);
@@ -144,6 +177,34 @@ function SongImportContent() {
     }
   }
 
+  async function previewFromCifraClub() {
+    const title = cifraClubTitle.trim();
+    const artist = cifraClubArtist.trim();
+    if (!title || !artist) {
+      setStatus("Informe titulo e artista para buscar automaticamente no Cifra Club");
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      const response = await fetch("/api/songs/import/cifra-club/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, artist }),
+      });
+
+      const body = await parseJson<{ parsed: ParsedChordPreview; sourceUrl?: string }>(response);
+      setPreviewData(body.parsed);
+      setPreviewSource("cifraClub");
+      setCifraClubSourceUrl(body.sourceUrl || "");
+      setStatus("Pré-visualização gerada automaticamente a partir do Cifra Club");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Falha ao localizar cifra no Cifra Club");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
   async function saveChartImport() {
     if (!previewData || !previewSource) {
       setStatus("Gere a pré-visualização antes de salvar");
@@ -166,7 +227,7 @@ function SongImportContent() {
         const body = await parseJson<{ song?: { id: string }; chordChart?: { version?: number } }>(response);
         setLastImportedSongId(body.song?.id || "");
         setLastImportedChartVersion(body.chordChart?.version ?? null);
-      } else {
+      } else if (previewSource === "file") {
         if (!txtPreviewFile) {
           throw new Error("Arquivo selecionado não encontrado");
         }
@@ -184,6 +245,27 @@ function SongImportContent() {
         const body = await parseJson<{ song?: { id: string }; chordChart?: { version?: number } }>(response);
         setLastImportedSongId(body.song?.id || "");
         setLastImportedChartVersion(body.chordChart?.version ?? null);
+      } else {
+        const title = cifraClubTitle.trim();
+        const artist = cifraClubArtist.trim();
+        if (!title || !artist) {
+          throw new Error("Informe titulo e artista para salvar a importacao automatica");
+        }
+
+        const payload: { title: string; artist: string; songId?: string } = { title, artist };
+        if (cleanSongId) {
+          payload.songId = cleanSongId;
+        }
+
+        const response = await fetch("/api/songs/import/cifra-club", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = await parseJson<{ song?: { id: string }; chordChart?: { version?: number }; sourceUrl?: string }>(response);
+        setLastImportedSongId(body.song?.id || "");
+        setLastImportedChartVersion(body.chordChart?.version ?? null);
+        setCifraClubSourceUrl(body.sourceUrl || cifraClubSourceUrl);
       }
 
       setStatus("Cifra salva com sucesso!");
@@ -200,10 +282,26 @@ function SongImportContent() {
       <section style={{ maxWidth: 1180, margin: "0 auto" }}>
           <header style={headerStyle}>
             <p style={tagStyle}>Music</p>
-            <h1 style={{ margin: "8px 0 12px", fontSize: 36, lineHeight: 1.1 }}>Importar Cifra (TXT)</h1>
+            <h1 style={{ margin: "8px 0 12px", fontSize: 36, lineHeight: 1.1 }}>Central de Importação</h1>
             <p style={{ margin: 0, color: "#d6e5f8" }}>
               API: <code>{apiUrl}</code>
             </p>
+            {queryHint ? (
+              <div style={hintCardStyle}>
+                <p style={{ margin: 0, fontWeight: 700 }}>Busca original: {queryHint}</p>
+                <p style={{ margin: "6px 0 0", color: "#d6e5f8", lineHeight: 1.5 }}>
+                  Use esta tela para importar a cifra da música que não foi encontrada na biblioteca.
+                </p>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                  <Link href={`/songs/new?title=${encodeURIComponent(queryHint)}`} style={compactLinkStyle}>
+                    Cadastro manual
+                  </Link>
+                  <Link href="/songs" style={compactLinkStyle}>
+                    Voltar para busca
+                  </Link>
+                </div>
+              </div>
+            ) : null}
             <p style={{ margin: "8px 0 0", color: "#1ecad3" }}>{status}</p>
             <p style={{ margin: "10px 0 0" }}>
               <Link href="/" style={linkStyle}>
@@ -215,7 +313,38 @@ function SongImportContent() {
           <article style={cardStyle}>
             <h2 style={{ marginTop: 0 }}>Pré-visualizar e Salvar</h2>
 
+          <div style={importSectionStyle}>
+            <div style={{ display: "grid", gap: 10 }}>
+              <p style={sectionLabelStyle}>Busca automática no Cifra Club</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
+                <input
+                  value={cifraClubTitle}
+                  onChange={(event) => setCifraClubTitle(event.target.value)}
+                  placeholder="Titulo da musica"
+                  style={inputStyle}
+                />
+                <input
+                  value={cifraClubArtist}
+                  onChange={(event) => setCifraClubArtist(event.target.value)}
+                  placeholder="Artista / ministerio"
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <button type="button" style={primaryButtonStyle} onClick={() => void previewFromCifraClub()}>
+                  {previewLoading ? "Buscando..." : "Buscar automaticamente"}
+                </button>
+                {cifraClubSourceUrl ? (
+                  <a href={cifraClubSourceUrl} target="_blank" rel="noopener noreferrer" style={compactSourceLinkStyle}>
+                    Abrir fonte encontrada
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: "grid", gap: 10 }}>
+            <p style={sectionLabelStyle}>Colar conteudo manualmente</p>
             <textarea
               value={txtPreviewInput}
               onChange={(event) => setTxtPreviewInput(event.target.value)}
@@ -229,6 +358,7 @@ function SongImportContent() {
           </div>
 
           <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+            <p style={sectionLabelStyle}>Ou carregar arquivo `.txt`</p>
             <input
               type="file"
               accept=".txt,text/plain"
@@ -281,9 +411,14 @@ function SongImportContent() {
                     Seções: {previewData.sections.length} | Acordes mapeados: {Object.keys(previewData.chordDictionary || {}).length}
                   </p>
                   <p style={{ margin: 0, color: "#7cf2a2", fontSize: 12 }}>
-                    Origem: {previewSource === "file" ? "arquivo" : previewSource === "text" ? "texto" : "-"} | Último salvamento:{" "}
+                    Origem: {previewSource === "file" ? "arquivo" : previewSource === "text" ? "texto" : previewSource === "cifraClub" ? "cifra club" : "-"} | Último salvamento:{" "}
                     {lastImportedSongId ? `música ${lastImportedSongId} (v${lastImportedChartVersion ?? "?"})` : "nenhum"}
                   </p>
+                  {previewSource === "cifraClub" && cifraClubSourceUrl ? (
+                    <p style={{ margin: 0, color: "#b3c6e0", fontSize: 12 }}>
+                      Fonte encontrada: <a href={cifraClubSourceUrl} target="_blank" rel="noopener noreferrer" style={inlineSourceLinkStyle}>{cifraClubSourceUrl}</a>
+                    </p>
+                  ) : null}
 
                   {/* Cifra completa */}
                   <div style={{ marginTop: 14, display: "grid", gap: 20 }}>
@@ -345,6 +480,21 @@ function SongImportContent() {
   );
 }
 
+function parseSearchIntent(search: string): { title: string; artist: string } {
+  const clean = search.trim();
+  if (!clean) return { title: "", artist: "" };
+
+  const parts = clean.split(" - ").map((value) => value.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      artist: parts[0] ?? "",
+      title: parts.slice(1).join(" - "),
+    };
+  }
+
+  return { title: clean, artist: "" };
+}
+
 const headerStyle: CSSProperties = {
   background: "linear-gradient(135deg, #1b3756 0%, #122840 55%, #0f2137 100%)",
   border: "1px solid #31557c",
@@ -380,6 +530,54 @@ const inputStyle: CSSProperties = {
   borderRadius: 12,
   padding: "10px 12px",
   outline: "none",
+};
+
+const importSectionStyle: CSSProperties = {
+  marginBottom: 16,
+  paddingBottom: 16,
+  borderBottom: "1px solid #1e3a5a",
+};
+
+const sectionLabelStyle: CSSProperties = {
+  margin: 0,
+  color: "#7cf2a2",
+  fontSize: 12,
+  textTransform: "uppercase",
+  letterSpacing: 1.2,
+  fontWeight: 700,
+};
+
+const hintCardStyle: CSSProperties = {
+  marginTop: 14,
+  padding: "14px 16px",
+  borderRadius: 14,
+  border: "1px solid rgba(124, 242, 162, 0.35)",
+  background: "rgba(7, 22, 35, 0.34)",
+};
+
+const compactLinkStyle: CSSProperties = {
+  color: "#061420",
+  background: "#7cf2a2",
+  borderRadius: 999,
+  padding: "8px 12px",
+  textDecoration: "none",
+  fontWeight: 700,
+  fontSize: 13,
+};
+
+const compactSourceLinkStyle: CSSProperties = {
+  color: "#d6e5f8",
+  textDecoration: "none",
+  border: "1px solid #31557c",
+  borderRadius: 999,
+  padding: "8px 12px",
+  fontWeight: 600,
+  fontSize: 13,
+};
+
+const inlineSourceLinkStyle: CSSProperties = {
+  color: "#7cf2a2",
+  textDecoration: "underline",
 };
 
 const primaryButtonStyle: CSSProperties = {

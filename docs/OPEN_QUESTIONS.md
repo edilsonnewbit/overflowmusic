@@ -47,3 +47,9 @@
 - Impacto: Performance e UX quando base de usuários crescer.
 - Dono: Backend
 - Status: Aberta — worker placeholder existe mas não processa nada.
+
+## Q-009
+- Assunto: Integracao com Cifra Club pode ser feita via parceria/API oficial, ou o produto aceita apenas fluxo assistido pelo usuario (baixar `.txt` / colar conteudo) para evitar scraping e risco juridico?
+- Impacto: Define se a importacao externa sera automatica no backend ou apenas semi-automatica na interface.
+- Dono: Produto/Tech Lead
+- Status: Parcialmente resolvida — fluxo automatico por pagina publica foi implementado sem URL manual, mas continua dependente da estrutura HTML publica do Cifra Club e sem parceria/API oficial.

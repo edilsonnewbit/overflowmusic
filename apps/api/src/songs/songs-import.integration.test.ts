@@ -11,6 +11,8 @@ import { SongsService } from "./songs.service";
 type SongsServiceMock = {
   importTxt: (input: { content: string; songId?: string }) => Promise<unknown>;
   previewTxt: (content: string) => Promise<unknown> | unknown;
+  importFromCifraClub: (input: { title: string; artist?: string; songId?: string }) => Promise<unknown>;
+  previewCifraClub: (input: { title: string; artist?: string }) => Promise<unknown> | unknown;
   list: () => Promise<unknown>;
   getById: (id: string) => Promise<unknown>;
   listCharts: (id: string) => Promise<unknown>;
@@ -30,6 +32,8 @@ async function createTestApp(
 
   let lastImportInput: { content: string; songId?: string } | null = null;
   let lastPreviewContent: string | null = null;
+  let lastCifraClubImportInput: { title: string; artist?: string; songId?: string } | null = null;
+  let lastCifraClubPreviewInput: { title: string; artist?: string } | null = null;
   let lastManagedToken: string | null = null;
 
   const songsServiceMock: SongsServiceMock = {
@@ -41,6 +45,14 @@ async function createTestApp(
       lastPreviewContent = content;
       return { ok: true, parsed: { title: "Preview", sections: [] } };
     },
+    importFromCifraClub: async (input) => {
+      lastCifraClubImportInput = input;
+      return { ok: true, received: input, sourceUrl: "https://www.cifraclub.com.br/artista/musica/" };
+    },
+    previewCifraClub: (input) => {
+      lastCifraClubPreviewInput = input;
+      return { ok: true, parsed: { title: "Preview", sections: [] }, sourceUrl: "https://www.cifraclub.com.br/artista/musica/" };
+    },
     list: async () => ({ ok: true, songs: [] }),
     getById: async (id: string) => ({ ok: true, song: { id } }),
     listCharts: async () => ({ ok: true, charts: [] }),
@@ -50,8 +62,11 @@ async function createTestApp(
   };
 
   const authServiceMock = {
-    assertCanManageContent: async (accessToken: string) => {
+    assertAdminKeyOrContentManager: async (accessToken: string) => {
       lastManagedToken = accessToken;
+      if (accessToken === `Bearer ${adminKey}`) {
+        return;
+      }
       if (options?.allowUserToken) {
         return;
       }
@@ -74,6 +89,8 @@ async function createTestApp(
     app,
     getLastImportInput: () => lastImportInput,
     getLastPreviewContent: () => lastPreviewContent,
+    getLastCifraClubImportInput: () => lastCifraClubImportInput,
+    getLastCifraClubPreviewInput: () => lastCifraClubPreviewInput,
     getLastManagedToken: () => lastManagedToken,
   };
 }
@@ -116,7 +133,7 @@ test("POST /api/songs/import/txt -> 201 com token de usuário autorizado", async
     .expect(201);
 
   assert.equal(response.body.ok, true);
-  assert.equal(getLastManagedToken(), "user_access_token");
+  assert.equal(getLastManagedToken(), "Bearer user_access_token");
   assert.deepEqual(getLastImportInput(), { content: "[Intro]\nC G", songId: "song_2" });
 
   await app.close();
@@ -133,7 +150,7 @@ test("POST /api/songs/import/txt -> 401 com token de usuário sem permissão", a
     .send({ content: "[Intro]\nC G", songId: "song_2" })
     .expect(401);
 
-  assert.equal(getLastManagedToken(), "member_access_token");
+  assert.equal(getLastManagedToken(), "Bearer member_access_token");
 
   await app.close();
 });
@@ -203,6 +220,40 @@ test("POST /api/songs/import/txt/file/preview -> 201 com arquivo válido", async
 
   assert.equal(response.body.ok, true);
   assert.equal(getLastPreviewContent(), "[Intro]\\nF7M Em7");
+
+  await app.close();
+});
+
+test("POST /api/songs/import/cifra-club/preview -> 201 e envia payload ao serviço", async () => {
+  const { app, getLastCifraClubPreviewInput } = await createTestApp("secret_key");
+
+  const response = await request(app.getHttpServer())
+    .post("/api/songs/import/cifra-club/preview")
+    .set("Authorization", "Bearer secret_key")
+    .send({ title: "Te Seguir", artist: "Hamilton Gomes" })
+    .expect(201);
+
+  assert.equal(response.body.ok, true);
+  assert.deepEqual(getLastCifraClubPreviewInput(), { title: "Te Seguir", artist: "Hamilton Gomes" });
+
+  await app.close();
+});
+
+test("POST /api/songs/import/cifra-club -> 201 com token autorizado", async () => {
+  const { app, getLastCifraClubImportInput } = await createTestApp("secret_key");
+
+  const response = await request(app.getHttpServer())
+    .post("/api/songs/import/cifra-club")
+    .set("Authorization", "Bearer secret_key")
+    .send({ title: "Te Seguir", artist: "Hamilton Gomes", songId: "song_7" })
+    .expect(201);
+
+  assert.equal(response.body.ok, true);
+  assert.deepEqual(getLastCifraClubImportInput(), {
+    title: "Te Seguir",
+    artist: "Hamilton Gomes",
+    songId: "song_7",
+  });
 
   await app.close();
 });

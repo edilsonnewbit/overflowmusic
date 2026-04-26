@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import type { ParsedChart } from "@/lib/types";
 
 type ChordChart = {
   id: string;
@@ -41,7 +42,7 @@ function EditChartContent({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [preview, setPreview] = useState<object | null>(null);
+  const [preview, setPreview] = useState<ParsedChart | null>(null);
 
   useEffect(() => {
     void params.then((p) => setIds(p));
@@ -84,7 +85,7 @@ function EditChartContent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: rawText }),
       });
-      const body = (await res.json()) as { ok: boolean; parsed?: object };
+      const body = (await res.json()) as { ok: boolean; parsed?: ParsedChart };
       if (body.ok) setPreview(body.parsed ?? null);
     } catch {
       setStatus("Erro ao gerar pré-visualização.");
@@ -164,10 +165,40 @@ function EditChartContent({
 
         {preview && (
           <div style={previewBoxStyle}>
-            <p style={{ margin: "0 0 10px", color: "#7cf2a2", fontWeight: 700 }}>Pré-visualização</p>
-            <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: "#d6e5f8", fontSize: 13 }}>
-              {JSON.stringify(preview, null, 2)}
-            </pre>
+            <div style={{ display: "grid", gap: 6 }}>
+              <p style={{ margin: 0, color: "#7cf2a2", fontWeight: 700 }}>Pré-visualização</p>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                {preview.title}
+                {preview.artist ? ` - ${preview.artist}` : ""}
+              </p>
+              <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>
+                Tom: {preview.metadata?.suggestedKey || "-"} | BPM: {preview.metadata?.bpm ?? "-"} | Capo: {preview.metadata?.capo ?? "-"}
+              </p>
+            </div>
+
+            <div style={{ marginTop: 18, display: "grid", gap: 18 }}>
+              {preview.sections.map((section) => (
+                <div key={section.name}>
+                  <p style={{ margin: "0 0 6px", color: "#1ecad3", fontWeight: 700 }}>[{section.name}]</p>
+                  <div style={{ display: "grid", gap: 2 }}>
+                    {section.lines.map((line, index) => (
+                      <pre
+                        key={`${section.name}-${index}`}
+                        style={{
+                          margin: 0,
+                          whiteSpace: "pre-wrap",
+                          color: line.type === "chords" ? "#7cf2a2" : line.type === "tab" ? "#f59e0b" : "#d6e5f8",
+                          fontSize: 13,
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {line.content || "\u00a0"}
+                      </pre>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -237,6 +268,6 @@ const previewBoxStyle: CSSProperties = {
   border: "1px solid #1e3650",
   borderRadius: 12,
   padding: "16px 20px",
-  maxHeight: 400,
+  maxHeight: 520,
   overflowY: "auto",
 };

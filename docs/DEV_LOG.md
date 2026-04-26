@@ -2271,3 +2271,127 @@ Registro oficial de progresso para handoff entre LLMs.
   - implementar próximos blocos de paridade P0: voluntários no evento e logs de setlist.
 - Próximo passo:
   - implementar **logs de setlist do evento** no mobile (listar alterações com paginação simples).
+
+### [2026-04-26 11:35 America/Recife] — Codex (GPT-5) — UX de inserção de músicas
+- Objetivo: reduzir atrito no cadastro/importação de músicas e preparar o fluxo "não encontrou -> importar/cadastrar".
+- Feito:
+  - `apps/web/app/songs/page.tsx`
+    - adicionada empty-state acionável quando a busca não encontra músicas.
+    - busca agora oferece atalhos para `Cadastro manual` e `Importar cifra`, reaproveitando o termo pesquisado.
+  - `apps/web/app/songs/new/page.tsx`
+    - tela de nova música reformulada com resumo visual do cadastro.
+    - suporte a prefill via query string (`title`, `artist`) vindo da busca.
+    - adicionado bloco de **cifra inicial opcional** com upload local de `.txt` ou colagem de conteúdo.
+    - submissão passou a criar a música e, se houver texto de cifra, importar a primeira versão automaticamente no mesmo fluxo.
+  - `apps/web/app/songs/import/page.tsx`
+    - cabeçalho atualizado para "Central de Importação".
+    - quando aberta a partir de uma busca sem resultado (`?q=`), exibe contexto da música procurada e atalhos de retorno/cadastro manual.
+  - `apps/web/app/songs/[songId]/charts/[chartId]/edit/page.tsx`
+    - preview da edição deixou de ser JSON cru e passou a renderizar título, metadados e seções da cifra em formato legível.
+- Arquivos:
+  - `apps/web/app/songs/page.tsx`
+  - `apps/web/app/songs/new/page.tsx`
+  - `apps/web/app/songs/import/page.tsx`
+  - `apps/web/app/songs/[songId]/charts/[chartId]/edit/page.tsx`
+  - `docs/OPEN_QUESTIONS.md`
+- Validação:
+  - `npm run build` em `apps/web` → **EXIT:0**
+- Pendências:
+  - decidir abordagem oficial para integração externa com Cifra Club (`docs/OPEN_QUESTIONS.md` Q-009).
+  - se aprovado juridicamente, criar backend de importação por URL reaproveitando o parser já existente de `.txt`.
+- Próximo passo:
+  - implementar uma etapa backend/frontend de **importação assistida por URL** com revisão antes de salvar, condicionada à decisão da Q-009.
+
+### [2026-04-26 17:36 America/Recife] — Codex (GPT-5) — Importação automática do Cifra Club
+- Objetivo: permitir busca e importação automática de cifra do Cifra Club sem exigir URL manual do usuário.
+- Feito:
+  - `apps/api/src/songs/songs.service.ts`
+    - adicionados `previewCifraClub(...)` e `importFromCifraClub(...)`.
+    - implementado resolvedor automático por `artista + titulo`:
+      - gera slug do artista,
+      - consulta a página pública do artista no Cifra Club,
+      - seleciona a música mais provável por score de similaridade,
+      - carrega a página da música,
+      - extrai `title`, `tom` e o bloco principal `<pre>` da cifra,
+      - converte o HTML em texto e reaproveita `parseChordTxt(...)`.
+  - `apps/api/src/songs/songs.controller.ts`
+    - novos endpoints:
+      - `POST /api/songs/import/cifra-club/preview`
+      - `POST /api/songs/import/cifra-club`
+  - `apps/web/app/api/songs/import/cifra-club/route.ts`
+  - `apps/web/app/api/songs/import/cifra-club/preview/route.ts`
+    - proxies server-side para os novos endpoints do backend.
+  - `apps/web/app/songs/import/page.tsx`
+    - adicionada seção **Busca automática no Cifra Club** com campos `titulo` e `artista`.
+    - preview e salvamento agora suportam origem `cifraClub`.
+    - exibição da URL fonte encontrada pelo resolvedor automático.
+  - `apps/web/app/songs/page.tsx`
+    - empty-state da busca passou a enfatizar `Importar do Cifra Club`.
+  - testes:
+    - `apps/api/src/songs/songs.service.test.ts`
+    - `apps/api/src/songs/songs-import.integration.test.ts`
+- Arquivos:
+  - `apps/api/src/songs/songs.service.ts`
+  - `apps/api/src/songs/songs.controller.ts`
+  - `apps/api/src/songs/songs.service.test.ts`
+  - `apps/api/src/songs/songs-import.integration.test.ts`
+  - `apps/web/app/api/songs/import/cifra-club/route.ts`
+  - `apps/web/app/api/songs/import/cifra-club/preview/route.ts`
+  - `apps/web/app/songs/import/page.tsx`
+  - `apps/web/app/songs/page.tsx`
+  - `docs/OPEN_QUESTIONS.md`
+- Validação:
+  - `npx tsx --test src/songs/songs.service.test.ts src/songs/songs-import.integration.test.ts` em `apps/api` → **12/12 testes OK**
+  - `npm run build` em `apps/api` → **EXIT:0**
+  - `npm run build` em `apps/web` → **EXIT:0**
+- Pendências:
+  - a integração depende da estrutura HTML pública do Cifra Club; se o site mudar, o resolvedor precisará de ajuste.
+  - hoje a busca automática exige `artista + titulo`; sem artista a assertividade cai muito.
+- Próximo passo:
+  - encaixar a ação automática também direto na busca/listagem de músicas, sem precisar abrir manualmente a central de importação.
+
+### [2026-04-26 17:49 America/Recife] — Codex (GPT-5) — Auto-disparo da importação na busca
+- Objetivo: reduzir mais um passo no fluxo "não encontrei a música" disparando a busca automática já na transição para a central de importação.
+- Feito:
+  - `apps/web/app/songs/page.tsx`
+    - quando a busca sem resultado estiver no formato `artista - música`, agora exibe ação principal **Buscar e importar automaticamente**.
+    - essa ação envia `q`, `title`, `artist` e `auto=1` para a central de importação.
+  - `apps/web/app/songs/import/page.tsx`
+    - leitura de `title` e `artist` pela query string, com prioridade sobre o texto bruto de `q`.
+    - `useEffect` de auto-preview: quando `auto=1` e os dois campos existem, a busca no Cifra Club é executada automaticamente ao abrir a página.
+    - proteção com `ref` para evitar disparos repetidos.
+- Arquivos:
+  - `apps/web/app/songs/page.tsx`
+  - `apps/web/app/songs/import/page.tsx`
+- Validação:
+  - `npm run build` em `apps/web` → **EXIT:0**
+- Pendências:
+  - criar variação equivalente dentro de setlist/ensaio/evento, para importar uma música nova sem sair do contexto operacional.
+- Próximo passo:
+  - adicionar o mesmo atalho de busca/importação automática dentro do fluxo de adicionar música ao evento/setlist.
+
+### [2026-04-26 17:58 America/Recife] — Codex (GPT-5) — Atalho de importação no evento e ensaio
+- Objetivo: permitir iniciar a importação automática do Cifra Club também a partir dos fluxos operacionais de setlist, sem obrigar o usuário a voltar para a biblioteca de músicas.
+- Feito:
+  - `apps/web/lib/song-search-intent.ts`
+    - extraído parser compartilhado para interpretar buscas no formato `artista - música`.
+  - `apps/web/app/events/[eventId]/page.tsx`
+    - no dropdown de adicionar música ao setlist, quando não há correspondência local e a busca contém artista+título, agora exibe CTAs para:
+      - abrir a importação automática do Cifra Club com `auto=1`
+      - abrir o cadastro manual já pré-preenchido
+  - `apps/web/app/rehearsals/page.tsx`
+    - comportamento equivalente no fluxo de adicionar música ao setlist do ensaio.
+  - `apps/web/app/songs/page.tsx`
+    - passou a reutilizar o parser compartilhado para manter o mesmo critério de interpretação da busca.
+- Arquivos:
+  - `apps/web/lib/song-search-intent.ts`
+  - `apps/web/app/events/[eventId]/page.tsx`
+  - `apps/web/app/rehearsals/page.tsx`
+  - `apps/web/app/songs/page.tsx`
+- Validação:
+  - `npm run build` em `apps/web` → **EXIT:0**
+- Pendências:
+  - hoje o atalho abre a central de importação em vez de anexar automaticamente a música recém-importada ao evento/ensaio.
+  - falta avaliar se vale reabrir automaticamente o contexto original depois do salvamento da música.
+- Próximo passo:
+  - encadear o retorno da importação para reanexar a nova música diretamente ao evento ou ensaio de origem.
