@@ -44,14 +44,20 @@ type PreviewTxtBody = {
 };
 
 type ImportCifraClubBody = {
-  title: string;
+  title?: string;
   artist?: string;
   songId?: string;
+  url?: string;
 };
 
 type PreviewCifraClubBody = {
-  title: string;
+  title?: string;
   artist?: string;
+  url?: string;
+};
+
+type SearchCifraClubCandidatesBody = {
+  title: string;
 };
 
 @SkipThrottle({ global: true })
@@ -141,6 +147,15 @@ export class SongsController {
   ) {
     await this.assertWriteAccess(authorization);
     return this.songsService.importFromCifraClub(body);
+  }
+
+  @Post("import/cifra-club/candidates")
+  async searchCifraClubCandidates(
+    @Headers("authorization") authorization: string | undefined,
+    @Body() body: SearchCifraClubCandidatesBody,
+  ) {
+    await this.assertWriteAccess(authorization);
+    return this.songsService.searchCifraClubCandidates(body.title);
   }
 
   @Post("import/cifra-club/preview")

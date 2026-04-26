@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import { CSSProperties, useEffect, useState } from "react";
 import { AuthRequired } from "@/components/AuthRequired";
 import { useAuth } from "@/components/AuthProvider";
 import { canManageSongs } from "@/lib/permissions";
@@ -29,6 +29,12 @@ type ParsedChordPreview = {
 };
 
 type ImportSource = "text" | "file" | "cifraClub" | null;
+
+type CifraClubCandidate = {
+  title: string;
+  artist: string;
+  url: string;
+};
 
 type ApiResult<T> = {
   ok: boolean;
@@ -58,17 +64,17 @@ function SongImportContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const queryHint = searchParams.get("q")?.trim() ?? "";
-  const autoImport = searchParams.get("auto") === "1";
   const titleParam = searchParams.get("title")?.trim() ?? "";
   const artistParam = searchParams.get("artist")?.trim() ?? "";
   const initialQuery = artistParam && titleParam
     ? `${artistParam} - ${titleParam}`
     : titleParam || queryHint;
-  const autoPreviewTriggeredRef = useRef(false);
   const [txtPreviewInput, setTxtPreviewInput] = useState("");
   const [txtPreviewFile, setTxtPreviewFile] = useState<File | null>(null);
   const [cifraClubQuery, setCifraClubQuery] = useState(initialQuery);
   const [cifraClubSourceUrl, setCifraClubSourceUrl] = useState("");
+  const [candidates, setCandidates] = useState<CifraClubCandidate[]>([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [targetSongId, setTargetSongId] = useState("");
   const [songs, setSongs] = useState<SongListItem[]>([]);
   const [previewData, setPreviewData] = useState<ParsedChordPreview | null>(null);
@@ -82,7 +88,7 @@ function SongImportContent() {
 
   useEffect(() => {
     setCifraClubQuery(initialQuery);
-    autoPreviewTriggeredRef.current = false;
+    setCandidates([]);
   }, [initialQuery]);
 
   useEffect(() => {
@@ -93,13 +99,6 @@ function SongImportContent() {
     }
     void loadSongs();
   }, [user, router]);
-
-  useEffect(() => {
-    if (!autoImport || autoPreviewTriggeredRef.current) return;
-    if (!cifraClubQuery) return;
-    autoPreviewTriggeredRef.current = true;
-    void previewFromCifraClub();
-  }, [autoImport, cifraClubQuery]);
 
   async function loadSongs() {
     setLoadingSongs(true);
@@ -167,28 +166,51 @@ function SongImportContent() {
     }
   }
 
-  async function previewFromCifraClub() {
+  async function searchForCandidates() {
     const query = cifraClubQuery.trim();
     if (!query) {
-      setStatus("Informe o nome da música ou artista para buscar no Cifra Club");
+      setStatus("Informe o nome da música ou artista para buscar");
       return;
     }
-
-    setPreviewLoading(true);
+    setCandidatesLoading(true);
+    setCandidates([]);
+    setPreviewData(null);
     try {
-      const response = await fetch("/api/songs/import/cifra-club/preview", {
+      const response = await fetch("/api/songs/import/cifra-club/candidates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: query }),
       });
+      const body = await parseJson<{ candidates: CifraClubCandidate[] }>(response);
+      if (!body.candidates.length) {
+        setStatus(`Nenhum resultado para "${query}". Tente "Artista - Nome da Música".`);
+      } else {
+        setCandidates(body.candidates);
+        setStatus(`${body.candidates.length} resultado(s) encontrado(s) — clique para visualizar`);
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Falha na busca");
+    } finally {
+      setCandidatesLoading(false);
+    }
+  }
 
+  async function previewFromUrl(url: string) {
+    setPreviewLoading(true);
+    setStatus("Carregando cifra...");
+    try {
+      const response = await fetch("/api/songs/import/cifra-club/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
       const body = await parseJson<{ parsed: ParsedChordPreview; sourceUrl?: string }>(response);
       setPreviewData(body.parsed);
       setPreviewSource("cifraClub");
-      setCifraClubSourceUrl(body.sourceUrl || "");
-      setStatus("Pré-visualização gerada automaticamente a partir do Cifra Club");
+      setCifraClubSourceUrl(body.sourceUrl || url);
+      setStatus("Pré-visualização gerada — confira e clique em Salvar");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Falha ao localizar cifra no Cifra Club");
+      setStatus(error instanceof Error ? error.message : "Falha ao carregar cifra");
     } finally {
       setPreviewLoading(false);
     }
@@ -235,25 +257,20 @@ function SongImportContent() {
         setLastImportedSongId(body.song?.id || "");
         setLastImportedChartVersion(body.chordChart?.version ?? null);
       } else {
-        const query = cifraClubQuery.trim();
-        if (!query) {
-          throw new Error("Informe a busca para salvar a importacao automatica");
+        if (!cifraClubSourceUrl) {
+          throw new Error("Selecione uma cifra na lista de resultados antes de salvar");
         }
-
-        const payload: { title: string; songId?: string } = { title: query };
-        if (cleanSongId) {
-          payload.songId = cleanSongId;
-        }
+        const payload: { url: string; songId?: string } = { url: cifraClubSourceUrl };
+        if (cleanSongId) payload.songId = cleanSongId;
 
         const response = await fetch("/api/songs/import/cifra-club", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const body = await parseJson<{ song?: { id: string }; chordChart?: { version?: number }; sourceUrl?: string }>(response);
+        const body = await parseJson<{ song?: { id: string }; chordChart?: { version?: number } }>(response);
         setLastImportedSongId(body.song?.id || "");
         setLastImportedChartVersion(body.chordChart?.version ?? null);
-        setCifraClubSourceUrl(body.sourceUrl || cifraClubSourceUrl);
       }
 
       setStatus("Cifra salva com sucesso!");
@@ -304,23 +321,34 @@ function SongImportContent() {
           <div style={importSectionStyle}>
             <div style={{ display: "grid", gap: 10 }}>
               <p style={sectionLabelStyle}>Busca automática no Cifra Club</p>
-              <input
-                value={cifraClubQuery}
-                onChange={(event) => setCifraClubQuery(event.target.value)}
-                onKeyDown={(event) => { if (event.key === "Enter") void previewFromCifraClub(); }}
-                placeholder="Ex: Banda Catedral ou Banda Catedral - Nome da Música"
-                style={inputStyle}
-              />
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <button type="button" style={primaryButtonStyle} onClick={() => void previewFromCifraClub()}>
-                  {previewLoading ? "Buscando..." : "Buscar automaticamente"}
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  value={cifraClubQuery}
+                  onChange={(event) => { setCifraClubQuery(event.target.value); setCandidates([]); }}
+                  onKeyDown={(event) => { if (event.key === "Enter") void searchForCandidates(); }}
+                  placeholder="Ex: Banda Catedral ou Banda Catedral - Nome da Música"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button type="button" style={primaryButtonStyle} onClick={() => void searchForCandidates()}>
+                  {candidatesLoading ? "Buscando..." : "Buscar"}
                 </button>
-                {cifraClubSourceUrl ? (
-                  <a href={cifraClubSourceUrl} target="_blank" rel="noopener noreferrer" style={compactSourceLinkStyle}>
-                    Abrir fonte encontrada
-                  </a>
-                ) : null}
               </div>
+              {candidates.length > 0 && (
+                <div style={candidateListStyle}>
+                  {candidates.map((c) => (
+                    <button
+                      key={c.url}
+                      type="button"
+                      style={candidateItemStyle}
+                      onClick={() => void previewFromUrl(c.url)}
+                      disabled={previewLoading}
+                    >
+                      <span style={{ fontWeight: 700, color: "#e2eaf5" }}>{c.title}</span>
+                      <span style={{ color: "#7cf2a2", fontSize: 12, marginLeft: 8 }}>{c.artist}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -532,14 +560,28 @@ const compactLinkStyle: CSSProperties = {
   fontSize: 13,
 };
 
-const compactSourceLinkStyle: CSSProperties = {
-  color: "#d6e5f8",
-  textDecoration: "none",
+const candidateListStyle: CSSProperties = {
+  display: "grid",
+  gap: 4,
+  background: "rgba(6, 18, 29, 0.85)",
   border: "1px solid #31557c",
-  borderRadius: 999,
-  padding: "8px 12px",
-  fontWeight: 600,
+  borderRadius: 12,
+  padding: 8,
+  maxHeight: 280,
+  overflowY: "auto",
+};
+
+const candidateItemStyle: CSSProperties = {
+  background: "transparent",
+  border: "none",
+  borderRadius: 8,
+  padding: "8px 10px",
+  textAlign: "left",
+  cursor: "pointer",
+  color: "#e2eaf5",
   fontSize: 13,
+  lineHeight: 1.4,
+  transition: "background 0.15s",
 };
 
 const inlineSourceLinkStyle: CSSProperties = {

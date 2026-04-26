@@ -23,9 +23,16 @@ type ImportTxtInput = {
 };
 
 type ImportCifraClubInput = {
-  title: string;
+  title?: string;
   artist?: string;
   songId?: string;
+  url?: string;
+};
+
+type CifraClubCandidate = {
+  title: string;
+  artist: string;
+  url: string;
 };
 
 type CifraClubLookupResult = {
@@ -269,6 +276,26 @@ function scoreSearchResult(path: string, query: string): number {
     if (combined.includes(token)) score += 100;
   }
   return score;
+}
+
+function extractSongCandidatesFromArtistPage(
+  html: string,
+  artistSlug: string,
+  artistName: string,
+): CifraClubCandidate[] {
+  const linkRegex = /<a\b[^>]*\bhref="([^"]*)"[^>]*>([^<]{2,80})<\/a>/gi;
+  const seen = new Set<string>();
+  const results: CifraClubCandidate[] = [];
+  for (const match of html.matchAll(linkRegex)) {
+    const href = match[1] ?? "";
+    const text = decodeHtmlEntities((match[2] ?? "").trim());
+    const normalized = normalizeCifraClubSongPath(href, artistSlug);
+    if (normalized && !seen.has(normalized) && text) {
+      seen.add(normalized);
+      results.push({ title: text, artist: artistName, url: `${CIFRA_CLUB_BASE_URL}${normalized}` });
+    }
+  }
+  return results;
 }
 
 function extractSongPathsFromArtistPage(html: string, artistSlug: string): string[] {
@@ -570,16 +597,73 @@ export class SongsService {
     return { content, parsed };
   }
 
+  async searchCifraClubCandidates(query: string): Promise<{ ok: true; candidates: CifraClubCandidate[] }> {
+    const q = query.trim();
+    if (!q) return { ok: true, candidates: [] };
+    return { ok: true, candidates: await this.findCifraClubCandidates(q) };
+  }
+
+  private async findCifraClubCandidates(query: string): Promise<CifraClubCandidate[]> {
+    const fetchOpts = { method: "GET" as const, headers: CIFRA_CLUB_FETCH_HEADERS, redirect: "follow" as const };
+    const parts = query.split(" - ").map((p) => p.trim()).filter(Boolean);
+    const [queryArtist, querySong] =
+      parts.length >= 2 ? [parts[0]!, parts.slice(1).join(" - ")] : [query, ""];
+    const artistSlug = slugifyCifraClub(queryArtist);
+
+    if (artistSlug) {
+      try {
+        const res = await fetch(`${CIFRA_CLUB_BASE_URL}/${artistSlug}/`, fetchOpts);
+        if (res.ok) {
+          const html = await res.text();
+          const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+          const artistName = decodeHtmlEntities((h1Match?.[1] ?? queryArtist).trim());
+          const candidates = extractSongCandidatesFromArtistPage(html, artistSlug, artistName);
+          if (candidates.length > 0) {
+            if (!querySong) return candidates.slice(0, 10);
+            return candidates
+              .map((c) => ({ ...c, _s: scoreSongPath(c.url.replace(CIFRA_CLUB_BASE_URL, ""), querySong) }))
+              .sort((a, b) => b._s - a._s)
+              .slice(0, 10)
+              .map(({ _s: _, ...c }) => c);
+          }
+        }
+      } catch { /* try next */ }
+    }
+
+    try {
+      const res = await fetch(`${CIFRA_CLUB_BASE_URL}/busca/?q=${encodeURIComponent(query)}`, fetchOpts);
+      if (res.ok) {
+        const html = await res.text();
+        const links = extractSongLinksFromSearchPage(html);
+        if (links.length > 0) {
+          return links.slice(0, 10).map((path) => {
+            const segs = path.split("/").filter(Boolean);
+            return {
+              title: decodeHtmlEntities((segs[1] ?? "").replace(/-/g, " ")),
+              artist: decodeHtmlEntities((segs[0] ?? "").replace(/-/g, " ")),
+              url: `${CIFRA_CLUB_BASE_URL}${path}`,
+            };
+          });
+        }
+      }
+    } catch { /* fall through */ }
+
+    return [];
+  }
+
   private async lookupCifraClubChart(input: ImportCifraClubInput): Promise<CifraClubLookupResult> {
     const title = (input.title || "").trim();
     const artist = (input.artist || "").trim();
+    const directUrl = (input.url || "").trim();
 
-    if (!title) {
-      throw new BadRequestException("title is required");
+    if (!directUrl && !title) {
+      throw new BadRequestException("title or url is required");
     }
 
     let sourceUrl: string;
-    if (artist) {
+    if (directUrl) {
+      sourceUrl = directUrl;
+    } else if (artist) {
       sourceUrl = await this.resolveCifraClubSongUrl(title, artist);
     } else {
       const parts = title.split(" - ").map((p) => p.trim()).filter(Boolean);
