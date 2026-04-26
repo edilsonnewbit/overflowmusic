@@ -62,6 +62,8 @@ function SongImportContent() {
   const [txtPreviewFile, setTxtPreviewFile] = useState<File | null>(null);
   const [cifraClubUrl, setCifraClubUrl] = useState("");
   const [cifraClubSourceUrl, setCifraClubSourceUrl] = useState("");
+  const [overrideTitle, setOverrideTitle] = useState("");
+  const [overrideArtist, setOverrideArtist] = useState("");
   const [targetSongId, setTargetSongId] = useState("");
   const [songs, setSongs] = useState<SongListItem[]>([]);
   const [previewData, setPreviewData] = useState<ParsedChordPreview | null>(null);
@@ -72,6 +74,13 @@ function SongImportContent() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [loadingSongs, setLoadingSongs] = useState(false);
   const [status, setStatus] = useState("Pronto");
+
+  useEffect(() => {
+    if (previewData) {
+      setOverrideTitle(previewData.title || "");
+      setOverrideArtist(previewData.artist || "");
+    }
+  }, [previewData]);
 
   useEffect(() => {
     if (!user) return;
@@ -179,6 +188,9 @@ function SongImportContent() {
     setSaveLoading(true);
 
     try {
+      type SaveResult = { song?: { id: string }; chordChart?: { version?: number } };
+      let saveResult: SaveResult;
+
       if (previewSource === "text") {
         const payload: { content: string; songId?: string } = { content: txtPreviewInput };
         if (cleanSongId) payload.songId = cleanSongId;
@@ -188,9 +200,7 @@ function SongImportContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const body = await parseJson<{ song?: { id: string }; chordChart?: { version?: number } }>(response);
-        setLastImportedSongId(body.song?.id || "");
-        setLastImportedChartVersion(body.chordChart?.version ?? null);
+        saveResult = await parseJson<SaveResult>(response);
       } else if (previewSource === "file") {
         if (!txtPreviewFile) {
           throw new Error("Arquivo selecionado não encontrado");
@@ -206,9 +216,7 @@ function SongImportContent() {
           method: "POST",
           body: formData,
         });
-        const body = await parseJson<{ song?: { id: string }; chordChart?: { version?: number } }>(response);
-        setLastImportedSongId(body.song?.id || "");
-        setLastImportedChartVersion(body.chordChart?.version ?? null);
+        saveResult = await parseJson<SaveResult>(response);
       } else {
         if (!cifraClubSourceUrl) {
           throw new Error("Cole a URL do Cifra Club e carregue a pré-visualização antes de salvar");
@@ -221,9 +229,27 @@ function SongImportContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const body = await parseJson<{ song?: { id: string }; chordChart?: { version?: number } }>(response);
-        setLastImportedSongId(body.song?.id || "");
-        setLastImportedChartVersion(body.chordChart?.version ?? null);
+        saveResult = await parseJson<SaveResult>(response);
+      }
+
+      const savedSongId = saveResult.song?.id || "";
+      setLastImportedSongId(savedSongId);
+      setLastImportedChartVersion(saveResult.chordChart?.version ?? null);
+
+      // Apply title/artist override if changed
+      if (savedSongId && previewData) {
+        const titleChanged = overrideTitle.trim() !== previewData.title;
+        const artistChanged = overrideArtist.trim() !== (previewData.artist ?? "");
+        if (titleChanged || artistChanged) {
+          await fetch(`/api/songs/${savedSongId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: overrideTitle.trim() || previewData.title,
+              artist: overrideArtist.trim() || null,
+            }),
+          });
+        }
       }
 
       setStatus("Cifra salva com sucesso!");
@@ -349,11 +375,21 @@ function SongImportContent() {
             <div style={{ marginTop: 16 }}>
               {previewData ? (
                 <div style={previewBoxStyle}>
-                  {/* Cabeçalho resumido */}
-                  <p style={{ margin: 0, fontWeight: 800, fontSize: 18 }}>
-                    {previewData.title}
-                    {previewData.artist ? ` - ${previewData.artist}` : ""}
-                  </p>
+                  {/* Título e artista editáveis */}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input
+                      value={overrideTitle}
+                      onChange={(e) => setOverrideTitle(e.target.value)}
+                      placeholder="Título da música"
+                      style={{ ...inputStyle, fontWeight: 700, fontSize: 15, flex: "2 1 160px" }}
+                    />
+                    <input
+                      value={overrideArtist}
+                      onChange={(e) => setOverrideArtist(e.target.value)}
+                      placeholder="Artista (opcional)"
+                      style={{ ...inputStyle, fontSize: 14, flex: "1 1 120px" }}
+                    />
+                  </div>
                   <p style={{ margin: 0, color: "#b3c6e0", fontSize: 13 }}>
                     Key: {previewData.metadata?.suggestedKey || "-"} | BPM: {previewData.metadata?.bpm ?? "-"} | Capo:{" "}
                     {previewData.metadata?.capo ?? "-"}
