@@ -211,6 +211,39 @@ function normalizeCifraClubSongPath(path: string, artistSlug: string): string | 
   return `/${artistSlug}/${baseMatch[1]}/`;
 }
 
+const EXCLUDED_CIFRA_CLUB_SLUGS = new Set([
+  "cifras", "violao", "guitarra", "musica", "artistas", "tablaturas",
+  "busca", "noticias", "ranking", "letras", "acordes", "ukulele",
+  "cavaquinho", "contrabaixo", "teclado", "bateria", "gaita",
+]);
+
+function extractSongLinksFromSearchPage(html: string): string[] {
+  const hrefRegex = /href="(\/[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*\/?)"[^>]*>/gi;
+  const unique = new Set<string>();
+  for (const match of html.matchAll(hrefRegex)) {
+    const path = match[1] ?? "";
+    const parts = path.split("/").filter(Boolean);
+    if (parts.length === 2 && !EXCLUDED_CIFRA_CLUB_SLUGS.has(parts[0] ?? "")) {
+      unique.add(`/${parts[0]}/${parts[1]}/`);
+    }
+  }
+  return [...unique];
+}
+
+function scoreSearchResult(path: string, query: string): number {
+  const parts = path.split("/").filter(Boolean);
+  const combined = normalizeForMatch(`${parts[0] ?? ""} ${parts[1] ?? ""}`.replace(/-/g, " "));
+  const target = normalizeForMatch(query);
+  const targetTokens = target.split(" ").filter(Boolean);
+  if (combined === target) return 10_000;
+  let score = 0;
+  if (combined.includes(target) || target.includes(combined)) score += 2_000;
+  for (const token of targetTokens) {
+    if (combined.includes(token)) score += 100;
+  }
+  return score;
+}
+
 function extractSongPathsFromArtistPage(html: string, artistSlug: string): string[] {
   const hrefRegex = /href="([^"]+)"/gi;
   const unique = new Set<string>();
@@ -518,11 +551,17 @@ export class SongsService {
       throw new BadRequestException("title is required");
     }
 
-    if (!artist) {
-      throw new BadRequestException("artist is required for automatic Cifra Club import");
+    let sourceUrl: string;
+    if (artist) {
+      sourceUrl = await this.resolveCifraClubSongUrl(title, artist);
+    } else {
+      const parts = title.split(" - ").map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        sourceUrl = await this.resolveCifraClubSongUrl(parts.slice(1).join(" - "), parts[0]!);
+      } else {
+        sourceUrl = await this.resolveCifraClubBySearch(title);
+      }
     }
-
-    const sourceUrl = await this.resolveCifraClubSongUrl(title, artist);
     const response = await fetch(sourceUrl, {
       method: "GET",
       headers: {
@@ -582,6 +621,35 @@ export class SongsService {
     }
 
     return directSongUrl;
+  }
+
+  private async resolveCifraClubBySearch(query: string): Promise<string> {
+    const searchUrl = `${CIFRA_CLUB_BASE_URL}/busca/?q=${encodeURIComponent(query)}`;
+    const response = await fetch(searchUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "OverflowMusicApp/1.0 (+https://music.overflowmvmt.com)",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+    });
+
+    if (!response.ok) {
+      throw new BadRequestException("Falha ao buscar cifras no Cifra Club.");
+    }
+
+    const html = await response.text();
+    const links = extractSongLinksFromSearchPage(html);
+
+    if (links.length === 0) {
+      throw new BadRequestException("Nenhuma cifra encontrada para a busca informada.");
+    }
+
+    const best = links
+      .map((path) => ({ path, score: scoreSearchResult(path, query) }))
+      .sort((a, b) => b.score - a.score)[0]?.path ?? links[0]!;
+
+    return `${CIFRA_CLUB_BASE_URL}${best}`;
   }
 
   // ── Tracks (multitrack player) ────────────────────────────────────────────
