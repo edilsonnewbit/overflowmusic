@@ -60,6 +60,12 @@ function extractFolderIdFromUrl(url: string): string | null {
 
 const CIFRA_CLUB_BASE_URL = "https://www.cifraclub.com.br";
 
+const CIFRA_CLUB_FETCH_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+};
+
 function escapeRegExp(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -177,18 +183,28 @@ function extractPrimaryPreBlock(html: string): string | null {
 
 function buildImportContentFromCifraClubPage(html: string): { content: string; title: string; artist: string | null } {
   const { title, artist } = extractPageTitleParts(html);
+  const key = extractSuggestedKeyFromHtml(html);
+
+  let chartBody = "";
+
   const preBlock = extractPrimaryPreBlock(html);
-  if (!preBlock) {
-    throw new BadRequestException("Nao foi possivel extrair a cifra da pagina encontrada.");
+  if (preBlock) {
+    chartBody = htmlToPlainText(preBlock).replace(/\n{3,}/g, "\n\n").trim();
   }
 
-  const key = extractSuggestedKeyFromHtml(html);
-  const chartBody = htmlToPlainText(preBlock)
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  if (!chartBody) {
+    const containerMatch = html.match(
+      /<(?:div|section)[^>]+(?:class|id)="[^"]*cifra[^"]*"[^>]*>([\s\S]*?)<\/(?:div|section)>/i,
+    );
+    if (containerMatch?.[1]) {
+      chartBody = htmlToPlainText(containerMatch[1]).replace(/\n{3,}/g, "\n\n").trim();
+    }
+  }
 
   if (!chartBody) {
-    throw new BadRequestException("A pagina encontrada nao possui conteudo de cifra importavel.");
+    throw new BadRequestException(
+      "Nao foi possivel extrair a cifra da pagina encontrada. A musica pode estar em formato nao suportado ou ser apenas letra.",
+    );
   }
 
   const header = artist ? `${artist} - ${title}` : title;
@@ -218,12 +234,23 @@ const EXCLUDED_CIFRA_CLUB_SLUGS = new Set([
 ]);
 
 function extractSongLinksFromSearchPage(html: string): string[] {
-  const hrefRegex = /href="(\/[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*\/?)"[^>]*>/gi;
   const unique = new Set<string>();
-  for (const match of html.matchAll(hrefRegex)) {
-    const path = match[1] ?? "";
+  const slugPattern = /^[a-z0-9][a-z0-9-]*$/;
+
+  for (const match of html.matchAll(/href="([^"]+)"/gi)) {
+    let href = match[1] ?? "";
+    if (href.startsWith("http://") || href.startsWith("https://")) {
+      if (!href.includes("cifraclub.com.br")) continue;
+      href = href.replace(/^https?:\/\/(?:www\.)?cifraclub\.com\.br/, "");
+    }
+    const path = (href.split("?")[0] ?? "").split("#")[0] ?? "";
     const parts = path.split("/").filter(Boolean);
-    if (parts.length === 2 && !EXCLUDED_CIFRA_CLUB_SLUGS.has(parts[0] ?? "")) {
+    if (
+      parts.length === 2 &&
+      !EXCLUDED_CIFRA_CLUB_SLUGS.has(parts[0] ?? "") &&
+      slugPattern.test(parts[0] ?? "") &&
+      slugPattern.test(parts[1] ?? "")
+    ) {
       unique.add(`/${parts[0]}/${parts[1]}/`);
     }
   }
@@ -564,10 +591,7 @@ export class SongsService {
     }
     const response = await fetch(sourceUrl, {
       method: "GET",
-      headers: {
-        "User-Agent": "OverflowMusicApp/1.0 (+https://music.overflowmvmt.com)",
-        Accept: "text/html,application/xhtml+xml",
-      },
+      headers: CIFRA_CLUB_FETCH_HEADERS,
       redirect: "follow",
     });
 
@@ -598,10 +622,7 @@ export class SongsService {
     try {
       const artistPageResponse = await fetch(artistPageUrl, {
         method: "GET",
-        headers: {
-          "User-Agent": "OverflowMusicApp/1.0 (+https://music.overflowmvmt.com)",
-          Accept: "text/html,application/xhtml+xml",
-        },
+        headers: CIFRA_CLUB_FETCH_HEADERS,
         redirect: "follow",
       });
 
@@ -624,32 +645,51 @@ export class SongsService {
   }
 
   private async resolveCifraClubBySearch(query: string): Promise<string> {
-    const searchUrl = `${CIFRA_CLUB_BASE_URL}/busca/?q=${encodeURIComponent(query)}`;
-    const response = await fetch(searchUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": "OverflowMusicApp/1.0 (+https://music.overflowmvmt.com)",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-    });
+    const fetchOpts = { method: "GET", headers: CIFRA_CLUB_FETCH_HEADERS, redirect: "follow" } as const;
 
-    if (!response.ok) {
-      throw new BadRequestException("Falha ao buscar cifras no Cifra Club.");
+    // Strategy 1: treat query as artist name → fetch artist page → pick first/best song
+    const artistSlug = slugifyCifraClub(query);
+    if (artistSlug) {
+      try {
+        const artistPageUrl = `${CIFRA_CLUB_BASE_URL}/${artistSlug}/`;
+        const artistResponse = await fetch(artistPageUrl, fetchOpts);
+        if (artistResponse.ok) {
+          const artistHtml = await artistResponse.text();
+          const paths = extractSongPathsFromArtistPage(artistHtml, artistSlug);
+          if (paths.length > 0) {
+            const scored = paths
+              .map((path) => ({ path, score: scoreSongPath(path, query) }))
+              .sort((a, b) => b.score - a.score);
+            const best = scored[0]?.score > 0 ? scored[0].path : paths[0]!;
+            return `${CIFRA_CLUB_BASE_URL}${best}`;
+          }
+        }
+      } catch {
+        // try next strategy
+      }
     }
 
-    const html = await response.text();
-    const links = extractSongLinksFromSearchPage(html);
-
-    if (links.length === 0) {
-      throw new BadRequestException("Nenhuma cifra encontrada para a busca informada.");
+    // Strategy 2: search page (works if SSR; Google CSE may not return links server-side)
+    try {
+      const searchUrl = `${CIFRA_CLUB_BASE_URL}/busca/?q=${encodeURIComponent(query)}`;
+      const searchResponse = await fetch(searchUrl, fetchOpts);
+      if (searchResponse.ok) {
+        const searchHtml = await searchResponse.text();
+        const links = extractSongLinksFromSearchPage(searchHtml);
+        if (links.length > 0) {
+          const best = links
+            .map((path) => ({ path, score: scoreSearchResult(path, query) }))
+            .sort((a, b) => b.score - a.score)[0]?.path ?? links[0]!;
+          return `${CIFRA_CLUB_BASE_URL}${best}`;
+        }
+      }
+    } catch {
+      // fall through
     }
 
-    const best = links
-      .map((path) => ({ path, score: scoreSearchResult(path, query) }))
-      .sort((a, b) => b.score - a.score)[0]?.path ?? links[0]!;
-
-    return `${CIFRA_CLUB_BASE_URL}${best}`;
+    throw new BadRequestException(
+      `Nao foi possivel encontrar "${query}" no Cifra Club. Tente o formato "Artista - Nome da Musica", por exemplo "Banda Catedral - Dom e Dono".`,
+    );
   }
 
   // ── Tracks (multitrack player) ────────────────────────────────────────────
