@@ -234,50 +234,6 @@ function normalizeCifraClubSongPath(path: string, artistSlug: string): string | 
   return `/${artistSlug}/${baseMatch[1]}/`;
 }
 
-const EXCLUDED_CIFRA_CLUB_SLUGS = new Set([
-  "cifras", "violao", "guitarra", "musica", "artistas", "tablaturas",
-  "busca", "noticias", "ranking", "letras", "acordes", "ukulele",
-  "cavaquinho", "contrabaixo", "teclado", "bateria", "gaita",
-]);
-
-function extractSongLinksFromSearchPage(html: string): string[] {
-  const unique = new Set<string>();
-  const slugPattern = /^[a-z0-9][a-z0-9-]*$/;
-
-  for (const match of html.matchAll(/href="([^"]+)"/gi)) {
-    let href = match[1] ?? "";
-    if (href.startsWith("http://") || href.startsWith("https://")) {
-      if (!href.includes("cifraclub.com.br")) continue;
-      href = href.replace(/^https?:\/\/(?:www\.)?cifraclub\.com\.br/, "");
-    }
-    const path = (href.split("?")[0] ?? "").split("#")[0] ?? "";
-    const parts = path.split("/").filter(Boolean);
-    if (
-      parts.length === 2 &&
-      !EXCLUDED_CIFRA_CLUB_SLUGS.has(parts[0] ?? "") &&
-      slugPattern.test(parts[0] ?? "") &&
-      slugPattern.test(parts[1] ?? "")
-    ) {
-      unique.add(`/${parts[0]}/${parts[1]}/`);
-    }
-  }
-  return [...unique];
-}
-
-function scoreSearchResult(path: string, query: string): number {
-  const parts = path.split("/").filter(Boolean);
-  const combined = normalizeForMatch(`${parts[0] ?? ""} ${parts[1] ?? ""}`.replace(/-/g, " "));
-  const target = normalizeForMatch(query);
-  const targetTokens = target.split(" ").filter(Boolean);
-  if (combined === target) return 10_000;
-  let score = 0;
-  if (combined.includes(target) || target.includes(combined)) score += 2_000;
-  for (const token of targetTokens) {
-    if (combined.includes(token)) score += 100;
-  }
-  return score;
-}
-
 function extractSongCandidatesFromArtistPage(
   html: string,
   artistSlug: string,
@@ -610,45 +566,28 @@ export class SongsService {
       parts.length >= 2 ? [parts[0]!, parts.slice(1).join(" - ")] : [query, ""];
     const artistSlug = slugifyCifraClub(queryArtist);
 
-    if (artistSlug) {
-      try {
-        const res = await fetch(`${CIFRA_CLUB_BASE_URL}/${artistSlug}/`, fetchOpts);
-        if (res.ok) {
-          const html = await res.text();
-          const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-          const artistName = decodeHtmlEntities((h1Match?.[1] ?? queryArtist).trim());
-          const candidates = extractSongCandidatesFromArtistPage(html, artistSlug, artistName);
-          if (candidates.length > 0) {
-            if (!querySong) return candidates.slice(0, 10);
-            return candidates
-              .map((c) => ({ ...c, _s: scoreSongPath(c.url.replace(CIFRA_CLUB_BASE_URL, ""), querySong) }))
-              .sort((a, b) => b._s - a._s)
-              .slice(0, 10)
-              .map(({ _s: _, ...c }) => c);
-          }
-        }
-      } catch { /* try next */ }
-    }
+    if (!artistSlug) return [];
 
     try {
-      const res = await fetch(`${CIFRA_CLUB_BASE_URL}/busca/?q=${encodeURIComponent(query)}`, fetchOpts);
-      if (res.ok) {
-        const html = await res.text();
-        const links = extractSongLinksFromSearchPage(html);
-        if (links.length > 0) {
-          return links.slice(0, 10).map((path) => {
-            const segs = path.split("/").filter(Boolean);
-            return {
-              title: decodeHtmlEntities((segs[1] ?? "").replace(/-/g, " ")),
-              artist: decodeHtmlEntities((segs[0] ?? "").replace(/-/g, " ")),
-              url: `${CIFRA_CLUB_BASE_URL}${path}`,
-            };
-          });
-        }
-      }
-    } catch { /* fall through */ }
+      const res = await fetch(`${CIFRA_CLUB_BASE_URL}/${artistSlug}/`, fetchOpts);
+      if (!res.ok) return [];
 
-    return [];
+      const html = await res.text();
+      const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+      const artistName = decodeHtmlEntities((h1Match?.[1] ?? queryArtist).trim());
+      const candidates = extractSongCandidatesFromArtistPage(html, artistSlug, artistName);
+
+      if (candidates.length === 0) return [];
+      if (!querySong) return candidates.slice(0, 10);
+
+      return candidates
+        .map((c) => ({ ...c, _s: scoreSongPath(c.url.replace(CIFRA_CLUB_BASE_URL, ""), querySong) }))
+        .sort((a, b) => b._s - a._s)
+        .slice(0, 10)
+        .map(({ _s: _, ...c }) => c);
+    } catch {
+      return [];
+    }
   }
 
   private async lookupCifraClubChart(input: ImportCifraClubInput): Promise<CifraClubLookupResult> {
@@ -730,45 +669,22 @@ export class SongsService {
 
   private async resolveCifraClubBySearch(query: string): Promise<string> {
     const fetchOpts = { method: "GET", headers: CIFRA_CLUB_FETCH_HEADERS, redirect: "follow" } as const;
-
-    // Strategy 1: treat query as artist name → fetch artist page → pick first/best song
     const artistSlug = slugifyCifraClub(query);
+
     if (artistSlug) {
       try {
-        const artistPageUrl = `${CIFRA_CLUB_BASE_URL}/${artistSlug}/`;
-        const artistResponse = await fetch(artistPageUrl, fetchOpts);
-        if (artistResponse.ok) {
-          const artistHtml = await artistResponse.text();
-          const paths = extractSongPathsFromArtistPage(artistHtml, artistSlug);
+        const res = await fetch(`${CIFRA_CLUB_BASE_URL}/${artistSlug}/`, fetchOpts);
+        if (res.ok) {
+          const html = await res.text();
+          const paths = extractSongPathsFromArtistPage(html, artistSlug);
           if (paths.length > 0) {
             const scored = paths
               .map((path) => ({ path, score: scoreSongPath(path, query) }))
               .sort((a, b) => b.score - a.score);
-            const best = scored[0]?.score > 0 ? scored[0].path : paths[0]!;
-            return `${CIFRA_CLUB_BASE_URL}${best}`;
+            return `${CIFRA_CLUB_BASE_URL}${scored[0]?.score > 0 ? scored[0]!.path : paths[0]!}`;
           }
         }
-      } catch {
-        // try next strategy
-      }
-    }
-
-    // Strategy 2: search page (works if SSR; Google CSE may not return links server-side)
-    try {
-      const searchUrl = `${CIFRA_CLUB_BASE_URL}/busca/?q=${encodeURIComponent(query)}`;
-      const searchResponse = await fetch(searchUrl, fetchOpts);
-      if (searchResponse.ok) {
-        const searchHtml = await searchResponse.text();
-        const links = extractSongLinksFromSearchPage(searchHtml);
-        if (links.length > 0) {
-          const best = links
-            .map((path) => ({ path, score: scoreSearchResult(path, query) }))
-            .sort((a, b) => b.score - a.score)[0]?.path ?? links[0]!;
-          return `${CIFRA_CLUB_BASE_URL}${best}`;
-        }
-      }
-    } catch {
-      // fall through
+      } catch { /* fall through */ }
     }
 
     throw new BadRequestException(
