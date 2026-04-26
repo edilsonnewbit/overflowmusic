@@ -22,25 +22,6 @@ type ImportTxtInput = {
   songId?: string;
 };
 
-type ImportCifraClubInput = {
-  title?: string;
-  artist?: string;
-  songId?: string;
-  url?: string;
-};
-
-type CifraClubCandidate = {
-  title: string;
-  artist: string;
-  url: string;
-};
-
-type CifraClubLookupResult = {
-  sourceUrl: string;
-  content: string;
-  parsed: ReturnType<typeof parseChordTxt>;
-};
-
 type TrackType =
   | "CLICK" | "GUIDE_VOCAL" | "FULL_BAND" | "PAD"
   | "BASS" | "STEM_KEYS" | "STEM_GUITAR" | "STEM_DRUMS" | "STEM_BACKING";
@@ -65,31 +46,11 @@ function extractFolderIdFromUrl(url: string): string | null {
   return match?.[1] ?? null;
 }
 
-const CIFRA_CLUB_BASE_URL = "https://www.cifraclub.com.br";
-
 const CIFRA_CLUB_FETCH_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
 };
-
-function escapeRegExp(input: string): string {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function normalizeForMatch(input: string): string {
-  return input
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/&/g, " e ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function slugifyCifraClub(input: string): string {
-  return normalizeForMatch(input).replace(/\s+/g, "-");
-}
 
 function decodeHtmlEntities(input: string): string {
   const namedEntities: Record<string, string> = {
@@ -217,84 +178,6 @@ function buildImportContentFromCifraClubPage(html: string): { content: string; t
   const header = artist ? `${artist} - ${title}` : title;
   const content = [header, key ? `Tom: ${key}` : null, "", chartBody].filter(Boolean).join("\n");
   return { content, title, artist };
-}
-
-function normalizeCifraClubSongPath(path: string, artistSlug: string): string | null {
-  const cleanPath = path.split("?")[0]?.split("#")[0] ?? "";
-  const baseMatch = cleanPath.match(new RegExp(`^/${escapeRegExp(artistSlug)}/([^/]+)(?:/)?`));
-  if (!baseMatch?.[1]) {
-    return null;
-  }
-
-  const invalidSuffixes = ["/letra/", "/guitarpro/", "/imprimir.html", "/tab/", "/partituras/"];
-  if (invalidSuffixes.some((suffix) => cleanPath.includes(suffix))) {
-    return null;
-  }
-
-  return `/${artistSlug}/${baseMatch[1]}/`;
-}
-
-function extractSongCandidatesFromArtistPage(
-  html: string,
-  artistSlug: string,
-  artistName: string,
-): CifraClubCandidate[] {
-  const linkRegex = /<a\b[^>]*\bhref="([^"]*)"[^>]*>([^<]{2,80})<\/a>/gi;
-  const seen = new Set<string>();
-  const results: CifraClubCandidate[] = [];
-  for (const match of html.matchAll(linkRegex)) {
-    const href = match[1] ?? "";
-    const text = decodeHtmlEntities((match[2] ?? "").trim());
-    const normalized = normalizeCifraClubSongPath(href, artistSlug);
-    if (normalized && !seen.has(normalized) && text) {
-      seen.add(normalized);
-      results.push({ title: text, artist: artistName, url: `${CIFRA_CLUB_BASE_URL}${normalized}` });
-    }
-  }
-  return results;
-}
-
-function extractSongPathsFromArtistPage(html: string, artistSlug: string): string[] {
-  const hrefRegex = /href="([^"]+)"/gi;
-  const unique = new Set<string>();
-
-  for (const match of html.matchAll(hrefRegex)) {
-    const href = match[1] ?? "";
-    const normalized = normalizeCifraClubSongPath(href, artistSlug);
-    if (normalized) {
-      unique.add(normalized);
-    }
-  }
-
-  return [...unique];
-}
-
-function scoreSongPath(path: string, title: string): number {
-  const target = normalizeForMatch(title);
-  const targetTokens = target.split(" ").filter(Boolean);
-  const songSlug = path.split("/").filter(Boolean)[1] ?? "";
-  const songLabel = normalizeForMatch(songSlug.replace(/-/g, " "));
-
-  if (!songLabel) {
-    return 0;
-  }
-
-  if (songLabel === target) {
-    return 10_000;
-  }
-
-  let score = 0;
-  if (songLabel.includes(target) || target.includes(songLabel)) {
-    score += 2_000;
-  }
-
-  for (const token of targetTokens) {
-    if (songLabel.includes(token)) {
-      score += 100;
-    }
-  }
-
-  return score;
 }
 
 @Injectable()
@@ -482,27 +365,17 @@ export class SongsService {
     return { ok: true, parsed };
   }
 
-  async previewCifraClub(input: ImportCifraClubInput) {
-    const lookup = await this.lookupCifraClubChart(input);
-    return {
-      ok: true,
-      parsed: lookup.parsed,
-      sourceUrl: lookup.sourceUrl,
-      content: lookup.content,
-    };
+  async previewCifraClubUrl(url: string) {
+    const response = await fetch(url, { method: "GET", headers: CIFRA_CLUB_FETCH_HEADERS, redirect: "follow" });
+    if (!response.ok) throw new BadRequestException("Falha ao carregar a página do Cifra Club.");
+    const html = await response.text();
+    const built = buildImportContentFromCifraClubPage(html);
+    return { ok: true, parsed: parseChordTxt(built.content), sourceUrl: url, content: built.content };
   }
 
-  async importFromCifraClub(input: ImportCifraClubInput) {
-    const lookup = await this.lookupCifraClubChart(input);
-    const result = await this.importTxt({
-      content: lookup.content,
-      songId: input.songId,
-    });
-
-    return {
-      ...result,
-      sourceUrl: lookup.sourceUrl,
-    };
+  async importFromCifraClubUrl(input: { url: string; songId?: string }) {
+    const preview = await this.previewCifraClubUrl(input.url);
+    return this.importTxt({ content: preview.content, songId: input.songId });
   }
 
   async listCharts(songId: string) {
@@ -551,145 +424,6 @@ export class SongsService {
 
     const parsed = parseChordTxt(content);
     return { content, parsed };
-  }
-
-  async searchCifraClubCandidates(query: string): Promise<{ ok: true; candidates: CifraClubCandidate[] }> {
-    const q = query.trim();
-    if (!q) return { ok: true, candidates: [] };
-    return { ok: true, candidates: await this.findCifraClubCandidates(q) };
-  }
-
-  private async findCifraClubCandidates(query: string): Promise<CifraClubCandidate[]> {
-    const fetchOpts = { method: "GET" as const, headers: CIFRA_CLUB_FETCH_HEADERS, redirect: "follow" as const };
-    const parts = query.split(" - ").map((p) => p.trim()).filter(Boolean);
-    const [queryArtist, querySong] =
-      parts.length >= 2 ? [parts[0]!, parts.slice(1).join(" - ")] : [query, ""];
-    const artistSlug = slugifyCifraClub(queryArtist);
-
-    if (!artistSlug) return [];
-
-    try {
-      const res = await fetch(`${CIFRA_CLUB_BASE_URL}/${artistSlug}/`, fetchOpts);
-      if (!res.ok) return [];
-
-      const html = await res.text();
-      const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-      const artistName = decodeHtmlEntities((h1Match?.[1] ?? queryArtist).trim());
-      const candidates = extractSongCandidatesFromArtistPage(html, artistSlug, artistName);
-
-      if (candidates.length === 0) return [];
-      if (!querySong) return candidates.slice(0, 10);
-
-      return candidates
-        .map((c) => ({ ...c, _s: scoreSongPath(c.url.replace(CIFRA_CLUB_BASE_URL, ""), querySong) }))
-        .sort((a, b) => b._s - a._s)
-        .slice(0, 10)
-        .map(({ _s: _, ...c }) => c);
-    } catch {
-      return [];
-    }
-  }
-
-  private async lookupCifraClubChart(input: ImportCifraClubInput): Promise<CifraClubLookupResult> {
-    const title = (input.title || "").trim();
-    const artist = (input.artist || "").trim();
-    const directUrl = (input.url || "").trim();
-
-    if (!directUrl && !title) {
-      throw new BadRequestException("title or url is required");
-    }
-
-    let sourceUrl: string;
-    if (directUrl) {
-      sourceUrl = directUrl;
-    } else if (artist) {
-      sourceUrl = await this.resolveCifraClubSongUrl(title, artist);
-    } else {
-      const parts = title.split(" - ").map((p) => p.trim()).filter(Boolean);
-      if (parts.length >= 2) {
-        sourceUrl = await this.resolveCifraClubSongUrl(parts.slice(1).join(" - "), parts[0]!);
-      } else {
-        sourceUrl = await this.resolveCifraClubBySearch(title);
-      }
-    }
-    const response = await fetch(sourceUrl, {
-      method: "GET",
-      headers: CIFRA_CLUB_FETCH_HEADERS,
-      redirect: "follow",
-    });
-
-    if (!response.ok) {
-      throw new BadRequestException("Falha ao carregar a pagina encontrada no Cifra Club.");
-    }
-
-    const html = await response.text();
-    const built = buildImportContentFromCifraClubPage(html);
-    return {
-      sourceUrl,
-      content: built.content,
-      parsed: parseChordTxt(built.content),
-    };
-  }
-
-  private async resolveCifraClubSongUrl(title: string, artist: string): Promise<string> {
-    const artistSlug = slugifyCifraClub(artist);
-    const titleSlug = slugifyCifraClub(title);
-
-    if (!artistSlug || !titleSlug) {
-      throw new BadRequestException("title and artist are required for automatic lookup");
-    }
-
-    const artistPageUrl = `${CIFRA_CLUB_BASE_URL}/${artistSlug}/`;
-    const directSongUrl = `${CIFRA_CLUB_BASE_URL}/${artistSlug}/${titleSlug}/`;
-
-    try {
-      const artistPageResponse = await fetch(artistPageUrl, {
-        method: "GET",
-        headers: CIFRA_CLUB_FETCH_HEADERS,
-        redirect: "follow",
-      });
-
-      if (artistPageResponse.ok) {
-        const artistPageHtml = await artistPageResponse.text();
-        const candidatePaths = extractSongPathsFromArtistPage(artistPageHtml, artistSlug)
-          .map((path) => ({ path, score: scoreSongPath(path, title) }))
-          .filter((candidate) => candidate.score > 0)
-          .sort((left, right) => right.score - left.score);
-
-        if (candidatePaths[0]?.path) {
-          return `${CIFRA_CLUB_BASE_URL}${candidatePaths[0].path}`;
-        }
-      }
-    } catch {
-      // fallback below
-    }
-
-    return directSongUrl;
-  }
-
-  private async resolveCifraClubBySearch(query: string): Promise<string> {
-    const fetchOpts = { method: "GET", headers: CIFRA_CLUB_FETCH_HEADERS, redirect: "follow" } as const;
-    const artistSlug = slugifyCifraClub(query);
-
-    if (artistSlug) {
-      try {
-        const res = await fetch(`${CIFRA_CLUB_BASE_URL}/${artistSlug}/`, fetchOpts);
-        if (res.ok) {
-          const html = await res.text();
-          const paths = extractSongPathsFromArtistPage(html, artistSlug);
-          if (paths.length > 0) {
-            const scored = paths
-              .map((path) => ({ path, score: scoreSongPath(path, query) }))
-              .sort((a, b) => b.score - a.score);
-            return `${CIFRA_CLUB_BASE_URL}${scored[0]?.score > 0 ? scored[0]!.path : paths[0]!}`;
-          }
-        }
-      } catch { /* fall through */ }
-    }
-
-    throw new BadRequestException(
-      `Nao foi possivel encontrar "${query}" no Cifra Club. Tente o formato "Artista - Nome da Musica", por exemplo "Banda Catedral - Dom e Dono".`,
-    );
   }
 
   // ── Tracks (multitrack player) ────────────────────────────────────────────

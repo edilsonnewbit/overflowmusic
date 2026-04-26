@@ -30,12 +30,6 @@ type ParsedChordPreview = {
 
 type ImportSource = "text" | "file" | "cifraClub" | null;
 
-type CifraClubCandidate = {
-  title: string;
-  artist: string;
-  url: string;
-};
-
 type ApiResult<T> = {
   ok: boolean;
   message?: string;
@@ -64,17 +58,10 @@ function SongImportContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const queryHint = searchParams.get("q")?.trim() ?? "";
-  const titleParam = searchParams.get("title")?.trim() ?? "";
-  const artistParam = searchParams.get("artist")?.trim() ?? "";
-  const initialQuery = artistParam && titleParam
-    ? `${artistParam} - ${titleParam}`
-    : titleParam || queryHint;
   const [txtPreviewInput, setTxtPreviewInput] = useState("");
   const [txtPreviewFile, setTxtPreviewFile] = useState<File | null>(null);
-  const [cifraClubQuery, setCifraClubQuery] = useState(initialQuery);
+  const [cifraClubUrl, setCifraClubUrl] = useState("");
   const [cifraClubSourceUrl, setCifraClubSourceUrl] = useState("");
-  const [candidates, setCandidates] = useState<CifraClubCandidate[]>([]);
-  const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [targetSongId, setTargetSongId] = useState("");
   const [songs, setSongs] = useState<SongListItem[]>([]);
   const [previewData, setPreviewData] = useState<ParsedChordPreview | null>(null);
@@ -85,11 +72,6 @@ function SongImportContent() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [loadingSongs, setLoadingSongs] = useState(false);
   const [status, setStatus] = useState("Pronto");
-
-  useEffect(() => {
-    setCifraClubQuery(initialQuery);
-    setCandidates([]);
-  }, [initialQuery]);
 
   useEffect(() => {
     if (!user) return;
@@ -166,35 +148,6 @@ function SongImportContent() {
     }
   }
 
-  async function searchForCandidates() {
-    const query = cifraClubQuery.trim();
-    if (!query) {
-      setStatus("Informe o nome da música ou artista para buscar");
-      return;
-    }
-    setCandidatesLoading(true);
-    setCandidates([]);
-    setPreviewData(null);
-    try {
-      const response = await fetch("/api/songs/import/cifra-club/candidates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: query }),
-      });
-      const body = await parseJson<{ candidates: CifraClubCandidate[] }>(response);
-      if (!body.candidates.length) {
-        setStatus(`Nenhum resultado para "${query}". Tente "Artista - Nome da Música".`);
-      } else {
-        setCandidates(body.candidates);
-        setStatus(`${body.candidates.length} resultado(s) encontrado(s) — clique para visualizar`);
-      }
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Falha na busca");
-    } finally {
-      setCandidatesLoading(false);
-    }
-  }
-
   async function previewFromUrl(url: string) {
     setPreviewLoading(true);
     setStatus("Carregando cifra...");
@@ -258,7 +211,7 @@ function SongImportContent() {
         setLastImportedChartVersion(body.chordChart?.version ?? null);
       } else {
         if (!cifraClubSourceUrl) {
-          throw new Error("Selecione uma cifra na lista de resultados antes de salvar");
+          throw new Error("Cole a URL do Cifra Club e carregue a pré-visualização antes de salvar");
         }
         const payload: { url: string; songId?: string } = { url: cifraClubSourceUrl };
         if (cleanSongId) payload.songId = cleanSongId;
@@ -320,35 +273,24 @@ function SongImportContent() {
 
           <div style={importSectionStyle}>
             <div style={{ display: "grid", gap: 10 }}>
-              <p style={sectionLabelStyle}>Busca automática no Cifra Club</p>
+              <p style={sectionLabelStyle}>URL do Cifra Club</p>
               <div style={{ display: "flex", gap: 8 }}>
                 <input
-                  value={cifraClubQuery}
-                  onChange={(event) => { setCifraClubQuery(event.target.value); setCandidates([]); }}
-                  onKeyDown={(event) => { if (event.key === "Enter") void searchForCandidates(); }}
-                  placeholder="Ex: Banda Catedral ou Banda Catedral - Nome da Música"
+                  value={cifraClubUrl}
+                  onChange={(event) => setCifraClubUrl(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === "Enter") void previewFromUrl(cifraClubUrl); }}
+                  placeholder="https://www.cifraclub.com.br/artista/nome-da-musica/"
                   style={{ ...inputStyle, flex: 1 }}
                 />
-                <button type="button" style={primaryButtonStyle} onClick={() => void searchForCandidates()}>
-                  {candidatesLoading ? "Buscando..." : "Buscar"}
+                <button
+                  type="button"
+                  style={primaryButtonStyle}
+                  onClick={() => void previewFromUrl(cifraClubUrl)}
+                  disabled={previewLoading}
+                >
+                  {previewLoading ? "Carregando..." : "Carregar cifra"}
                 </button>
               </div>
-              {candidates.length > 0 && (
-                <div style={candidateListStyle}>
-                  {candidates.map((c) => (
-                    <button
-                      key={c.url}
-                      type="button"
-                      style={candidateItemStyle}
-                      onClick={() => void previewFromUrl(c.url)}
-                      disabled={previewLoading}
-                    >
-                      <span style={{ fontWeight: 700, color: "#e2eaf5" }}>{c.title}</span>
-                      <span style={{ color: "#7cf2a2", fontSize: 12, marginLeft: 8 }}>{c.artist}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
@@ -558,30 +500,6 @@ const compactLinkStyle: CSSProperties = {
   textDecoration: "none",
   fontWeight: 700,
   fontSize: 13,
-};
-
-const candidateListStyle: CSSProperties = {
-  display: "grid",
-  gap: 4,
-  background: "rgba(6, 18, 29, 0.85)",
-  border: "1px solid #31557c",
-  borderRadius: 12,
-  padding: 8,
-  maxHeight: 280,
-  overflowY: "auto",
-};
-
-const candidateItemStyle: CSSProperties = {
-  background: "transparent",
-  border: "none",
-  borderRadius: 8,
-  padding: "8px 10px",
-  textAlign: "left",
-  cursor: "pointer",
-  color: "#e2eaf5",
-  fontSize: 13,
-  lineHeight: 1.4,
-  transition: "background 0.15s",
 };
 
 const inlineSourceLinkStyle: CSSProperties = {
